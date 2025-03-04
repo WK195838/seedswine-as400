@@ -1,0 +1,233 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR042                                        *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/02/25                                      *
+      * UPDATE DATE  : 81/04/18 STEPHANIE   訂單批次檢查           *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :分車準備明細表                               *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.16 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FARAALF01IF  E           K        DISK
+     FIMR042D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      501 505 $WRHUS
+     I                                      513 513 $WRHTY
+     I                                      523 5240PRINT
+     I                                      523 524 PRINTC
+     I                                      598 5990$PRTID
+     I*                                     601 602 DSE01
+     I                                      603 603 DSEL
+     I                                      609 613 DSE07
+     I                                      609 609 DSE07L
+     I*(MM/DD/YY)
+     I                                      621 6260DSE06
+     I*(YY/MM/DD)
+B2MODI                                      640 6470YSE06
+     I*
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+B2000C           *LIKE     DEFN AA02      WAA02
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+     C           *IN87     PARM *IN87     IN87    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N87N97N98          EXSR RTN010                     .INIT SCREEN
+     C  N87N97N98          EXSR RTN020                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C*訂單批次作業檢查碼
+  02-C           *IN87     IFEQ '1'
+    C                     SETON                       99
+  02-C                     END
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  03-C           *IN03     IFEQ '0'
+  04-C           *IN04     IFEQ '1'
+    C**********************
+    C*  F4 PROMPT PROCESS *
+    C**********************
+    C                     EXSR RTNF4
+  04*C                     ELSE
+    C                     EXSR RTN100                     .CHECK      ?
+  04-C                     END
+  03-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*                    MOVE *BLANK    DSE01
+|    C                     MOVE *BLANK    DSE07
+|    C                     Z-ADD$EGMDY    DSE06
+|    C                     Z-ADD0         YSE06
+      *印表機
+     C           PRINTC    IFNE *BLANKS
+     C                     Z-ADDPRINT     $PRTID
+     C                     ELSE
+     C                     Z-ADD0         $PRTID
+     C                     END
+      *
+|    C                     Z-ADD1         $EVR
+|    C                     Z-ADD1         $CPY
+M001AC                     Z-ADD0         W6      60
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN020....INIT SCREEN
+      *===============================================================*
+01===C           RTN020    BEGSR
+|    C*
+     C                     SETON                     38
+     C           $WRHUS    IFNE '*ALL '
+     C           $WRHUS    ANDNE*BLANKS
+     C                     SETOF                     38
+|    C                     MOVEL$WRHUS    DSE07
+     C                     END
+|    C*
+|    C*
+     C           DSE07     IFEQ 'W0001'
+     C                     MOVEL'1'       DSEL
+     C                     ELSE
+     C                     MOVEL'3'       DSEL
+     C                     END
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+      *USE TIME
+B2000C                     TIME           TIME   120
+B2000C                     MOVELTIME      HOUR    20
+     C           HOUR      IFGE 0
+     C           HOUR      ANDLE5
+     C                     SETON                     669699
+     C                     END
+|    C   99                GOTO END100
+|    C*公司代號
+| 01-C*          DSE01     IFEQ *BLANK
+|   C*                    SETON                     609599
+| 01-C*                    END
+|    C*  99                GOTO END100
+|    C*
+|    C*物流點
+| 08-C           DSE07     IFEQ *BLANK
+|   C                     SETON                     659599
+| 08-C                     END
+|    C   99                GOTO END100
+|    C*
+     C           $WRHUS    IFNE '*ALL  '
+     C           $WRHUS    IFNE *BLANKS
+     C           DSE07     IFNE $WRHUS
+     C                     SETON                     659699
+     C                     END
+     C                     ELSE
+     C           DSE07L    IFNE $WRHTY
+     C                     SETON                     659699
+     C                     END
+     C                     END
+     C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*(CHECK DATE)-送貨日期
+| 09-C           DSE06     IFEQ 0
+|   C                     SETON                     669599
+| 09-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C                     CALL 'P09'
+|    C                     PARM DSE06     P0901I  60
+|    C                     PARM           P0911O  1
+| 10-C           P0911O    IFEQ 'N'
+|   C                     SETON                     669399
+| 10-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*(CHANGE TO CHINESE DATE)
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM DSE06     S001I2  60
+B2MODC           W6        PARM           S001OI  60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M001AC                     MOVE HB2@T8    YSE06
+|    C*
+B2000C                     MOVELYSE06     WAA02
+|    C*日期是否小於開立日期
+B2000C           WAA02     SETLLAA0
+B2000C           WAA02     READEAA0                      46
+     C           *IN46     DOWEQ'0'
+B2000C           AA09      IFGT YSE06
+     C*                    SETON                     668899
+|    C   99                GOTO END100
+     C                     END
+B2000C           WAA02     READEAA0                      46
+     C                     END
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C*
+| 02-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE41
+|   C           D#COL     ANDLE42
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+03===C           ENDF4     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+M001AC/COPY HBP2CVTR
+

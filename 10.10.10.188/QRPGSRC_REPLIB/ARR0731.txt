@@ -1,0 +1,159 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : ARR0732                                       *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 09/01/93                                      *
+      * UPDATE DATE  : 03/09/94 AN MING HSIA                         *
+      * UPDATA REMARK: 未分配金額為至折讓日之金額　　              *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :遞延銷退餘額明細表                           *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /*                                                          */
+     /*=============================================================*/
+      ****************************************************************
+     FSOSGPF  IP  E           K        DISK
+     FSOSHPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FARACLF04IF  E           K        DISK
+     FARADPF  IF  E           K        DISK
+     FREWF83  O   E           K        DISK
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I*
+     I                                      620 620 DMD07S
+     I                                      621 621 DMD07E
+     I                                      624 625 DMD08S
+     I                                      626 627 DMD08E
+     I*折讓日期
+B2MODI                                      652 6590YSG26S
+B2MODI                                      660 6670YSG26E
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN AC05      WAC05            *START KEY
+     C           *LIKE     DEFN AC06      WSG09            *START KEY
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSG     KLIST
+     C                     KFLD           SG01
+     C                     KFLD           SG04
+     C                     KFLD           SG05
+     C                     KFLD           WAC05
+     C                     KFLD           WSG09
+     C           KEYWF     KLIST
+     C                     KFLD           SG01
+     C                     KFLD           SG04
+     C                     KFLD           SG26
+     C                     KFLD           SG09
+     C           KEYAD     KLIST
+     C                     KFLD           AC01
+     C                     KFLD           AC02
+     C                     KFLD           AC03
+     C                     KFLD           AC04
+     C                     KFLD           AC05
+     C                     KFLD           AC06
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN000
+     C                     EXSR RTN010
+     CLR 10                SETON                     LR
+     C*==============================================================*
+     C*          RTN000.... INITIAL
+     C*==============================================================*
+01===C           RTN000    BEGSR
+|    C                     SETON                     10
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN010.... JUDGE CHANNEL
+     C*==============================================================*
+02===C           RTN010    BEGSR
+|    C*
+|    C           SG04      CHAINMD0                  40
+| 01-C           *IN40     IFEQ '0'
+| 02-C           MD07      IFGE DMD07S
+|   C           MD07      ANDLEDMD07E
+|   C           MD08      ANDGEDMD08S
+|   C           MD08      ANDLEDMD08E
+|   C                     EXSR RTN020
+| 02-C                     END
+| 01-C                     END
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN020.... CHAIN ARACLF04
+     C*==============================================================*
+03===C           RTN020    BEGSR
+|    C*
+|    C                     MOVEL'50'      WAC05
+|    C                     MOVELSG09      WSG09
+|    C           KEYSG     CHAINAC0                  40
+|    C                     EXSR RTN100
+|    C*未分配金額不為零則尋找退貨明細
+| 01-C           WF8306    IFNE 0
+|   C                     EXSR RTN110
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET DETAIL
+     C*==============================================================*
+04===C           RTN100    BEGSR
+|    C*
+|    C                     MOVELSG01      WF8301
+|    C                     MOVELSG04      WF8302
+|    C                     MOVELSG05      WF8303
+B2000C                     MOVELSG26      WF8304
+|    C                     MOVELSG09      WF8305
+|    C                     Z-ADDAC08      WF8306
+|    C                     EXSR RTN120
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN110....WRITE WORK FILE
+      *==============================================================*
+05===C           RTN110    BEGSR
+|    C***
+|    C           SG02      SETLLSH0
+|    C           SG02      READESH0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C                     MOVELSH03      WF8307
+|   C                     Z-ADDSH12      WF8308
+|   C                     Z-ADDSH13      WF8309
+|   C                     Z-ADDSH13      WF8309
+|   C                     Z-ADDSH07      WF8311
+| 02-C           SH12      IFNE 0
+|   C           SH07      DIV  SH12      WF8310
+| 02*C                     ELSE
+|   C                     Z-ADD0         WF8310
+| 02-C                     END
+|   C                     WRITEWF830
+|   C           SG02      READESH0                      41
+| 01-C                     END
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN120....WRITE WORK FILE
+      *==============================================================*
+06===C           RTN120    BEGSR
+|    C*
+B2000C           KEYAD     SETLLAD0
+B2000C           KEYAD     READEAD0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C*未分配金額分配日期在折讓日期範圍內
+B2000C           AD12      IFGE YSG26S
+|   C           AD12      ANDLEYSG26E
+|   C                     SUB  AD08      WF8306
+| 02-C                     END
+B2000C           KEYAD     READEAD0                      41
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+

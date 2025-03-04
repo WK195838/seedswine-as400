@@ -1,0 +1,243 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARR0601                                    *
+     A*    AUTHOR       : A1118  PHILIP                              *
+     A*    DATE WRITTEN : 81/04/28                                   *
+     A*    UPDATE DATE  : 81/04/30  每月改成每兩月統計             *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收帳款子系統                            *
+     A*    REMARK       :統一發票申報錯誤報表列印及資料轉檔        *
+      *===============================================================
+      * MODI CODE |  AUTHOR  |  DATE  | DESCRIPTION
+      *---------------------------------------------------------------
+      *  M001     | MICHELLE |02.01.04|讀取發票檔得非營業人稅額
+      *===============================================================
+     A****************************************************************
+     FSOSIPF  IP  E           K        DISK
+     FSOSSPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FREWF41  UF  E           K        DISK                      A
+     FREWF42  UF  E           K        DISK                      A
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 602 DSI01
+     I*                                     603 604 DSI01E
+     I                                      613 6160DSI21S
+     I                                      617 6200DSI21E
+M001AI                                      621 6240WSI21S
+M001AI                                      625 6280WSI21E
+B2MODI                                      680 680 ERRCD
+M001AI                                      850 855 YMD8S
+M001AI                                      858 863 YMD8E
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYWF1    KLIST
+     C                     KFLD           WF4101
+     C                     KFLD           WF4102
+     C           KEYWF2    KLIST
+     C                     KFLD           WF4201
+     C                     KFLD           WF4202
+     C                     KFLD           WF4203
+     C                     KFLD           WF4213
+     C           KEYME     KLIST
+     C                     KFLD           SI12
+     C                     KFLD           SI13
+     C           KEYSS     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+      *==============================================================*
+      *                    MWF41N ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN010
+     C*新增資料
+     C                     EXSR RTN100                     *DATA->FILE
+     C*
+      *=========================================================*
+      *          RTN010....INIT                                 *
+      *=========================================================*
+01===C           RTN010    BEGSR
+|    C*SYSTEM DATE
+|    C                     Z-ADD0         DATE    60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM $EGMDY    S001I2  60
+|    C           DATE      PARM           S001O1  60
+|    C                     SETON                     10
+|    C                     MOVE *BLANK    ERRCD
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN100....DATA TO HEADING FILE                 *
+      *=========================================================*
+02===C           RTN100    BEGSR
+|    C**GET發票公司
+|    C           SI01      CHAIN#B0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #B17
+| 01-C                     END
+|    C*
+|    C                     MOVE #B17      WF4101
+B2000C                     MOVELYMD8S     WF4102
+|    C***每月            MOVELSI21      WF4102
+|    C*
+|    C           KEYWF1    CHAINWF410                40
+| 02-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN110                     *INITIAL
+|   C                     EXSR RTN120                     *MOVE DATA
+|   C*WRITE HEADING FILE
+|   C                     WRITEWF410
+| 02*C                     ELSE
+|   C                     EXSR RTN120                     *UPDATE
+|   C*UPDATE HEADING FILE
+|   C                     UPDATWF410
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN110....INITIAL  BEFORE WRITE HEADING        *
+      *=========================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C*                    MOVE *BLANKS   WF4101
+|    C*                    Z-ADD0         WF4102
+|    C                     Z-ADD0         WF4103
+|    C                     Z-ADD0         WF4104
+|    C                     Z-ADD0         WF4105
+|    C                     Z-ADD0         WF4106
+|    C                     Z-ADD0         WF4107
+|    C                     Z-ADD0         WF4108
+|    C                     Z-ADD0         WF4109
+|    C                     Z-ADD0         WF4110
+|    C                     Z-ADD0         WF4111
+|    C                     Z-ADD0         WF4112
+M001AC                     Z-ADD0         WF4113
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN120....UPDATE HEADING                       *
+      *=========================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C                     EXSR RTN200
+|    C*
+04===C                     ENDSR
+      *=========================================================*
+      *          RTN200 .. DATA TO DETWF41L
+      *=========================================================*
+05===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE #B17      WF4201
+B2000C                     MOVELYMD8S     WF4202
+|    C**每月             MOVELSI21      WF4202
+|    C                     MOVELSI02      WF4203
+|    C**區域碼
+|    C                     MOVE SI02      SI02C   2
+| 01-C           SI02C     IFGE '00'
+|   C           SI02C     ANDLE'49'
+|   C                     Z-ADD0         WF4213
+| 01*C                     ELSE
+|   C                     Z-ADD50        WF4213
+| 01-C                     END
+|    C*
+|    C           KEYWF2    CHAINWF420                40
+| 02-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN210
+|   C                     EXSR RTN220
+|   C*WRITE DETWF41L FILE
+|   C                     WRITEWF420
+|   C**明細表張數
+|   C                     ADD  1         WF4112
+| 02*C                     ELSE
+|   C                     EXSR RTN220
+|   C*UPDATE DETWF41L FILE
+|   C                     UPDATWF420
+| 02-C                     END
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN210....WRITE DATE TO DETWF41L
+      *==============================================================*
+06===CSR         RTN210    BEGSR
+|    C*
+|    C                     Z-ADD0         WF4204
+|    C                     Z-ADD0         WF4205
+|    C                     Z-ADD0         WF4206
+|    C                     Z-ADD0         WF4207
+|    C                     Z-ADD0         WF4208
+|    C                     Z-ADD0         WF4209
+|    C                     Z-ADD0         WF4210
+|    C                     Z-ADD0         WF4211
+|    C                     Z-ADD0         WF4212
+M001AC                     Z-ADD0         WF4214
+|    C*
+06===CSR                   ENDSR
+      *=========================================================*
+      *          RTN220....UPDATE DETWF41L                        *
+      *=========================================================*
+07===C           RTN220    BEGSR
+|    C*作廢判別
+|    C                     EXSR RTN300
+|    C*
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHECK
+      *==============================================================*
+08===CSR         RTN300    BEGSR
+|    C*
+|    C*作廢判別
+     C           KEYSS     SETLLSS0                      41
+| 01-C           SI19      IFEQ 'V'
+     C           *IN41     OREQ '1'
+|   C                     ADD  1         WF4106
+|   C                     ADD  1         WF4207
+| 01*C                     ELSE
+|   C*
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C           SI17      ANDEQ2
+|   C                     ADD  SI25      WF4109
+M001AC                     ADD  SI24      WF4113
+|   C                     ADD  1         WF4103
+|   C                     ADD  SI25      WF4210
+M001AC                     ADD  SI24      WF4214
+|   C                     ADD  1         WF4204
+|   C           SI22      WHEQ 'D'
+|   C           SI17      ANDEQ3
+|   C                     ADD  SI23      WF4107
+|   C                     ADD  SI24      WF4108
+|   C                     ADD  1         WF4103
+|   C                     ADD  SI23      WF4208
+|   C                     ADD  SI24      WF4209
+|   C                     ADD  1         WF4204
+|   C           SI22      WHEQ 'Z'
+|   C           SI17      ANDEQ2
+|   C           SI22      OREQ 'Z'
+|   C           SI17      ANDEQ3
+|   C                     ADD  SI25      WF4110
+|   C                     ADD  1         WF4104
+|   C                     ADD  SI25      WF4211
+|   C                     ADD  1         WF4205
+|   C           SI22      WHEQ 'B'
+|   C           SI17      ANDEQ2
+|   C           SI22      OREQ 'B'
+|   C           SI17      ANDEQ3
+|   C                     ADD  SI25      WF4111
+|   C                     ADD  1         WF4105
+|   C                     ADD  SI25      WF4212
+|   C                     ADD  1         WF4206
+|   C                     ENDSL
+| 01-C                     END
+|    C*
+08===CSR                   ENDSR
+

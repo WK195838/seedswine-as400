@@ -1,0 +1,358 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARA0101                                    *
+     A*    AUTHOR       : A1118  PHILIP                              *
+     A*    DATE WRITTEN : 81/04/28                                   *
+     A*    UPDATE DATE  : 81/04/30  每月改成每兩月統計             *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收帳款子系統                            *
+     A*    REMARK       :統一發票申報錯誤報表列印及資料轉檔        *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.17 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      *  M002     | MICHELLE |02.01.04|讀取發票檔得非營業人稅額
+     A*================================================================
+     A****************************************************************
+     FSOSIPF  IP  E           K        DISK
+     F                                              KINFSR ERRSR
+     FSOSILF  UF  E           K        DISK
+     F                                              KINFSR ERRSR
+     F            SI0                               KRENAMESI0L
+     FSOSSPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FARAIPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+     FARAJPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+     FARA010APO   E             39     PRINTER
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+M001AI                                      201 2080DATE
+     I                                      598 5990$PRTID
+     I                                      601 602 DSI01
+     I*                                     603 604 DSI01E
+     I                                      613 6160DSI21S
+     I                                      617 6200DSI21E
+B2MODI                                      621 6260WSI21S
+B2MODI                                      627 6320WSI21E
+B2MODI                                      680 680 ERRCD
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYAI     KLIST
+     C                     KFLD           AI01
+     C                     KFLD           AI02
+     C           KEYAJ     KLIST
+     C                     KFLD           AJ01
+     C                     KFLD           AJ02
+     C                     KFLD           AJ03
+     C                     KFLD           AJ13
+     C           KEYME     KLIST
+     C                     KFLD           SI12
+     C                     KFLD           SI13
+     C           KEYSI     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN010
+     C*更新發票主檔資料
+     C*
+     C           KEYSI     CHAINSI0L                 40
+  01-C           *IN40     IFEQ '0'
+    C                     MOVE 'V'       SI20
+B2000C                     Z-ADDDATE      SIXX
+B2000C                     TIME           SIYY
+    C                     MOVE $USER     SIZZ
+    C                     UPDATSI0L                   99
+     C                     EXSR RTN800                     *WRITE LOG
+  01-C                     END
+     C*
+     C*新增資料
+     C           *IN99     IFEQ '0'
+     C                     EXSR RTN100                     *DATA->FILE
+     C                     END
+     C*
+     CLR 38                WRITEPE2
+     CLRN10                EXSR RTNLR
+     C*
+      *=========================================================*
+      *          RTN010....INIT                                 *
+      *=========================================================*
+01===C           RTN010    BEGSR
+|    C*SYSTEM DATE
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+B2???C*                    PARM $EGMDY    S001I2  80
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC*M001D     DATE      PARM           S001O1  80
+|    C                     SETON                     10
+|    C                     MOVE *BLANK    ERRCD
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN100....DATA TO HEADING FILE                 *
+      *=========================================================*
+02===C           RTN100    BEGSR
+|    C**GET發票公司
+|    C           SI01      CHAIN#B0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #B17
+| 01-C                     END
+|    C*
+|    C                     MOVE #B17      AI01
+B2000C                     MOVELWSI21S    AI02
+|    C***每月            MOVELSI21      AI02
+|    C*
+|    C           KEYAI     CHAINAI0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN110                     *INITIAL
+|   C                     EXSR RTN120                     *MOVE DATA
+|   C*WRITE HEADING FILE
+|   C                     WRITEAI0
+| 02*C                     ELSE
+|   C                     EXSR RTN120                     *UPDATE
+|   C*UPDATE HEADING FILE
+|   C                     UPDATAI0
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN110....INITIAL  BEFORE WRITE HEADING        *
+      *=========================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C*                    MOVE *BLANKS   AI01
+|    C*                    Z-ADD0         AI02
+|    C                     Z-ADD0         AI03
+|    C                     Z-ADD0         AI04
+|    C                     Z-ADD0         AI05
+|    C                     Z-ADD0         AI06
+|    C                     Z-ADD0         AI07
+|    C                     Z-ADD0         AI08
+|    C                     Z-ADD0         AI09
+|    C                     Z-ADD0         AI10
+|    C                     Z-ADD0         AI11
+|    C                     Z-ADD0         AI12
+|    C                     Z-ADD0         AIXX
+|    C                     Z-ADD0         AIYY
+|    C                     MOVE *BLANK    AIZZ
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN120....UPDATE HEADING                       *
+      *=========================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C                     EXSR RTN200
+|    C*
+B2000C                     Z-ADDDATE      AIXX
+B2000C                     TIME           AIYY
+|    C                     MOVE $USER     AIZZ
+|    C*
+04===C                     ENDSR
+      *=========================================================*
+      *          RTN200 .. DATA TO DETAIL
+      *=========================================================*
+05===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE #B17      AJ01
+B2000C                     MOVELWSI21S    AJ02
+|    C**每月             MOVELSI21      AJ02
+|    C                     MOVELSI02      AJ03
+|    C**區域碼
+|    C                     MOVE SI02      SI02C   2
+| 01-C           SI02C     IFGE '00'
+|   C           SI02C     ANDLE'49'
+|   C                     Z-ADD0         AJ13
+| 01*C                     ELSE
+|   C                     Z-ADD50        AJ13
+| 01-C                     END
+|    C*
+|    C           KEYAJ     CHAINAJ0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN210
+|   C                     EXSR RTN220
+|   C*WRITE DETAIL FILE
+|   C                     WRITEAJ0
+|   C**明細表張數
+|   C                     ADD  1         AI12
+| 02*C                     ELSE
+|   C                     EXSR RTN220
+|   C*UPDATE DETAIL FILE
+|   C                     UPDATAJ0
+| 02-C                     END
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN210....WRITE DATE TO DETAIL
+      *==============================================================*
+06===CSR         RTN210    BEGSR
+|    C*
+|    C*                    MOVE *BLANK    AJ01
+|    C*                    Z-ADD0         AJ02
+|    C*                    MOVE *BLANK    AJ03
+|    C                     Z-ADD0         AJ04
+|    C                     Z-ADD0         AJ05
+|    C                     Z-ADD0         AJ06
+|    C                     Z-ADD0         AJ07
+|    C                     Z-ADD0         AJ08
+|    C                     Z-ADD0         AJ09
+|    C                     Z-ADD0         AJ10
+|    C                     Z-ADD0         AJ11
+|    C                     Z-ADD0         AJ12
+|    C*                    MOVE *BLANK    AJ13
+|    C*
+06===CSR                   ENDSR
+      *=========================================================*
+      *          RTN220....UPDATE DETAIL                        *
+      *=========================================================*
+07===C           RTN220    BEGSR
+|    C*作廢判別
+|    C                     EXSR RTN300
+|    C*
+B2000C                     Z-ADDDATE      AJXX
+B2000C                     TIME           AJYY
+|    C                     MOVE $USER     AJZZ
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHECK
+      *==============================================================*
+08===CSR         RTN300    BEGSR
+|    C*
+|    C*作廢判別
+     C           KEYSI     SETLLSS0                      41
+| 01-C           SI19      IFEQ 'V'
+     C           *IN41     OREQ '1'
+|   C                     ADD  1         AI06
+|   C                     ADD  1         AJ07
+| 01*C                     ELSE
+|   C*
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C           SI17      ANDEQ2
+|   C                     ADD  SI25      AI09
+M002AC                     ADD  SI24      AI13
+|   C                     ADD  1         AI03
+|   C                     ADD  SI25      AJ10
+M002AC                     ADD  SI24      AJ14
+|   C                     ADD  1         AJ04
+|   C           SI22      WHEQ 'D'
+|   C           SI17      ANDEQ3
+|   C                     ADD  SI23      AI07
+|   C                     ADD  SI24      AI08
+|   C                     ADD  1         AI03
+|   C                     ADD  SI23      AJ08
+|   C                     ADD  SI24      AJ09
+|   C                     ADD  1         AJ04
+|   C           SI22      WHEQ 'Z'
+|   C           SI17      ANDEQ2
+|   C           SI22      OREQ 'Z'
+|   C           SI17      ANDEQ3
+|   C                     ADD  SI25      AI10
+|   C                     ADD  1         AI04
+|   C                     ADD  SI25      AJ11
+|   C                     ADD  1         AJ05
+|   C           SI22      WHEQ 'B'
+|   C           SI17      ANDEQ2
+|   C           SI22      OREQ 'B'
+|   C           SI17      ANDEQ3
+|   C                     ADD  SI25      AI11
+|   C                     ADD  1         AI05
+|   C                     ADD  SI25      AJ12
+|   C                     ADD  1         AJ06
+|   C                     ENDSL
+| 01-C                     END
+|    C*
+08===CSR                   ENDSR
+     C*==============================================================*
+     C*          RTN800....WRITE LOG
+     C*==============================================================*
+09===C           RTN800    BEGSR
+|    C*
+| 01-C           *IN38     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     SETON                     38
+| 01-C                     END
+|    C*OVERFLOW CON.
+| 02-C           *IN39     IFEQ '1'
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+| 02-C                     END
+     C************
+|    C**發票日期
+     C************
+M001AC                     Z-ADDSI21      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM W6        S001I2  60
+B2MODC           PSI21     PARM           S001O1  60
+     C************
+|    C**客戶簡稱
+     C************
+|    C           KEYME     CHAINME0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 03-C                     END
+     C*
+     C           *IN99     IFEQ '0'
+     C                     MOVEL'  Y     'MARK
+     C                     ELSE
+     C                     MOVEL'未申報'MARK
+     C                     END
+     C***************
+|    C**客戶統一編號
+     C***************
+     C           SI08      CHAINMD0                  53
+     C*
+     C   53                MOVE *BLANK    MD17
+     C**************
+|    C*WRITE REPORT
+     C**************
+|    C                     WRITEPD1
+     C*
+     C                     SETOF                     99
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTNLR.... LR
+      *==============================================================*
+05===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE3
+|    C                     WRITEPE2
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          ERRSR ....DATA LOCK ROUTINE
+     C*==============================================================*
+11===C           ERRSR     BEGSR
+|    C*
+|    C*                    CALL 'P50'
+|    C*          DMSG      PARM           P5001O 78
+|    C*                    SETON                     8099
+|    C*
+11===C*                    ENDSR'*DETC'
+*ERR*C                     ENDSR
+

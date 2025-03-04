@@ -1,0 +1,91 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1118  PHILIP                             */
+     /*    CREATE DATE  : 81/04/21                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : IMR050C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :庫存系統                                 */
+     /*    REMARK       :存貨週轉率報表                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DIN01)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DIN04S) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DIN04E) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&WIN02)  TYPE(*CHAR) LEN(6) /*M001M*/
+             DCL        VAR(&DOPT)   TYPE(*CHAR) LEN(1)
+
+
+     /***** ADD MEMBER --> REWF09                               *****/
+     /*      DCL        VAR(&NO)     TYPE(*CHAR) LEN(6)             */
+     /*      DCL        VAR(&MBR)    TYPE(*CHAR) LEN(10)            */
+     /*      RTVJOBA    NBR(&NO)                                    */
+     /*      CHGVAR     VAR(&MBR)    VALUE('IM' *TCAT &NO)          */
+     /*                                                             */
+     /*      ADDPFM     FILE(REWF09) MBR(&MBR)                      */
+     /*      MONMSG     MSGID(CPF7306) EXEC(CLRPFM FILE(REWF09) +   */
+     /*                   MBR(&MBR))                                */
+     /*                                                             */
+     /*      OVRDBF     FILE(REWF09) MBR(&MBR)                      */
+     /*-------------------------------------------------------------*/
+
+             CHGVAR     VAR(&DIN01)  VALUE(%SST(*LDA 601 1))
+             CHGVAR     VAR(&DIN04S) VALUE(%SST(*LDA 608 9))
+             CHGVAR     VAR(&DIN04E) VALUE(%SST(*LDA 617 9))
+  /*M001M    CHGVAR     VAR(&WIN02)  VALUE(%SST(*LDA 630 4)) +
+             CHGVAR     VAR(&DOPT)   VALUE(%SST(*LDA 634 1)) */
+  /*M001M*/  CHGVAR     VAR(&WIN02)  VALUE(%SST(*LDA 630 6))
+  /*M001M*/  CHGVAR     VAR(&DOPT)   VALUE(%SST(*LDA 636 1))
+
+
+             OVRPRTF    FILE(IMR050AP) PAGESIZE(*N 158) CPI(12) +
+                        USRDTA('存週轉率')
+             OVRDBF     FILE(IMINPF) SHARE(*YES)
+  /* 含保稅倉                                             */
+             IF         COND(&DOPT *EQ 'Y') THEN(DO)
+             OPNQRYF    FILE((IMINPF)) QRYSLT(' IN01 *EQ "' *CAT +
+                          &DIN01 *CAT '" & IN04 *EQ %RANGE("' *CAT +
+                          &DIN04S *CAT '" "' *CAT &DIN04E *CAT '") +
+                          & IN02 *EQ ' *CAT &WIN02 *CAT ' ') +
+                          KEYFLD((IN04))
+             ENDDO
+             ELSE       CMD(DO)
+  /* 不含保稅倉                                             */
+             OPNQRYF    FILE((IMINPF)) QRYSLT(' IN01 *EQ "' *CAT +
+                          &DIN01 *CAT '" & IN04 *EQ %RANGE("' *CAT +
+                          &DIN04S *CAT '" "' *CAT &DIN04E *CAT '") +
+                          & IN02 *EQ ' *CAT &WIN02 *CAT ' & IN03L +
+                          *NE "T" ') KEYFLD((IN04)) MAPFLD((IN03L +
+                          '%SST(IN03 1 1)' *CHAR 1))
+             ENDDO
+
+             CALL       IMR0501
+
+             DLTOVR     FILE(IMR050AP)
+             CHGVAR     VAR(&P6601I) VALUE('IMR050AP')
+
+             CLOF       OPNID(IMINPF)
+             DLTOVR     FILE(IMINPF)
+
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+     /*      CHGVAR     VAR(&P6601I) VALUE('IMR050A')      */
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+             ENDPGM
+

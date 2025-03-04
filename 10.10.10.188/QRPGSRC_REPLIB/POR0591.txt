@@ -1,0 +1,205 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : POR0591                                       *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 82/12/04                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :採購分析系統                                 *
+      * REMARK       :國外到貨統計年報                             *
+      *===============================================================
+      * CODE    AUTH.     DATE    DESCRIPTION
+      *---------------------------------------------------------------
+      * M001  MICHELLE  1998.8.31 數量轉換成標準容積箱
+      *                        （單位容積Ｘ單位轉換）／品牌標準容積
+      *---------------------------------------------------------------
+      * M002  MICHELLE  2001.7.19（數量Ｘ單位轉換Ｘ單位容積）／
+      *      |           |         |品牌標準容積
+      *===============================================================
+      ****************************************************************
+     FPOPDPF  IF  E           K        DISK
+     FPOPEPF  IF  E           K        DISK
+     FPOPCPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+M001AFPA#HPF  IF  E           K        DISK
+     FREWF02  UF  E           K        DISK                      A
+     E                    AMT        12  9 0
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      600 601 DPD01S
+     I                                      602 603 DPD01E
+     I                                      610 614 DPD07S
+     I                                      615 619 DPD07E
+     I                                      620 628 DPE04S
+     I                                      630 638 DPE04E
+      *MM//YY
+     I                                      641 6440DPD04
+     I                                      641 6420DPD04M
+     I                                      643 6440DPD04Y
+     I*往前一年
+     I                                      650 6530PD04S
+     I                                      650 6510PD04SY
+     I                                      652 6530PD04SM
+     I                                      654 6570PD04E
+     I                                      654 6550PD04EY
+     I                                      656 6570PD04EM
+     I            DS
+     I                                        1  12 SD02
+     I                                        3   4 SD02A
+     I            DS
+B2MODI                                        1   80PD04
+B2MODI                                        5   60MPD04
+M001AI            DS
+M001AI                                        1   9 PE04
+M001AI                                        3   4 WPE04
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF0201
+     C                     KFLD           WF0202
+     C                     KFLD           WF0203
+     C                     KFLD           WF0216
+     C           KEYPC     KLIST
+     C                     KFLD           PE03
+     C                     KFLD           PE04
+M001AC           KEY#H     KLIST
+M001AC                     KFLD           W#H01   8
+M001AC                     KFLD           W#H02  10
+M001AC                     MOVE 'STANDARD'W#H01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN200
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN200....月銷售數量及金額
+      *==============================================================*
+01===C           RTN200    BEGSR
+|    C*
+|    C                     READ PD0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C           PD02      SETLLPE0
+|   C           PD02      READEPE0                      46
+| 02-C           *IN46     DOWEQ'0'
+| 03-C           PE04      IFGE DPE04S
+|   C           PE04      ANDLEDPE04E
+|   C                     MOVELPD01      WF0201
+|   C                     MOVELPD07      WF0202
+|   C                     MOVELPE04      WF0203
+     C*CHAIN POPCPF OR MTMAPF GET 單位轉換　採購單位
+     C           KEYPC     CHAINPC0                  41
+     C           *IN41     IFEQ '0'
+     C                     Z-ADDPC10      WF0216
+     C                     MOVELPC09      WF0217
+     C                     ELSE
+     C           PE04      CHAINMA0                  41
+     C           *IN41     IFEQ '0'
+     C                     Z-ADDMA16      WF0216
+     C                     MOVELMA14      WF0217
+     C                     END
+     C                     END
+M001AC*
+M001AC                     MOVELWPE04     W#H02
+M001AC           PE04      CHAINMA0                  49
+M001AC           *IN49     IFEQ '0'
+M002AC                     Z-ADDMA15      WMA15   43
+M001AC                     END
+M001AC           KEY#H     CHAIN#H0                  50
+M001AC           *IN50     IFEQ '1'
+M001AC                     Z-ADD1         #H03
+M001AC                     END
+     C*
+M002AC* 訂購量Ｘ單位轉換率Ｘ單位容積／品牌標準容積
+     C*
+M002MC           PE06      MULT WF0216    WQTY   113H
+M002MC           WQTY      MULT WMA15     WPE06  113H
+M002MC           WPE06     DIV  #H03      WPE061  80H
+     C*
+M002DC* 數量以箱計算WPE06
+M002DC*
+M002DC*          WF0216    IFLT MA16
+M002DC*          PE06      DIV  MA16      WPE06  113H
+M002DC*                    ELSE
+M002DC*          WF0216    IFGT MA16
+M002DC*          PE06      MULT WF0216    WPE06     H
+M002DC*                    ELSE
+M002DC*                    Z-ADDPE06      WPE06
+M002DC*                    END
+M002DC*                    END
+M002DC*
+M002DC*箱數Ｘ標準容積率＝實際標準容積箱數
+M002DC*
+M002DC*          WPE06     MULT WUOM      WPE061  80H
+     C*
+|   C           KEYWF     CHAINWF020                40
+|   C                     EXSR RTN300
+| 03-C                     END
+|   C           PD02      READEPE0                      46
+| 02-C                     END
+|    C*
+|    C                     READ PD0                      45
+| ERRC                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE OR UPDATE REWF02
+      *==============================================================*
+02===C           RTN300    BEGSR
+|    C*
+|    C                     Z-ADD0         AMT
+|    C*計算月份欄位
+|    C           MPD04     ADD  12        L       20
+|    C           L         SUB  DPD04M    L
+| 01-C           L         IFGT 12
+|   C           L         SUB  12        L
+| 01-C                     END
+|    C*
+|    C*
+|    C*累計數量
+M001MC*                    Z-ADDPE06      AMT,L
+M001MC                     Z-ADDWPE061    AMT,L
+|    C*
+M001AC           AMT,L     IFNE 0
+| 02-C           *IN40     IFEQ '0'
+|   C                     ADD  AMT,1     WF0204
+|   C                     ADD  AMT,2     WF0205
+|   C                     ADD  AMT,3     WF0206
+|   C                     ADD  AMT,4     WF0207
+|   C                     ADD  AMT,5     WF0208
+|   C                     ADD  AMT,6     WF0209
+|   C                     ADD  AMT,7     WF0210
+|   C                     ADD  AMT,8     WF0211
+|   C                     ADD  AMT,9     WF0212
+|   C                     ADD  AMT,10    WF0213
+|   C                     ADD  AMT,11    WF0214
+|   C                     ADD  AMT,12    WF0215
+|   C*
+|   C                     UPDATWF020
+| 02*C                     ELSE
+|   C                     Z-ADDAMT,1     WF0204
+|   C                     Z-ADDAMT,2     WF0205
+|   C                     Z-ADDAMT,3     WF0206
+|   C                     Z-ADDAMT,4     WF0207
+|   C                     Z-ADDAMT,5     WF0208
+|   C                     Z-ADDAMT,6     WF0209
+|   C                     Z-ADDAMT,7     WF0210
+|   C                     Z-ADDAMT,8     WF0211
+|   C                     Z-ADDAMT,9     WF0212
+|   C                     Z-ADDAMT,10    WF0213
+|   C                     Z-ADDAMT,11    WF0214
+|   C                     Z-ADDAMT,12    WF0215
+|   C                     WRITEWF020
+| 02-C                     END
+M001AC                     END
+|    C*
+02===C                     ENDSR
+

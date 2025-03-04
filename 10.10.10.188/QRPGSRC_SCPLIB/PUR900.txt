@@ -1,0 +1,223 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : PUR900                                     *
+     A*    AUTHOR       : A1010  JOHN                                *
+     A*    CREATE DATE  : 2013/04/10                                 *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存                                *
+     A*    SUBSYSTEM    :庫存管理系統                              *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A****************************************************************
+     FINTXTM  O   E           K        DISK                      A
+     F*採購驗收
+     FPOCMLF92IF  E           K        DISK
+     F*進貨退出
+     FINTFLF92IF  E           K        DISK
+     I*----------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      201 2080DATE
+     I                                      187 1920DATES
+     I            DS
+     I                                        1  13 DOCNO
+     I                                        3   4 TRXCD
+     I            DS
+     I                                        1   8 XDATE
+     I                                        1   80SDATE
+     I            DS
+     I                                        1   8 YDATE
+     I                                        1   80EDATE
+     IDA02        DS
+     I                                        1   43DUTY
+      *==============================================================*
+      *                    DEFINE ROUTINE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+|    C                     PARM           DATE1   8
+|    C                     PARM           DATE2   8
+|    C                     PARM           TYPE    1
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYTX     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           SDATE
+     C           KEYTX1    KLIST
+     C                     KFLD           INCOMP
+     C*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT RTN
+     C           TYPE      IFEQ 'A'                        ALL
+     C           TYPE      OREQ 'I'                        IN
+     C                     EXSR RTN100                     POCM 採購驗收
+     C                     ENDIF
+     C           TYPE      IFEQ 'A'                        ALL
+     C           TYPE      OREQ 'R'                        RETURN
+     C                     EXSR RTN120                     INTF 進貨退出
+     C                     ENDIF
+     C                     SETON                     LR
+     C*
+     C*==============================================================*
+     C*          RTN010....INITIAL RTN
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVELDATE1     XDATE
+|    C                     MOVELDATE2     YDATE
+|    C*
+|    C           *NAMVAR   DEFN           DA02             稅率REFLIB
+|    C                     IN   DA02
+|    C*
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....PROC POCM    進貨
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C           KEYTX     SETLLCM0
+|    C           KEYTX1    READECM0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           CM16      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN500
+|   C*
+|   C           KEYTX1    READECM0                      41
+| 01-C                     ENDDO
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN120....PROC INTF    進貨退出
+     C*==============================================================*
+04===C           RTN120    BEGSR
+|    C           KEYTX     SETLLTF0
+|    C           KEYTX1    READETF0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TF08      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN520                     進貨退出
+|   C*
+|   C           KEYTX1    READETF0                      41
+| 01-C                     ENDDO
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN500....WRITE INTX FOR POCM驗收(C1 C2 C3)
+     C*==============================================================*
+12===C           RTN500    BEGSR
+     C*
+     C           CM15      IFNE 'P'
+|    C                     CALL 'MCC0021'
+|    C                     PARM           CM01             公司別
+|    C                     PARM           CM12             通路別
+|    C                     PARM           CM03             產品代號
+|    C                     PARM           CM16             單據日期
+|    C                     PARM           WTX18   82       單價
+     C*
+     C                     Z-ADDWTX18     CM07             單價
+|    C           CM06      MULT CM07      WAMT   110H
+|    C                     Z-ADDWAMT      CM08             金額
+|    C           CM08      MULT DUTY      WTAX    90H
+|    C                     Z-ADDWTAX      CM09             稅額
+     C*
+     C                     ENDIF
+     C*
+     C*
+|    C                     MOVELCM01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELCM11      TX01             公司
+|    C                     Z-ADD0         TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVELCM01      TX05             單據號碼
+|    C                     Z-ADDCM16      TX06             單據日期
+|    C                     Z-ADDCM14      TX06A            進貨到店日
+|    C                     MOVELCM02      TX07             對象別
+|    C                     MOVELCM10      TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELCM03      TX11             產品代號
+|    C                     MOVELCM13      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDCM04      TX14             原始數量
+|    C                     Z-ADDCM06      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADDCM07      TX18             單價
+|    C                     Z-ADDCM08      TX19             金額
+|    C                     Z-ADDCM09      TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'CM'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELCM12      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+12===C                     ENDSR
+     C*==============================================================*
+     C*          RTN520 ...WRITE INTX FOR INTF 進貨退出
+     C*==============================================================*
+15===C           RTN520    BEGSR
+|    C                     CALL 'MCC0021'
+|    C                     PARM           TF05             公司別
+|    C                     PARM           TF06             通路別
+|    C                     PARM           TF03             產品代號
+|    C                     PARM           TF08             單據日期
+|    C                     PARM           WTX18   82       單價
+|    C*
+|    C                     MOVELTF01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELTF05      TX01             公司
+|    C                     Z-ADD0         TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD-1        TX04             加減別
+|    C                     MOVELTF01      TX05             單據號碼
+|    C                     Z-ADDTF08      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVELTF02      TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTF03      TX11             產品代號
+|    C                     MOVELTF07      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTF04      TX14             原始數量
+|    C                     Z-ADDTF04      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADDWTX18     TX18             單價
+|    C           TX15      MULT TX18      WAMT   110H      金額
+|    C                     Z-ADDWAMT      TX19             金額
+|    C           TX19      MULT DUTY      WTAX    90H      稅額
+|    C                     Z-ADDWTAX      TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TF'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELTF06      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+15===C                     ENDSR
+     C*==============================================================*
+

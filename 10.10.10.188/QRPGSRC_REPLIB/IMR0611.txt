@@ -1,0 +1,161 @@
+     FSOSCPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#2PF  IF  E           K        DISK
+     FREWF38  O   E                    DISK
+     FIMR0611DCF  E                    WORKSTN
+     F                                        RRN1  KSFILE SFLSR1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I*                                     598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I*                                     506 506 $PURID
+     I*                                     507 508 $TRNID
+     I*                                     509 512 $APAUT
+     I                                      513 513 $WRHTY
+     I*                                     514 521 $#101
+     I                                      609 613 DSE07
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN12     PARM *IN12     IN12    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+     C           KEY#2     KLIST
+     C                     KFLD           #201
+     C                     KFLD           #202
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN110                     *INIT SFL
+      *
+     C                     EXSR RTN120                     *READ NEXT PAGE
+     C                     EXSR RTN140                     *EXFMT
+     C           *IN03     IFEQ '0'
+     C           *IN12     ANDEQ'0'
+      *READC
+     C                     EXSR RTN170
+     C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+B2MODC                     Z-ADD0         DATE    80
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C                     PARM $EGMDY    S001I2  80
+B2INF *CVR3012 sev.30 Field $EGMDY contains more than one year
+B2INF *CVR3012 sev.30 Field S001I2 contains more than one year
+B2MODC           DATE      PARM           S001O1  80
+|    C*
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN110....INITIAL                              *
+      *=========================================================*
+06===C           RTN110    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     Z-ADD1         DRRN1
+|    C                     Z-ADD0         RRN1
+|    C                     SETOF                     53
+|    C                     SETON                     5254
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+      *
+06===C                     ENDSR
+      *=========================================================*
+      *          RTN120 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+07===C           RTN120    BEGSR
+|    C*
+|    C                     SETOF                     54
+|   C                     READ SC0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C*
+      *
+|   C                     EXSR RTN121                     *GET DATA
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+|   C*
+|   C                     READ SC0                      46
+| 01-C                     END
+|    C*
+|    C*
+08===C                     ENDSR
+      *=========================================================*
+      *          RTN121 .. GET DATA
+      *=========================================================*
+09===C           RTN121    BEGSR
+|    C*
+|    C* GET 單別說明
+|    C                     MOVELSC03      #201
+|    C                     MOVELSC03      #202
+|    C           KEY#2     CHAIN#20                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL#203      D#203
+| 01*C                     ELSE
+|   C                     MOVE *BLANK    D#203
+| 01-C                     END
+|    C* GET客戶分店簡稱 MTMEPF=客戶分店檔
+|    C                     MOVELSC04      ME01
+|    C                     MOVELSC05      ME02
+|    C           KEYME     CHAINME0                  40
+|    C   40                MOVE *BLANK    ME04
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN140... EXFMT SFL                                 *
+      *==============================================================*
+10===C           RTN140    BEGSR
+|    C*
+| 01-C           RRN1      IFLE *ZEROS
+|   C                     SETON                     95    *NODATA
+| 01*C                     ELSE
+|   C                     SETON                     50
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+03===C           RTN170    BEGSR
+      *
+     C                     Z-ADD0         NUM     10
+|    C                     SETON                     54
+|    C*
+|    C                     READCSFLSR1                 5757*NF
+| 01-C           *IN57     DOWEQ'0'                        *40 LOOP
+     C           DOPT1     IFEQ '/'
+     C                     Z-ADD1         NUM
+     C                     MOVELSC02      WF3801
+     C                     MOVEL*BLANKS   WF3802
+     C                     WRITEWF380
+     C                     END
+|   C*
+|    C                     READCSFLSR1                 5757*NF
+| 01-C                     END                             *40 END
+|    C*
+     C           NUM       IFEQ 0
+     C                     SETON                     12
+     C                     END
+|    C*
+04===C                     ENDSR
+

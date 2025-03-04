@@ -1,0 +1,277 @@
+      ****************************************************************
+      * PROGRAM ID : P21                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :璸衡癬ら°ùら禯る计のら计                   *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P2101I    I   *DEC    6 0 癬ら(い瓣)  *
+      *             02   P2102I    I   *DEC    6 0 ùら(い瓣)  *
+      *             02   P2111O    O   *DEC    7 0 禯る计...     *
+      *                                            璽计癬るùる
+      *             02   P2112O    O   *DEC    2 0 禯ぱ计...     *
+      *                                            璽计癬らùら
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             00   P210DS    N   *CHAR   6    YYMMDD(い瓣) *
+      *             01   P2101C    N   *DEC    2 0 い瓣          *
+      *                  P2101     N   *DEC    4 0 ﹁じ          *
+      *             02   P2102(P21)N   *DEC    2 0 る            *
+      *             03   P2103     N   *DEC    2 0 ら戳            *
+      *             04   P2104     N   *DEC    5 0 坝计            *
+      *             05   P2105     N   *DEC    4 0 緇计            *
+      *             06   P2106     N   *CHAR   1   柬(Y/N)       *
+      *             07   P2107     N   *DEC    3 0 喷谍(Y/N)       *
+      *             08   P21DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P21DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P2106=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P2106=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P2106=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P2106=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E                    P21DAY 12  12  2 0
+     IP21SC       DS
+     I                                        1   20P21SYY
+     I                                        3   40P21SMM
+     I                                        5   60P21SDD
+     IP21BC       DS
+     I                                        1   20P21BYY
+     I                                        3   40P21BMM
+     I                                        5   60P21BDD
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P2101I  60
+     C                     PARM           P2102I  60
+     C                     PARM           P2111O  70
+     C                     PARM           P2112O  20
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     EXSR P21CMP
+     C                     EXSR P21CYY
+     C                     EXSR P21CMD
+     C                     EXSR P21CAL
+     C                     EXSR P21DTL
+      *
+     C                     Z-ADD0         P21FTM  70
+     C                     Z-ADD0         P21FTD  20
+     C           P21CCK    IFEQ 'N'
+     C           0         SUB  P21TD     P21FTD
+     C           0         SUB  P21TM     P21FTM
+     C                     ELSE
+     C                     Z-ADDP21TD     P21FTD
+     C                     Z-ADDP21TM     P21FTM
+     C                     END
+     C                     Z-ADDP21FTM    P2111O
+     C                     Z-ADDP21FTD    P2112O
+      *
+     C                     RETRN
+      *--------------------------------------------------------------*
+      *          P21CMP....COMPARE FROM DATE AND TO DATE WHICH LARGE *
+      *                    INPUT      P2101I                         *
+      *                    INPUT      P2102I                         *
+      *                    OUTPUT     P21SML                         *
+      *                    OUTPUT     P21BIG                         *
+      *                    OUTPUT     P21CCK ( Y = P2101I <= P2102I )*
+      *--------------------------------------------------------------*
+     C           P21CMP    BEGSR
+     C           P2101I    IFLE P2102I
+     C                     MOVE 'Y'       P21CCK  1        .CMP CHECK
+     C                     Z-ADDP2101I    P21SML  60
+     C                     Z-ADDP2102I    P21BIG  60
+     C                     ELSE
+     C                     MOVE 'N'       P21CCK
+     C                     Z-ADDP2102I    P21SML
+     C                     Z-ADDP2101I    P21BIG
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21CYY....CACULATE YEARS DAY                        *
+      *                    INPUT      P21SCY ら戳﹁じ          *
+      *                    INPUT      P21BCY ら戳﹁じ          *
+      *                    OUTPUT     P21YDA 禯ぱ计          *
+      *--------------------------------------------------------------*
+     C           P21CYY    BEGSR
+     C                     MOVE P21SML    P21SC   6
+     C                     MOVE P21BIG    P21BC   6
+     C                     Z-ADD0         P21SCY  40
+     C                     Z-ADD0         P21BCY  40
+     C           P21SYY    ADD  1911      P21SCY
+     C           P21BYY    ADD  1911      P21BCY
+     C                     Z-ADD0         P21YDA  90
+     C           P21SCY    DOWNEP21BCY
+      *
+     C                     Z-ADDP21SCY    P2101   40
+     C                     EXSR P21LEP
+      *
+     C           P2106     IFEQ 'Y'
+     C                     ADD  366       P21YDA
+     C                     ELSE
+     C                     ADD  365       P21YDA
+     C                     END
+      *
+     C                     ADD  1         P21SCY
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P2101 ﹁じ                 *
+      *                    OUTPUT     P2106  (Y=柬:N=キ)     *
+      *--------------------------------------------------------------*
+     C           P21LEP    BEGSR
+     C           P2101     DIV  400       P2104   50
+     C                     MVR            P2105   40
+     C           P2105     IFEQ 0
+     C                     MOVE 'Y'       P2106   1
+     C                     ELSE
+     C*
+     C           P2101     DIV  100       P2104
+     C                     MVR            P2105
+     C           P2105     IFEQ 0
+     C                     MOVE 'N'       P2106
+     C                     ELSE
+     C*
+     C           P2101     DIV  4         P2104
+     C                     MVR            P2105
+     C           P2105     IFEQ 0
+     C                     MOVE 'Y'       P2106
+     C                     ELSE
+     C                     MOVE 'N'       P2106
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21CMD....CALCULATE YEAR DAYS OF P21SML AND P21BIG  *
+      *                    INPUT    P21SML ......                    *
+      *                                    P21SYY                    *
+      *                                    P21SMM                    *
+      *                                    P21SDD                    *
+      *                             P21BIG ......                    *
+      *                                    P21BYY                    *
+      *                                    P21BMM                    *
+      *                                    P21BDD                    *
+      *                    OUTPUT   P21SDA(YEAR DAYS OF P21SML)      *
+      *                             P21BDA(YEAR DAYS OF P21BIG)      *
+      *--------------------------------------------------------------*
+     C           P21CMD    BEGSR
+      *-------------------------------------*
+      *        CALCULATE   P21SDA           *
+      *-------------------------------------*
+     C                     Z-ADD0         P21SDA  90
+     C                     Z-ADD1         PMM     20
+     C           PMM       DOWNEP21SMM
+     C                     ADD  P21DAY,PMMP21SDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P21SDD    P21SDA
+      *
+     C                     Z-ADD1911      P2101
+     C                     ADD  P21SYY    P2101
+     C                     EXSR P21LEP
+     C           P2106     IFEQ 'Y'
+     C           P21SMM    ANDGT2
+     C                     ADD  1         P21SDA
+     C                     END
+      *-------------------------------------*
+      *        CALCULATE   P21BDA           *
+      *-------------------------------------*
+     C                     Z-ADD0         P21BDA  90
+     C                     Z-ADD1         PMM
+     C           PMM       DOWNEP21BMM
+     C                     ADD  P21DAY,PMMP21BDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P21BDD    P21BDA
+      *
+     C                     Z-ADD1911      P2101
+     C                     ADD  P21BYY    P2101
+     C                     EXSR P21LEP
+     C           P2106     IFEQ 'Y'
+     C           P21BMM    ANDGT2
+     C                     ADD  1         P21BDA
+     C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21CAL....CACULATE DAYS BETWEEN P21SML & P21BIG     *
+      *                    INPUT      P21SDA  (YEAR DAYS OF P21SML)  *
+      *                    INPUT      P21BDA  (YEAR DAYS OF P21BIG)  *
+      *                    INPUT      P21YDA 禯ぱ计          *
+      *                    OUTPUT     P21RST 禯ぱ计              *
+      *--------------------------------------------------------------*
+     C           P21CAL    BEGSR
+     C                     Z-ADD0         P21TD   90
+     C           P21YDA    ADD  P21BDA    P21TD
+     C                     SUB  P21SDA    P21TD
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21DTL....CACULATE DAYS & MONTH                     *
+      *                                  BETWEEN P21SML & P21BIG     *
+      *                    INPUT      P21SDA  (YEAR DAYS OF P21SML)  *
+      *                    INPUT      P21BDA  (YEAR DAYS OF P21BIG)  *
+      *                    INPUT      P21YDA 禯ぱ计          *
+      *                    OUTPUT     P21TM  禯る计              *
+      *                    OUTPUT     P21TD  禯ぱ计              *
+      *--------------------------------------------------------------*
+     C           P21DTL    BEGSR
+     C                     Z-ADDP21SYY    PYY     20
+     C                     Z-ADD0         P21TM   70
+     C                     Z-ADD0         PDD     20
+     C                     Z-ADDP21SMM    PMM
+     C                     Z-ADDP21DAY,PMMPDD
+     C           PMM       IFEQ 2
+     C           PYY       ADD  1911      P2101
+     C                     EXSR P21LEP
+     C           P2106     IFEQ 'Y'
+     C                     ADD  1         PDD
+     C                     END
+     C                     END
+      *
+     C           P21TD     DOWGEPDD
+      *
+     C*          PYY       IFEQ P21SYY
+     C*          PMM       ANDEQP21SMM
+     C*          P21TD     ADD  P21SDD    P21TD
+     C*                    END
+     C           P21TD     SUB  PDD       P21TD
+     C           P21TM     ADD  1         P21TM
+      *
+     C           PMM       ADD  1         PMM
+     C           PMM       IFGT 12
+     C           PYY       ADD  1         PYY
+     C                     Z-ADD1         PMM
+     C                     END
+     C                     Z-ADDP21DAY,PMMPDD
+     C           PMM       IFEQ 2
+     C           PYY       ADD  1911      P2101
+     C                     EXSR P21LEP
+     C           P2106     IFEQ 'Y'
+     C                     ADD  1         PDD
+     C                     END
+     C                     END
+      *
+     C                     END
+      *
+     C                     ENDSR
+**
+312831303130313130313031
+

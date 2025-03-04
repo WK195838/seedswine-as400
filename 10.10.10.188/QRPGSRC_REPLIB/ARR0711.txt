@@ -1,0 +1,172 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : ARR0701                                       *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 05/06/93                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款子系統                               *
+      * REMARK       :寄賣產品成本明細表                           *
+      ****************************************************************
+     FSOSGPF  IF  E           K        DISK
+     FSOSHPF  IF  E           K        DISK
+     FSOSGLF  IF  E           K        DISK
+     F            SG0                               KRENAMESG0L
+     FREWF78  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I*
+     I*辦事處，產品，客戶
+     I                                      601 601 COMPS
+     I                                      602 602 COMPE
+     I                                      611 619 DSH03S
+     I                                      621 629 DSH03E
+     I                                      630 634 DSG04S
+     I                                      635 639 DSG04E
+     I*折讓日期
+     I                                      640 6450DSG26S
+     I                                      646 6510DSG26E
+     I                                      652 6570YSG26S
+     I                                      658 6630YSG26E
+     I            DS
+     I                                        1   2 SG01
+     I                                        1   1 SG01A
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF7801
+     C                     KFLD           WF7804
+     C                     KFLD           SH03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C*送貨單明細檔讀取
+     C                     READ SG0                      45
+     C*
+  01-C           *IN45     DOWEQ'0'
+    C                     EXSR RTN010
+    C                     EXSR RTN100
+    C                     EXSR RTN200
+    C                     READ SG0                      45
+  01-C                     END
+     C*
+     C* REWF78檔讀取
+|    C           *LOVAL    SETLLWF780
+     C                     READ WF780                    45
+     C*
+  02-C           *IN45     DOWEQ'0'
+  03-C           WF7808    IFEQ WF7809
+    C                     DELETWF780
+  03-C                     END
+    C                     READ WF780                    45
+  02-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE SG01A     WF7801
+|    C                     MOVE SG09      WF7804
+|    C                     MOVE SG18      WF7805
+B2000C                     MOVE SG26      WF7807
+|    C                     MOVE SG04      WF7802
+|    C                     MOVE SG05      WF7803
+|    C                     MOVE SG02      WF7812
+|    C                     MOVE SG17      WF7813
+|    C           WF7813    CHAINSG0L                 41
+| 04-C           *IN41     IFEQ '0'
+|   C                     MOVE SG04      WF7802
+|   C                     MOVE SG05      WF7803
+| 04-C                     END
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET DETAIL
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           WF7812    SETLLSH0
+|    C           WF7812    READESH0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C**CHAIN KEY
+     C           SH12      ADD  SH13      WQTY    70
+| 02-C           SH03      IFGE DSH03S
+|   C           SH03      ANDLEDSH03E
+     C           WQTY      ANDNE0
+|   C                     MOVE SH03      WF7806
+|   C           KEYWF     CHAINWF780                40
+| 03-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN110
+| 03*C                     ELSE                              修改
+|   C                     EXSR RTN120
+| 03-C                     END
+| 02-C                     END
+|   C*
+|   C           WF7812    READESH0                      41
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN110....WRITE WORK FILE
+      *==============================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C                     Z-ADDSH12      WF7810
+|    C                     Z-ADDSH13      WF7811
+|    C                     Z-ADDSH07      WF7808
+|    C*WRITE WORK FILE
+|    C                     WRITEWF780
+|    C***
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN120....UPDATE WORK FILE
+      *==============================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C                     Z-ADDSH12      WF7810
+|    C                     Z-ADDSH13      WF7811
+|    C                     Z-ADDSH07      WF7808
+|    C*WRITE WORK FILE
+|    C                     UPDATWF780
+|    C***
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....
+     C*==============================================================*
+05===C           RTN200    BEGSR
+|    C*
+|    C           WF7813    CHAINSG0L                 41
+| 01-C           *IN41     IFEQ '0'
+|   C*
+|   C           SG02      SETLLSH0
+|   C           SG02      READESH0                      41
+| 02-C           *IN41     DOWEQ'0'
+     C           SH12      ADD  SH13      WQTY    70
+|   C*產品銷售成本明細
+| 03-C           SH03      IFGE DSH03S
+|   C           SH03      ANDLEDSH03E
+|   C           WQTY      ANDNE0
+|   C           KEYWF     CHAINWF780                40
+| 04-C           *IN40     IFEQ '0'
+      *訂購成本
+     C           SH08      MULT WF7810    WCOST  152
+     C           WCOST     DIV  WQTY      WF7809    H
+|   C                     UPDATWF780
+| 04-C                     END
+| 03-C                     END
+|   C*
+|   C           SG02      READESH0                      41
+| 02-C                     END
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+

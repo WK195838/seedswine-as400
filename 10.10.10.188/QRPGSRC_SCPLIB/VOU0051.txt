@@ -1,0 +1,189 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250
+     H*
+     H*    PROGRAM ID   : VOU0051
+     H*    PROGRAM NAME :陳列轉進貨傳票批次
+     H*    AUTHOR       : A1492 TERRY
+     H*    CREATE DATE  : 2009.02.23
+     H*    UPDATE DATE  :
+     H*    SYSTEM       :進銷存收TO總帳
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     F****************************************************************
+     FVOU005D CF  E                    WORKSTN      KINFDS DSPFDS
+     FC#EKPF  IF  E           K        DISK
+     E*---------------------------------------------------------------*
+     I*CURSOR POSTITON
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I*LOCAL DATA AREA
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      111 1160$CHYMD
+     I                                      119 1240$ADMDY
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      152 161 $USERN
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+      *確認日期
+     I                                      601 6080F01
+     I                                      609 6160F02
+     I                                      617 6200D02
+     I                                      617 6180D02M
+     I                                      619 6200D02Y
+      *公司別
+     I                                      625 625 D01
+     I            DS
+     I                                        1   60WDATE
+     I                                        1   20MM
+     I                                        3   40DD
+     I                                        5   60YY
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *NAMVAR   DEFN *LDA      LDA
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN14     PARM *IN14     IN14    1
+     C           *IN10     PARM *IN10     IN10    1
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYEK     KLIST
+     C                     KFLD           EK01             *公司別
+     C                     KFLD           EK02             *年月份
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C   10                EXSR R0200                      *INIT MSG.
+     C  N10                EXSR R0100                      *INIT VALUE
+     C*
+     C                     MOVEL*BLANK    @PRT    1        *PRINT
+  01-C           *IN03     DOUEQ'1'
+    C           @PRT      OREQ 'Y'
+    C                     EXSR R1000                      *SCRN
+  01-C                     END
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+     C*==============================================================*
+     C*          R0100 ....SCREEN INIT VALUE SET
+     C*==============================================================*
+01===CSR         R0100     BEGSR
+|    C                     SETON                     10
+|    C* SCREEN INIT VALUE SET *+++++++++++++++++++++++++++++++++++++++
+|    C                     MOVE *BLANKS   D01
+|    C                     Z-ADD*ZEROS    D02
+|    C                     Z-ADD*ZEROS    F01
+|    C                     Z-ADD*ZEROS    F02
+|    C                     Z-ADD*ZEROS    WDATE
+     C                     Z-ADD*ZEROS    W6      60
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R0200 ....INITIAL VALUE
+     C*==============================================================*
+02===CSR         R0200     BEGSR
+|    C*
+|    C                     SETON                       99
+|    C*
+| 01-C           $EVR      IFEQ 1                          ON-LINE
+|   C                     MOVEL'UPT2142' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+| 01-C                     END
+|    C*
+| 02-C           $EVR      IFEQ 2                          BATCH
+|   C                     MOVEL'UPT2111' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+     C*===============================================================*
+     C*          R1000  ...SCREEN MAIN PROCESS
+     C*===============================================================*
+03===C           R1000     BEGSR
+|    C*
+|    C                     EXFMTDSPD1
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+| 01-C           *IN03     IFEQ '1'
+|   C                     GOTO E1000
+| 01-C                     END
+|    C*
+|    C                     EXSR R1B00                      .CHECK      ?
+|    C*
+| 03-C           *IN99     IFEQ *ZERO
+|   C           *IN14     ANDEQ'1'
+|   C                     SETON                     28    .執行中
+|   C                     WRITEDSPD1
+|   C                     SETOF                     28
+|   C*
+|   C                     OUT  *NAMVAR
+|   C                     MOVEL'Y'       @PRT
+| 03-C                     END
+|    C*
+03===C           E1000     ENDSR
+     C*===============================================================*
+     C*          R1B00  ...CHECK DATA FROM SCREEN KEY-IN
+     C*===============================================================*
+04===C           R1B00     BEGSR
+|    C*
+|    C*+<<DATA CHECK>>+++++++++++++++++++++++++++++++++++++++++++++++++
+      *公司別
+| 01-C           D01       IFEQ *BLANKS
+|   C                     MOVEL'UPT0010' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6199
+| 01-C                     END
+|    C   99                GOTO E1B00
+|    C*
+|    C*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      *確認日期
+|    C*
+| 02-C           D02       IFEQ *ZEROS
+|   C                     MOVEL'UPT0012' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6599
+| 02*C                     ELSE
+|   C*
+|   C                     CALL 'P38'
+|   C                     PARM D02       P3801I  60
+|   C                     PARM '3'       P3802I  1
+|   C                     PARM '1'       P3803I  1
+|   C                     PARM           P3801O  60
+|   C                     PARM           P3811O  1
+|03 C           P3811O    IFEQ 'N'
+|   C                     MOVEL'UPT0040' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6599
+|03 C                     ELSE
+|   C*          P3801O    MULT 100       F01
+|   C*                    ADD  1         F01
+|   C*          P3801O    MULT 100       F02
+|   C*                    ADD  31        F02
+|   C                     MOVE 'S1'      EK01
+|   C                     Z-ADDP3801O    EK02
+|   C           KEYEK     CHAINEK0                  42
+|  C           *IN42     IFEQ '0'
+|   C                     MOVELEK07      F01
+|   C                     MOVELEK08      F02
+|  C                     ELSE
+|   C                     MOVEL'UPT0016' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6599
+|  C                     ENDIF
+| 03C                     END
+| 02-C                     END
+|   C   99                GOTO E1B00
+|   C*
+04===CSR         E1B00     ENDSR
+

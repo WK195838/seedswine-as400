@@ -1,0 +1,252 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INR0822                                       *
+      * AUTHER       : A1492  TERRY                                  *
+      * CREATE DATE  : 2011/05/30                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :                                             *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :陳列品使用明細表                             *
+      ****************************************************************
+     FINTNLF03IP  E           K        DISK
+     FINTNLF11IF  E           K        DISK
+     F            TN0                               KRENAMETNL11
+     FINTDPF  IF  E           K        DISK
+     FINTHLF01IF  E           K        DISK
+     FINTLLF01IF  E           K        DISK
+     FINTPLF04IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FSCWK241 O   E           K        DISK                      A
+     FSCWK242 UF  E           K        DISK                      A
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      601 602 DTO01
+     I                                      603 604 DDOC
+     I                                      605 606 DTO02S
+     I                                      607 608 DTO02E
+     I                                      609 613 DTO03S
+     I                                      614 618 DTO03E
+     I                                      619 6190DATA
+     I                                      621 629 DTO04S
+     I                                      631 639 DTO04E
+     I                                      641 6460DTO05
+     I                                      641 6420DTOYY
+     I*  截止日期
+     I                                      651 6580Y0DATE
+     I                                      659 659 DOPT
+     I*採購單號3~4為'M1'表示此筆為調撥進來
+     I*可從INTDPF查詢調出分店
+     I            DS
+     I                                        1  13 TN10
+     I                                        3   4 TNM1
+     I*
+     I              '調撥'              C         @TYPE1
+     I              '陳列轉進貨'        C         @TYPE2
+     I              '陳列退出'          C         @TYPE3
+     I              '借用'              C         @TYPE4
+      *==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYWK1    KLIST
+     C                     KFLD           W24101
+     C                     KFLD           W24102
+     C                     KFLD           W24103
+     C                     KFLD           W24106
+     C                     KFLD           W24104
+     C           KEYWK2    KLIST
+     C                     KFLD           W24200
+     C                     KFLD           W24206
+     C                     KFLD           W24201
+     C                     KFLD           W24202
+     C                     KFLD           W24203
+     C                     KFLD           W24204
+     C           KEYTD     KLIST
+     C                     KFLD           TN10
+     C                     KFLD           TN05
+     C           KEYTNL    KLIST
+     C                     KFLD           W24106
+     C                     KFLD           W24104
+     C           KEYNC     KLIST
+     C                     KFLD           TN01             公司別
+     C                     KFLD           TN05             產品代號
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN100
+     C*
+      *==============================================================*
+      *                    WRITE SCWK241
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+     C           DOPT      IFEQ 'N'
+     C           KEYNC     CHAINNC0                  40
+     C           *IN40     IFEQ '0'
+     C           NC25      ANDEQ'Y'
+     C                     GOTO END100
+     C                     ENDIF
+     C                     ENDIF
+|    C*
+|    C                     CLEARW241
+|    C*
+|    C                     MOVELTN01      W24101           公司代號
+|    C                     MOVELTN02      W24102           通路代號
+|    C                     MOVELTN04      W24103           分店代號
+|    C                     MOVELTN05      W24104           產品代號
+|    C                     Z-ADDTN06      W24105           單價
+|    C                     MOVELTN09      W24106           驗收單號
+|    C                     Z-ADDTN08      W24107           到店日期
+|    C                     Z-ADDTN14      W24108           驗收數量
+|    C                     Z-ADDTN07      W24109           餘量
+|    C*
+|    C                     WRITEW241
+|    C*調撥
+|    C                     EXSR RTN110
+|    C*陳列轉進貨
+|    C                     EXSR RTN120
+|    C*陳列退出
+|    C                     EXSR RTN130
+|    C*借用
+|    C                     EXSR RTN140
+|    C*
+01===C           END100    ENDSR
+     C*==============================================================*
+     C*                   調撥
+     C*==============================================================*
+02===C           RTN110    BEGSR
+|    C*
+|    C                     SETOF                     41
+|    C           KEYTNL    SETLLINTNLF11
+| 01-C           *IN41     DOWEQ*OFF
+|   C           KEYTNL    READEINTNLF11                 41
+|   C   41                LEAVE
+|   C*
+|   C                     MOVELW24103    W24200           分店代號
+|   C                     MOVELW24104    W24206           產品代號
+|   C                     MOVELW24106    W24201           驗收單號
+|   C*處理驗收單號為'@@'　　
+| 02-C           TN18      IFEQ '@@'
+|   C                     EXSR RTN111
+| 03-C           @DATA     IFNE 'Y'
+|   C                     ITER
+| 03-C                     ENDIF
+| 02-C                     ENDIF
+|   C*
+|   C                     Z-ADDTN08      W24202           日期
+|   C                     MOVEL@TYPE1    W24203           類別
+|   C                     MOVELTN04      W24204           分店
+|   C           KEYWK2    CHAINSCWK242              40
+| 04-C           *IN40     IFEQ *OFF
+|   C                     ADD  TN14      W24205           數量
+|   C                     UPDATW242
+| 04*C                     ELSE
+|   C                     Z-ADDTN14      W24205           數量
+|   C                     MOVELTN10      W24207           異動單號
+|   C                     WRITEW242
+| 04-C                     ENDIF
+|   C*
+|   C                     CLEARW242
+|   C*
+| 01-C                     ENDDO
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*                   調撥
+     C*==============================================================*
+03===C           RTN111    BEGSR
+|    C*
+|    C                     MOVEL*BLANK    @DATA   1
+|    C           KEYTD     CHAININTDPF               40
+| 01-C           *IN40     IFEQ *OFF
+| 02-C           W24200    IFEQ TD07
+|   C                     MOVEL'Y'       @DATA
+| 02-C                     ENDIF
+| 01-C                     ENDIF
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*                   陳列轉進貨
+     C*==============================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C           KEYWK1    SETLLINTHLF01
+|    C           KEYWK1    READEINTHLF01                 42
+| 01-C           *IN42     DOWEQ*OFF
+|   C                     MOVELW24103    W24200
+|   C                     MOVELTH02      W24206
+|   C                     MOVELTH05      W24201           驗收單號
+|   C                     Z-ADDTH09      W24202           日期
+|   C                     MOVEL@TYPE2    W24203           類別
+|   C                     MOVELTH08      W24204           分店
+|   C                     Z-ADDTH03      W24205           數量
+|   C                     MOVELTH01      W24207           異動單號
+|   C                     WRITEW242
+|   C                     CLEARW242
+|   C           KEYWK1    READEINTHLF01                 42
+| 01-C                     ENDDO
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*                   陳列退出
+     C*==============================================================*
+05===C           RTN130    BEGSR
+|    C*
+|    C           KEYWK1    SETLLINTLLF01
+|    C           KEYWK1    READEINTLLF01                 42
+| 01-C           *IN42     DOWEQ*OFF
+|   C                     MOVELW24103    W24200
+|   C                     MOVELTL02      W24206
+|   C                     MOVELTL04      W24201           驗收單號
+|   C                     Z-ADDTL08      W24202           日期
+|   C                     MOVEL@TYPE3    W24203           類別
+|   C                     MOVELTL07      W24204           分店
+|   C                     Z-ADDTL03      W24205           數量
+|   C                     MOVELTL01      W24207           異動單號
+|   C                     WRITEW242
+|   C                     CLEARW242
+|   C           KEYWK1    READEINTLLF01                 42
+| 01-C                     ENDDO
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*                   借用
+     C*==============================================================*
+06===C           RTN140    BEGSR
+|    C*
+|    C           KEYWK1    SETLLINTPLF04
+|    C           KEYWK1    READEINTPLF04                 42
+| 01-C           *IN42     DOWEQ*OFF
+|   C                     MOVELW24103    W24200
+|   C                     MOVELTP05      W24206
+|   C                     MOVELTP12      W24201           驗收單號
+|   C                     Z-ADDTP03      W24202           日期
+|   C                     MOVEL@TYPE4    W24203           類別
+|   C                     MOVELTP04      W24204           分店
+|   C                     Z-ADDTP06      W24205           數量
+|   C                     MOVELTP10      W24207           異動單號
+|   C                     WRITEW242
+|   C                     CLEARW242
+|   C           KEYWK1    READEINTPLF04                 42
+| 01-C                     ENDDO
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*                    INITIAL
+     C*==============================================================*
+07===C           *INZSR    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     IN   LDA
+|    C*
+07===C                     ENDSR
+     C*==============================================================*
+

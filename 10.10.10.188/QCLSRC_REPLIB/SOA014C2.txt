@@ -1,0 +1,58 @@
+             PGM
+
+             DCL        VAR(&WSC39S) TYPE(*CHAR) LEN(6)       /*BP2MOD */
+             DCL        VAR(&WSC39) TYPE(*DEC) LEN(6 0)
+             DCL        VAR(&YMD) TYPE(*DEC) LEN(6 0)          /*BP2MOD*/
+             DCL        VAR(&MDY) TYPE(*DEC) LEN(6 0)          /*BP2MOD*/
+             DCL        VAR(&YY) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YY2) TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&YY4) TYPE(*DEC) LEN(4 0)
+             DCL        VAR(&YY4C) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&MD) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YMD4) TYPE(*CHAR) LEN(8)
+
+             CALL       PGM(P63)
+
+             CHGVAR     VAR(&WSC39) VALUE(%SST(*LDA 187 6))
+
+  /*前一日*/
+             CALL       PGM(CUNDAT) PARM(&WSC39 &YMD &MDY)
+
+             CHGVAR     VAR(&WSC39S) VALUE(&YMD)               /*BP2000*/
+ /* M001A */
+             CHGVAR     VAR(&YY)  VALUE(%SST(&WSC39S 1 2))
+             CHGVAR     VAR(&YY2) VALUE(&YY)
+             CHGVAR     VAR(&MD)  VALUE(%SST(&WSC39S 3 4))
+             IF (&YY2 < 30  ) THEN(CHGVAR (&YY4) (&YY2 + 2000))
+             ELSE
+                IF (&YY2 >= 30) THEN(CHGVAR (&YY4) (&YY2 + 1900))
+             CHGVAR     VAR(&YY4C) VALUE(&YY4)
+             CHGVAR VAR(&YMD4) VALUE(&YY4C *CAT &MD)
+
+             OVRDBF     FILE(SOSCJF01) SHARE(*YES)
+             OVRDBF     FILE(SOSGJF01) SHARE(*YES)
+             OVRDBF     FILE(SOSNJF01) SHARE(*YES)
+             OVRPRTF    FILE(SOA014P) USRDTA('銷售月結')
+             OPNQRYF    FILE((SOSCJF01)) QRYSLT(' SC39 *LE ' *CAT +
+                          &YMD4   *CAT '  *AND SC39 *NE 0 *AND #I01 +
+                          *EQ "            " ') KEYFLD(*FILE)
+
+             OPNQRYF    FILE((SOSGJF01)) QRYSLT(' SG26 *LE ' *CAT +
+                          &YMD4   *CAT '  *AND SG26 *NE 0 *AND #I01 +
+                          *EQ "            " *AND (SG17 *EQ +
+                          "            " *OR (SG17 *NE "            +
+                          " *AND SG14 *EQ "V"))') KEYFLD(*FILE)
+
+             OPNQRYF    FILE((SOSNJF01)) QRYSLT(' SN06 *LE ' *CAT +
+                          &YMD4   *CAT '  *AND SN06 *NE 0 *AND #I01 +
+                          *EQ "            " ') KEYFLD(*FILE)
+
+             CALL       PGM(SOA0142)
+
+             CLOF       OPNID(SOSCJF01)
+             CLOF       OPNID(SOSGJF01)
+             CLOF       OPNID(SOSNJF01)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

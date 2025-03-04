@@ -1,0 +1,251 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOA012                                        *
+      * AUTHER       : A1034 STEPHANIE                               *
+      * CREATE DATE  : 81/06/03                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+      * REMARK       :訂單批次處理                                 *
+      ****************************************************************
+     FPA#BPF  IF  E           K        DISK
+     FSOA012D CF  E                    WORKSTN
+     ILDA        UDS
+     I                                      101 110 $USER
+B2MODI                                      111 1220$CHYMD
+B2MODI                                      125 1300$EGMDY
+B2MODI                                      607 608 DSC01
+B2MODI                                      609 6200WSC07S
+B2MODI                                      609 612 YYS
+B2MODI                                      613 620 MMDDS
+B2MODI                                      621 6320WSC07E
+B2MODI                                      621 624 YYE
+B2MODI                                      625 632 MMDDE
+B2MODI                                      639 643 DSC04S
+B2MODI                                      649 653 DSC04E
+B2MODI                                      659 670 DSC02S
+B2MODI                                      679 690 DSC02E
+B2MODI                                      699 7040DSC07S
+B2MODI                                      709 7140DSC07E
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN14     PARM *IN14     IN14    1
+     C           *IN97     PARM *IN97     IN97    1
+     C           *IN96     PARM *IN96     IN96    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N10N96          EXSR RTN010                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN14     OREQ '1'
+    C           *IN99     ANDEQ'0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  02-C           *IN03     IFEQ '0'
+    C           *IN14     ANDEQ'1'
+    C                     EXSR RTN100                     .CHECK      ?
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DSC01
+|    C                     Z-ADD0         WSC07S
+|    C                     Z-ADD0         WSC07E
+|    C*上月最後一日
+      *
+B2MODC                     Z-ADD$CHYMD    CHKMDY  80
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    MOVE '01'      CHKMDY
+B2VFYC                     MOVE '2001'    CHKMDY
+B2INF *CVR3012 sev.30 Field CHKMDY contains more than one year
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+     C                     CALL 'P62'
+B2MODC                     PARM CHKMDY    P6201I  80
+     C                     PARM -1        P6202I  40
+B2MODC           CHKMDY    PARM           P6201O  80
+B2CHKC                     ADD  110000    CHKMDY
+B2INF *CVR3012 sev.30 Field CHKMDY contains more than one year
+      *
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM CHKMDY    S001I2  80
+B2???C           DSC07S    PARM           S001O1  80
+B2INF *CVR5011 sev.50 Field S001O1 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2INF *CVR3012 sev.30 Field DSC07S contains more than one year
+B2000C                     Z-ADDDSC07S    DSC07E
+|    C*
+|    C*                    Z-ADD$EGMDY    DSC07S
+|    C*                    Z-ADD$EGMDY    DSC07E
+|    C                     MOVE *BLANK    DSC04S
+|    C                     MOVE *BLANK    DSC04E
+|    C                     MOVE *BLANK    DSC02S
+|    C                     MOVE *BLANK    DSC02E
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+      *USE TIME
+B2000C                     TIME           TIME   120
+B2000C                     MOVELTIME      HOUR    20
+     C           HOUR      IFGE 0
+     C           HOUR      ANDLE5
+     C                     SETON                     6162
+     C                     SETON                     8799
+     C                     END
+|    C   99                GOTO END100
+|    C*公司別檢查
+| 01-C           DSC01     IFEQ *BLANK
+|   C                     SETON                     609599
+| 01-C                     END
+|    C   99                GOTO END100
+| 01-C           DSC01     IFGE 'C1'
+| 01-C           DSC01     ANDLE'C3'
+|   C                     SETON                     609499
+| 01-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C           DSC01     CHAIN#B0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     SETON                     609499
+| 02-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*訂單日期檢查
+|    C** DEFAULT VALUE
+B2CHKC           DSC07S    IFEQ 0
+B2INF *CVR3012 sev.30 Field DSC07S contains more than one year
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2CHKC                     Z-ADD010101    DSC07S
+B2INF *CVR3012 sev.30 Field DSC07S contains more than one year
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+| 03-C                     END
+B2CHKC           DSC07E    IFEQ 0
+B2INF *CVR3012 sev.30 Field DSC07E contains more than one year
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2CHKC                     Z-ADD123199    DSC07E
+B2INF *CVR3012 sev.30 Field DSC07E contains more than one year
+| 04-C                     END
+|    C**
+|    C                     CALL 'P09'
+B2???C                     PARM DSC07S    P0901I  80
+B2INF *CVR3012 sev.30 Field DSC07S contains more than one year
+B2INF *CVR3012 sev.30 Field P0901I contains more than one year
+|    C                     PARM           P0911O  1
+| 05-C           P0911O    IFEQ 'N'
+|   C                     SETON                     619899
+| 05*C                     ELSE
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    MOVE DSC07S    YYS
+B2NEWC                     MOVE DSC07S    HB2@YY  2
+B2CHKC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2CHKC                     MOVE HB2@Y4    YYS
+B2INF *CVR3012 sev.30 Field DSC07S contains more than one year
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2???C                     MOVELDSC07S    MMDDS
+B2INF *CVR3012 sev.30 Field DSC07S contains more than one year
+B2INF *CVR3012 sev.30 Field MMDDS contains more than one year
+| 05-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C                     CALL 'P09'
+B2???C                     PARM DSC07E    P0901I  80
+B2INF *CVR3012 sev.30 Field DSC07E contains more than one year
+B2INF *CVR3012 sev.30 Field P0901I contains more than one year
+|    C                     PARM           P0911O  1
+| 06-C           P0911O    IFEQ 'N'
+|   C                     SETON                     629899
+| 06*C                     ELSE
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    MOVE DSC07E    YYE
+B2NEWC                     MOVE DSC07E    HB2@YY  2
+B2CHKC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2CHKC                     MOVE HB2@Y4    YYE
+B2INF *CVR3012 sev.30 Field DSC07E contains more than one year
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2???C                     MOVELDSC07E    MMDDE
+B2INF *CVR3012 sev.30 Field DSC07E contains more than one year
+B2INF *CVR3012 sev.30 Field MMDDE contains more than one year
+| 06-C                     END
+|    C   99                GOTO END100
+|    C*日期區間檢查
+B2000C           WSC07S    IFGT WSC07E
+|   C                     SETON                     616292
+|   C                     SETON                     99
+| 07-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*客戶區間檢查
+| 08-C           DSC04E    IFEQ *BLANKS
+|   C                     MOVE *HIVAL    DSC04E
+| 08-C                     END
+| 09-C           DSC04S    IFGT DSC04E
+|   C                     SETON                     639099
+| 09-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*訂單區間檢查
+| 10-C           DSC02E    IFEQ *BLANKS
+|   C                     MOVE *HIVAL    DSC02E
+| 10-C                     END
+| 11-C           DSC02S    IFGT DSC02E
+|   C                     SETON                     649099
+| 11-C                     END
+|    C   99                GOTO END100
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+03===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+03===C           ENDLDA    ENDSR
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2NEWC/COPY HBP2CVTR
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+

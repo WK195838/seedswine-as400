@@ -1,0 +1,195 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : MTI024                                        *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 82/01/07                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :停止出貨產品查詢                             *
+      ****************************************************************
+     FMTMALF03IF  E           K        DISK
+     FMTI024D CF  E                    WORKSTN
+     F                                        RRN1  KSFILE SFLSR1
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C*
+     C           *LIKE     DEFN MA01      OBGN1            *START KEY
+     C           *LIKE     DEFN MA01      KUP1                         OM
+     C           *LIKE     DEFN MA01      KDN1                         OM
+     C           *LIKE     DEFN MA01      WORK1
+      *SFL FIELD
+     C           *LIKE     DEFN RRN1      WRRN1
+     C           *LIKE     DEFN RRN1      WPRCD
+     C           *LIKE     DEFN RRN1      DSPRCD
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN110                     *INIT SFL
+     C                     EXSR RTN120                     *READ DATA
+     C                     EXSR RTN140                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN25     IFEQ '1'
+    C*IN25向上翻頁
+    C           KDN1      SETGTMA0
+    C                     EXSR RTN110
+    C                     EXSR RTN120
+  02*C                     ELSE
+  03-C           *IN26     IFEQ '1'
+    C*IN26向下翻頁
+    C           KUP1      SETLLMA0
+    C                     EXSR RTN110
+    C                     EXSR RTN130
+  03*C                     ELSE
+    C*ENTER
+  04-C           DBGN1     IFNE OBGN1
+    C           DBGN1     SETLLMA0
+    C                     EXSR RTN110
+    C                     EXSR RTN120
+    C*KEEP SCREEN SETLL KEY
+    C                     MOVELDBGN1     OBGN1
+  04-C                     END
+  03-C                     END
+  02-C                     END
+    C  N03                EXSR RTN140
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN110....INITTAL SFL
+      *==============================================================*
+01===C           RTN110    BEGSR
+|    C*WORK = FIELD FOR NONE DISPLAY (ND)
+|    C                     MOVEL*BLANKS   WORK1
+|    C*SFL
+|    C                     Z-ADD0         RRN1
+|    C                     Z-ADD0         WRRN1
+|    C                     Z-ADD10        WPRCD
+|    C                     SETOF                     53
+|    C                     SETON                     52
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+|    C*
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN120 .. READ DATA TO SFL
+      *=========================================================*
+02===C           RTN120    BEGSR
+|    C*
+|    C                     READ MA0                      46
+| 01-C           *IN46     IFEQ '0'
+|   C*KEEP SETLL KEY
+|   C                     EXSR RTN810
+| 01-C                     END
+|    C*
+| 02-C           *IN46     DOWEQ'0'
+|   C           RRN1      ANDLTWPRCD
+|   C*
+|   C*GET DATA
+|   C                     EXSR RTN121
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+|   C*KEEP SETGT KEY
+|   C                     EXSR RTN820
+|   C*
+|   C                     READ MA0                      46
+| 02-C                     END
+|    C*
+| 03-C           RRN1      IFLT WPRCD
+|   C*BOTOM
+|   C                     SETON                     97
+| 03-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN121....GATA DATA TO SFL
+      *==============================================================*
+03===C           RTN121    BEGSR
+|    C*
+|    C                     MOVELMA01      WORK1
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN130 .. READP DATA TO SFL
+      *=========================================================*
+04===C           RTN130    BEGSR
+|    C*
+|    C                     Z-ADDWPRCD     RRN1
+|    C*
+|    C                     READPMA0                      46
+| 01-C           *IN46     IFEQ '0'
+|   C*KEEP SETGT KEY
+|   C                     EXSR RTN820
+| 01-C                     END
+|    C*
+| 02-C           *IN46     DOWEQ'0'
+|   C           RRN1      ANDGT0
+|   C                     SUB  1         RRN1
+      *
+|   C                     SETOF                     3031
+|   C*KEEP SETLL KEY
+|   C                     EXSR RTN810
+|   C*
+|   C                     READPMA0                      46
+| 02-C                     END
+|    C*
+| 03-C           RRN1      IFEQ 0
+|   C           KUP1      SETLLMA0
+| 03*C                     ELSE
+|   C           *LOVAL    SETLLMA0
+|   C*PAGE TOP
+| 04-C           RRN1      IFEQ WPRCD
+|   C                     SETON                     98
+| 04-C                     END
+|   C*
+| 03-C                     END
+|    C                     EXSR RTN110
+|    C                     EXSR RTN120
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN140... EXFMT SFL                                 *
+      *==============================================================*
+05===C           RTN140    BEGSR
+|    C*
+| 01-C           RRN1      IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN810... KEEY SETLL KEY                            *
+      *==============================================================*
+06===C           RTN810    BEGSR
+|    C*
+|    C                     MOVELMA01      KUP1
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN820... KEEY SETGT KEY                            *
+      *==============================================================*
+07===C           RTN820    BEGSR
+|    C*
+|    C                     MOVELMA01      KDN1
+|    C*
+07===C                     ENDSR
+

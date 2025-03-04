@@ -1,0 +1,50 @@
+/*-------------------------------------------------------------------*/
+/*           1. AUTHOR     : TAYLOR                                  */
+/*           2. CREAT DATE : 80.5.1                                  */
+/*           3. FUNCTION   : FOR DAIRLY BACK UP                      */
+/*  DESCRIPTION:                                                     */
+/*                                                                   */
+/*  PARMATERS:                                                       */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+             PGM
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN90) TYPE(*CHAR) LEN(1) VALUE('0')
+             DCLF       FILE(WKBKUPT)
+             MONMSG     MSGID(MCH0000 CPF0000 CPF9999)
+                           /*EXECEPTION HANDER */
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*NOTIFY)
+
+             CALL       PGM(SET) PARM(&IN03)
+             IF         COND(&IN03 *EQ '0') THEN(DO)
+             CALL PTB805              /* CLEAR PGM:Q* IN QRPLOBJ */
+             SAVOBJ     OBJ(PTB801) LIB(PTPLIB) DEV(TAP01) SEQNBR(1) +
+                          EXPDATE(090189) ENDOPT(*LEAVE) +
+                          TGTRLS(*CURRENT)
+
+RCVFIL:      RCVF
+             MONMSG     MSGID(CPF0864) EXEC(GOTO CMDLBL(ENDPGM)) +
+                        /*EXIT OF FILE REACHED */
+             IF         COND(&LIB *EQ '          ') THEN(GOTO +
+                          CMDLBL(RCVFIL))
+             CHKOBJ     OBJ(QSYS/&LIB) OBJTYPE(*LIB) /*CHECK IF FILE +
+                          EXISTS */
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(RCVFIL))
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('此LIB: ' *CAT &LIB *CAT +
+                          '正在做DAIRLY BACKUP') TOPGMQ(*EXT) +
+                          MSGTYPE(*STATUS)
+             SAVCHGOBJ  OBJ(Q*) LIB(&LIB) DEV(TAP01) OBJTYPE(*FILE) +
+                          EXPDATE(090189) ENDOPT(*LEAVE)
+             IF         COND(&IN90 = '0') THEN(DO)
+             SBMJOB     CMD(WRKACTJOB OUTPUT(*PRINT) SBS(QINTER))
+             CHGVAR     VAR(&IN90) VALUE('1')
+             ENDDO
+
+             GOTO       RCVFIL
+             CLOF       OPNID(WKBKUP)
+             CHKTAP     DEV(TAP01) ENDOPT(*UNLOAD)
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*BREAK)
+             ENDDO
+ENDPGM:      ENDPGM
+

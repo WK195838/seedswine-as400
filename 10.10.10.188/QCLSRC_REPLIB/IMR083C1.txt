@@ -1,0 +1,96 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : JANET                                     */
+     /*    CREATE DATE  : 87/01/07                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : IMR083C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :訂單系統                                 */
+     /*    REMARK       :送貨未確認明細表                         */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&YSE06S) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YSE06E) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DSE10S) TYPE(*CHAR) LEN(1)
+/*M001A*/    DCL        VAR(&YMD8S)  TYPE(*CHAR) LEN(8)
+/*M001A*/    DCL        VAR(&YMD8E)  TYPE(*CHAR) LEN(8)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+
+             CHGVAR     VAR(&YSE06S) VALUE(%SST(*LDA 630 6))
+             CHGVAR     VAR(&YSE06E) VALUE(%SST(*LDA 636 6))
+             CHGVAR     VAR(&DSE10S) VALUE(%SST(*LDA 673 1))
+/*M001A*/    CHGVAR     VAR(&YMD8S)  VALUE(%SST(*LDA 850 8))
+/*M001A*/    CHGVAR     VAR(&YMD8E)  VALUE(%SST(*LDA 858 8))
+
+             CPYF       FROMFILE(REW500) TOFILE(QTEMP/REW500) +
+                        CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REW500))
+             OVRDBF     FILE(REW500) TOFILE(QTEMP/REW500)
+
+
+             CPYF       FROMFILE(REW502) TOFILE(QTEMP/REW502) +
+                        CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REW502))
+             OVRDBF     FILE(REW502) TOFILE(QTEMP/REW502) SHARE(*YES)
+
+             OVRPRTF    FILE(IMR083P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('倉租彙總')
+             OVRPRTF    FILE(IMR084P) PAGESIZE(*N 198) CPI(15)   +
+                        USRDTA('倉租明細')
+             OVRDBF     FILE(IMIAPF) SHARE(*YES)
+             OVRDBF     FILE(MTMAPF) SHARE(*YES)
+             OVRDBF     FILE(IMIRLF15) SHARE(*YES)
+
+             CALL       IMR0831
+             OVRDBF     FILE(REW500) TOFILE(QTEMP/REW500) SHARE(*YES)
+             OPNQRYF    FILE((REW500)) OPTION(*ALL) QRYSLT(' WF5001 +
+                          *EQ %RANGE(' *CAT &YMD8S  *CAT ' ' *CAT +
+                          &YMD8E  *CAT ') ') KEYFLD((WF5000) +
+                          (WF5004) (WF5001) (WF500A) (WF5003))
+
+             IF         COND(&DSE10S *EQ '1') THEN(DO) /* POST-PF14 */
+             CALL       IMR0832
+             CHGVAR     VAR(&P6601I) VALUE('IMR083P')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDDO
+             IF         COND(&DSE10S *EQ '2')  THEN(DO) /* POST-PF14 */
+             CALL       IMR0833
+             CHGVAR     VAR(&P6601I) VALUE('IMR084P')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+                        ENDDO
+             IF         COND(&DSE10S *EQ '3')  THEN(DO) /* POST-PF14 */
+             CALL       IMR0832
+             CHGVAR     VAR(&P6601I) VALUE('IMR083P')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             CLOF       OPNID(REW500)
+             OVRDBF     FILE(REW500) TOFILE(QTEMP/REW500) SHARE(*YES)
+             OPNQRYF    FILE((REW500)) OPTION(*ALL) QRYSLT(' WF5001 +
+                          *EQ %RANGE(' *CAT &YMD8S  *CAT ' ' *CAT +
+                          &YMD8E  *CAT ') ') KEYFLD((WF5000) +
+                          (WF5004) (WF5001) (WF500A) (WF5003))
+             CALL       IMR0833
+             CHGVAR     VAR(&P6601I) VALUE('IMR084P')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+                        ENDDO
+             RCLRSC
+             DLTOVR     FILE(*ALL)
+
+
+             ENDPGM
+

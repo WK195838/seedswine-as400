@@ -1,0 +1,224 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     H*                                                              *
+     H*    PROGRAM-ID   : PIA00922                                   *
+     H*    PROGRAM NAME :計算12/25庫存量-驗收數量            *
+     H*    AUTHOR       : RACHEL                                     *
+     H*    CREATE DATE  : 2022/10/11                                 *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :庫存系統作業                              *
+     H*    SUBSYSTEM    :盤點系統　　                              *
+     H*    REMARK       :計算盤點日與12/25之間的驗收數量         *
+     H*                   (進貨&退貨)                            *
+     H*                                                              *
+     H****************************************************************
+     FSCWK051LIF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FPOCCLF08IF  E           K        DISK
+     FPIZALF07IF  E           K        DISK
+     FPIA9LF02UF  E           K        DISK                      A
+     F            PA9                               KRENAMEPA9L
+     E*---------------------------------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      201 2080$A8YMD
+     I                                      500 500 $DATA
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+     I                                      501 502 DPI01
+     I                                      503 504 DPI02
+     I                                      505 5080DPI03
+     I                                      509 5140DPI04S
+     I                                      509 5100DPI4SM
+     I                                      511 5120DPI4SD
+     I                                      515 5200DPI04E
+     I                                      515 5160DPI4EM
+     I                                      517 5180DPI4ED
+     I                                      521 5260DPIYM
+     I                                      527 5340DZA03S
+     I                                      535 5420DZA03E
+     I           IDS
+     I                                        1   80WZA03
+     I                                        1   60WZA3YM
+     I                                        1   40WZA03Y
+     I                                        5   60WZA03M
+     I                                        7   80WZA03D
+     I           IDS
+     I                                        1   80KP905
+     I                                        7   80KP905D
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYCC     KLIST
+     C                     KFLD           P904             產品代號
+     C                     KFLD           KP905            生效起日
+     C           KEYNC     KLIST
+     C                     KFLD           TX01             公司
+     C                     KFLD           P904             產品代號
+     C           KEYNE     KLIST
+     C                     KFLD           P901             公司別
+     C                     KFLD           P902             通路代號
+     C                     KFLD           P903             分店代號
+     C           KEYZA     KLIST
+     C                     KFLD           TX01             公司別
+     C                     KFLD           TX27             通路代號
+     C                     KFLD           TX12             分店代號
+     C           KEYA9     KLIST
+     C                     KFLD           TX01             公司別
+     C                     KFLD           TX27             通路代號
+     C                     KFLD           TX12             分店代號
+     C                     KFLD           TX11             產品代號
+     C                     KFLD           K905             盤點日期
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     SETOF                     4041
+     C                     Z-ADDDPIYM     WZA3YM
+     C                     Z-ADD25        WZA03D           以25日為基準日
+     C                     READ TX0                      40
+  01-C           *IN40     DOWEQ'0'
+     C*
+     C                     MOVEL*BLANK    ACT
+     C           KEYZA     SETLLZA0
+     C           KEYZA     READEZA0                      41
+  02-C           *IN41     IFEQ '0'
+     C*
+     C*盤點日在25日，不異動驗收數量
+  03-C           ZA03      IFEQ WZA03
+    C                     GOTO NEXT
+  03-C                     END
+     C*
+     C                     Z-ADDZA03      K905    80
+     C*盤點日在25日前，以(盤點日+1)為驗收起日、25日為迄日
+ 00A+C*盤點日在25日前，以(盤點日)為驗收起日、25日為迄日-->20230112
+  04-C           ZA03      IFLT WZA03
+    C                     Z-ADDZA03      KZA03S  80
+ 00A+C*修正0112          ADD  1         KZA03S
+    C                     Z-ADDWZA03     KZA03E  80       　
+    C                     MOVEL'A'       ACT     1        加項
+  04-C                     END
+     C*
+     C*盤點日在25日後，以26日為驗收起日、盤點日為迄日
+  05-C           ZA03      IFGT WZA03
+    C                     Z-ADDWZA03     KZA03S
+    C                     ADD  1         KZA03S
+    C                     Z-ADDZA03      KZA03E
+    C                     MOVEL'S'       ACT              減項
+  05-C                     END
+     C*
+  06-C           TX06      IFGE KZA03S
+    C           TX06      ANDLEKZA03E
+    C*
+    C           KEYZA     SETLLPA9L
+    C           KEYA9     CHAINPA9L                 42
+  07-C           *IN42     IFEQ '0'
+    C*
+    C*計算驗收數量(進貨&退貨)
+    C           TX04      IFEQ 1                          進貨
+    C           ACT       IFEQ 'A'
+    C                     ADD  TX15      P913             驗收數量
+    C                     END
+    C           ACT       IFEQ 'S'
+    C                     SUB  TX15      P913             驗收數量
+    C                     END
+    C                     END
+    C*
+    C           TX04      IFEQ -1                         退貨
+    C           ACT       IFEQ 'A'
+    C                     SUB  TX15      P913             驗收數量
+    C                     END
+    C           ACT       IFEQ 'S'
+    C                     ADD  TX15      P913             驗收數量
+    C                     END
+    C                     END
+    C*
+    C                     MOVEL'PIA0922U'P9WW      P
+    C                     Z-ADD$A8YMD    P9XX
+    C                     TIME           P9YY
+    C                     UPDATPA9L
+    C*
+    C*有進貨但無盤點資料-->新增該產品資料
+  07*C                     ELSE
+    C*計算驗收數量(進貨&退貨)
+    C           TX04      IFEQ 1                          進貨
+    C           ACT       IFEQ 'A'
+    C                     Z-ADDTX15      P913             驗收數量
+    C                     END
+    C           ACT       IFEQ 'S'
+    C                     Z-SUBTX15      P913             驗收數量
+    C                     END
+    C                     END
+    C*
+    C           TX04      IFEQ -1                         退貨
+    C           ACT       IFEQ 'A'
+    C                     Z-SUBTX15      P913             驗收數量
+    C                     END
+    C           ACT       IFEQ 'S'
+    C                     Z-ADDTX15      P913             驗收數量
+    C                     END
+    C                     END
+    C*
+    C                     MOVELTX01      P901      P      公司別
+    C                     MOVELTX27      P902      P      通路代號
+    C                     MOVELTX12      P903      P      分店代號
+    C           KEYNE     CHAINNE0                  43
+    C           *IN43     IFEQ '0'
+    C                     MOVELNE04      P903NM    P      分店全稱
+    C                     ELSE
+    C                     MOVEL*BLANK    P903NM
+    C                     ENDIF
+    C*
+    C                     MOVELTX11      P904      P      產品代號
+    C           KEYNC     CHAINNC0                  44
+    C           *IN44     IFEQ '0'
+    C                     MOVELNC05      P904NM    P      中文簡稱
+    C                     ELSE
+    C                     MOVEL*BLANK    P904NM
+    C                     ENDIF
+    C*
+    C                     Z-ADDK905      P905             盤點日期
+    C                     MOVEL*BLANK    P906             盤點單號
+    C                     Z-ADD0         P907             未稅成本
+    C*以25日為生效起日查詢報價檔的單價
+    C                     Z-ADDDZA03S    KP905            生效起日
+    C                     Z-ADD25        KP905D
+    C           KEYCC     SETGTCC0
+    C                     READ CC0                      45
+  08-C           *IN45     DOWEQ'0'
+  09-C           P905      IFGE CC07
+    C                     Z-ADDCC09      P907             未稅成本
+    C                     LEAVE
+  09*C                     ELSE
+    C                     READ CC0                      45
+  09-C                     ENDIF
+  08-C                     END
+    C                     Z-ADD0         P908             系統數量
+    C                     Z-ADD0         P909             盤點量
+    C                     Z-ADD0         P910             差異量
+    C                     Z-ADD0         P911             盤差金額
+    C                     Z-ADD0         P912             銷售數量
+    C                     Z-ADD0         P914             系統異動調整
+    C                     Z-ADD0         P915             實際庫存量
+|   C                     Z-ADD0         P916             12/25系統庫存量
+|   C                     Z-ADD0         P917             12/25盤盈虧數量
+|   C                     Z-ADD0         P918             12/25盤盈虧金額
+    C                     MOVEL'PIA0922W'P9WW      P
+    C                     Z-ADD$A8YMD    P9XX
+    C                     TIME           P9YY
+    C                     MOVEL$USER     P9ZZ      P
+    C                     WRITEPA9L
+  07-C                     END
+    C*
+  06-C                     END
+  02-C                     END
+    C*
+    C           NEXT      TAG
+    C                     READ TX0                      40
+  01-C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+

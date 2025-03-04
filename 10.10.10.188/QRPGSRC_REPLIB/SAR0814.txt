@@ -1,0 +1,219 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : SAR0812                                       *
+      * AUTHER       : MICHELLE                                      *
+      * CREATE DATE  : 06/17/99                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :期間專櫃銷售分析表BY ITEM                    *
+      ****************************************************************
+     FREWFC51 IP  E           K        DISK
+     FMTMHPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FSAR081P2O   E             39     PRINTER
+     E*
+     E                    SL         12  9 0
+     IWFC50
+     I                                              WFC502L2
+     I                                              WFC503L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 605 DSC04S
+     I                                      606 610 DSC04E
+      *MM/DD/YY
+     I                                      611 6140DSC39S
+     I                                      617 6200DSC39E
+      *YY/MM/DD
+     I                                      623 6280WSC39S
+     I                                      629 6340WSC39E
+      *
+     I                                      700 700 DSEL
+     I                                      701 701 DSEL2
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+     C           KEY#A     KLIST
+     C                     KFLD           W#A01
+     C                     KFLD           W#A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+    C                     SETOF                     30
+  01*C*                    ELSE
+  02-C*          *INL2     IFEQ '1'
+     C*          *IN22     ANDEQ'0'                        PRT DETAIL
+     C*                    WRITEPE1
+    C*                    EXSR RTN010                     *HEADING
+     C*                    SETOF                     30
+  02-C*                    END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL2                   EXSR RTN200
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          *INZSR ...INZITIAL
+      *==============================================================*
+01===C           *INZSR    BEGSR
+     C                     MOVELDSC04S    ME01
+     C                     MOVEL*BLANKS   ME02
+|    C           KEYME     CHAINME0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   ME04S
+     C                     ELSE
+     C                     MOVE ME04      ME04S
+| 03-C                     END
+     C                     MOVELDSC04E    ME01
+     C                     MOVEL*BLANKS   ME02
+|    C           KEYME     CHAINME0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   ME04E
+     C                     ELSE
+     C                     MOVE ME04      ME04E
+| 03-C                     END
+|    C*彙總／明細
+|   C                     SETOF                     22
+| 03-C           DSEL2     IFEQ '1'
+|   C                     SETON                     22    SUMMARY
+| 03*C                     ELSE
+|   C                     SETOF                     22
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     WRITEPH1
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           WFC503    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   MA03
+| 01-C                     END
+      *
+      *銷貨收入－（銷貨成本＋搭贈成本）＝銷貨毛利
+      *銷貨毛利／銷貨收入＝銷貨毛利率
+      *
+     C           WFC506    ADD  WFC511    WORK   132
+     C           WFC505    SUB  WORK      WFC556
+     C           WFC505    IFNE 0
+     C           WFC556    DIV  WFC505    WRATE   84H
+     C           WRATE     MULT 100       RATE      H
+     C                     ELSE
+     C           0         SUB  100       RATE
+     C                     END
+      *
+|    C   39                EXSR RTN900
+     C           *IN22     IFEQ '0'                        DETAIL
+|    C                     WRITEPD1
+     C                     SETOF                     30
+     C                     END
+|    C                     ADD  WFC504    T1C504
+|    C                     ADD  WFC505    T1C505
+|    C                     ADD  WFC506    T1C506
+|    C                     ADD  WFC510    T1C510
+|    C                     ADD  WFC511    T1C511
+|    C                     ADD  WFC556    T1C556
+|    C                     Z-ADD0         RATE
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+     C                     MOVEL'SHOPDEPT'W#A01   8
+     C                     MOVELWFC502    W#A02  10
+     C                     MOVELWFC502    FC502
+     C           KEY#A     CHAIN#A0                  90
+     C           *IN90     IFEQ '0'
+     C                     MOVEL#A03      W#A03
+     C                     ELSE
+     C                     MOVELWFC502    W#A03
+     C                     END
+     C*
+     C           T1C506    ADD  T1C511    WORK   132
+     C           T1C505    SUB  WORK      T1C556
+     C           T1C505    IFNE 0
+     C           T1C556    DIV  T1C505    WRATE   84H
+     C           WRATE     MULT 100       T1RATE    H
+     C                     ELSE
+     C           0         SUB  100       T1RATE
+     C                     END
+     C*
+|    C                     WRITEPT1
+     C                     SETON                     30
+|    C                     ADD  T1C504    T3C504
+|    C                     ADD  T1C505    T3C505
+|    C                     ADD  T1C506    T3C506
+|    C                     ADD  T1C510    T3C510
+|    C                     ADD  T1C511    T3C511
+|    C                     ADD  T1C556    T3C556
+|    C                     Z-ADD0         T1C504
+|    C                     Z-ADD0         T1C505
+|    C                     Z-ADD0         T1C506
+|    C                     Z-ADD0         T1C510
+|    C                     Z-ADD0         T1C511
+|    C                     Z-ADD0         T1C556
+|    C                     Z-ADD0         T1RATE
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+      *
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNLR
+      *==============================================================*
+06===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE3
+     C                     ELSE
+|    C   39                EXSR RTN900
+     C*
+     C           T3C506    ADD  T3C511    WORK   132
+     C           T3C505    SUB  WORK      T3C556
+     C           T3C505    IFNE 0
+     C           T3C556    DIV  T3C505    WRATE   84H
+     C           WRATE     MULT 100       T3RATE    H
+     C                     ELSE
+     C           0         SUB  100       T3RATE
+     C                     END
+     C*
+|    C                     WRITEPT3
+| 01-C                     END
+|    C*
+|    C                     WRITEPE2
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+

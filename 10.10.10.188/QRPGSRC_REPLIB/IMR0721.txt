@@ -1,0 +1,201 @@
+      ****************************************************************
+      *                                                              *
+      * PROGRAM NAME : IMR0721                                       *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 82/04/12                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存作業                                     *
+      * REMARK       :庫存與異動保留量差異表                       *
+      ****************************************************************
+     FIMIAPF  IP  E           K        DISK
+     FIMISLF01IF  E           K        DISK
+     FIMIRLF09IF  E           K        DISK
+     F                                              KINFDS IRRCDN
+     FPA#APF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FIMR072P O   E             39     PRINTER
+     IIA0
+     I                                              IA01  L3
+     I                                              IA02  L2
+     I                                              IA03  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*公司
+     I                                      601 601 DIA01S
+     I                                      602 602 DIA01E
+     I*物流點
+     I                                      603 607 DIA02S
+     I                                      603 603 IA02SL
+     I                                      608 612 DIA02E
+     I                                      608 608 IA02EL
+     I*產品
+     I                                      613 621 DIA03S
+     I                                      622 630 DIA03E
+     IIRRCDN      DS
+     I                                     *RECORD  RCDR
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYIA     KLIST
+     C                     KFLD           IA03
+     C                     KFLD           IA02
+     C                     KFLD           IA01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01*C                     ELSE
+  02-C           *INL2     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010                     *HEADING
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTNL1
+     CL2 10                EXSR RTNL2
+     CL3 10                SETON                     39
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+|    C                     Z-ADD0         TOT1
+|    C                     Z-ADD0         QTY
+|    C                     MOVELIA01      DIA01
+|    C                     WRITEPH1
+      *
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C                     Z-ADD0         IR071
+|    C                     Z-ADD0         IR072
+|    C                     Z-ADD0         IR121
+|    C                     Z-ADD0         IR122
+|    C           KEYIA     SETLLIMIRLF09
+|    C           KEYIA     READEIMIRLF09                 44
+| 01-C           *IN44     DOWEQ'0'
+     C*CHAIN到頭檔者，才表示有保留量之單別
+|   C           IR06      CHAINIMISLF01             49
+|   C*禮盒組拆之保留量之挑法
+|   C                     MOVELRCDR      CHKRCD  3
+| 02-C           CHKRCD    IFEQ 'IL0'
+|   C           IR03      CHAINMA0                  40
+| 03-C           *IN40     IFEQ '0'
+| 04-C           MA54      IFEQ 'Y'
+|   C           IR05      ANDEQ'G1'
+|   C           MA54      ORNE 'Y'
+|   C           IR05      ANDEQ'G2'
+|   C                     SETON                     49
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+     C*
+| 05-C           *IN49     IFEQ '0'
+|   C                     EXSR RTN10A
+| 05-C                     END
+|   C           KEYIA     READEIMIRLF09                 44
+| 01-C                     END
+|    C*
+|   C           IA09      SUB  QTY       TOT1
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN10A....MOVE DATA TO SFLSR2
+      *==============================================================*
+03===C           RTN10A    BEGSR
+|    C*
+|    C                     MOVELRCDR      RCDRCK  3
+|    C           IR071     ADD  IR072     WORK1   50
+| 01-C           RCDRCK    IFNE 'SD0'
+|   C           RCDRCK    ANDNE'IL0'
+|   C           RCDRCK    ANDNE'IH0'
+|   C                     SUB  IR121     WORK1
+|   C                     SUB  IR122     WORK1
+| 01-C                     END
+     C*
+|    C                     ADD  WORK1     QTY
+     C*
+     C                     Z-ADD0         IR071
+     C                     Z-ADD0         IR072
+     C*
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL1 ....L1 ON
+      *==============================================================*
+04===C           RTNL1     BEGSR
+     C           TOT1      IFNE 0
+|    C*物流點
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELIA02      #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   #A03
+| 01-C                     END
+|    C*產品
+|    C           IA03      CHAINMA0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   MA03
+| 02-C                     END
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     SETON                     30
+| 06-C                     END
+|    C                     Z-ADD0         QTY
+|    C                     Z-ADD0         TOT1
+|    C                     Z-ADD0         WORK1
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNL2 ....L2 ON
+      *==============================================================*
+05===C           RTNL2     BEGSR
+      *
+|    C                     SETOF                     30
+|    C*物流點
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELIA02      #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   #A03
+| 01-C                     END
+      *
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+06===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     3930
+      *
+06===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+04===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+|    C                     WRITEPH1
+|    C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+04===C                     ENDSR
+

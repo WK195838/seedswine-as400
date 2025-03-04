@@ -1,0 +1,91 @@
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN12)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN98)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN97)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN87)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN86)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&ERRCD)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSE07)  TYPE(*CHAR) LEN(5)
+             DCL        VAR(&YSE06)  TYPE(*CHAR) LEN(6)
+     /*   * ADD MEMBER --> REWF38                               *****/
+             DCL        VAR(&NO)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&MBR)    TYPE(*CHAR) LEN(10)
+
+             CHGVAR     VAR(%SST(*LDA 162   1)) VALUE('1')
+             CHGVAR     VAR(%SST(*LDA 125   3)) VALUE('001')
+             CHGVAR     VAR(%SST(*LDA 598   2)) VALUE('00')
+
+ START:      CALL       PGM(IMR061) PARM(&IN03 &IN98 &IN97 &IN87 &IN86)
+             IF         COND(&IN03) THEN(DO)
+             CHGVAR     VAR(%SST(*LDA 601 100)) VALUE(' ')
+             RETURN
+             ENDDO
+
+             CHGVAR     VAR(&DSE07)  VALUE(%SST(*LDA 609 5))
+             CHGVAR     VAR(&YSE06)  VALUE(%SST(*LDA 640 6))
+
+             RTVJOBA    NBR(&NO)
+             CHGVAR     VAR(&MBR)    VALUE('IM' *TCAT &NO)
+             ADDPFM     FILE(REWF38) MBR(&MBR)
+             MONMSG     MSGID(CPF7306) EXEC(CLRPFM FILE(REWF38) +
+                          MBR(&MBR))
+
+             OVRDBF     FILE(SOSCPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSCPF)) QRYSLT(' SC03 *NE "S2" & SC03 +
+                          *NE "S3"  & SC03 *NE "S7" & SC11 *EQ "' +
+                          *CAT &DSE07 *CAT '" & SC08 *EQ ' *CAT +
+                          &YSE06 *CAT ' & SC29 *EQ " " & SC38 *EQ " +
+                          "  & SC30 *EQ " "  & (SC13 *EQ "C" | SC13 +
+                          *EQ " ")') KEYFLD((SC02))
+
+             OVRDBF     FILE(REWF38) MBR(&MBR)
+     /*-------------------------------------------------------------*/
+             CALL       PGM(IMR0611) PARM(&IN03 &IN12)
+             CLOF       OPNID(SOSCPF)
+             IF         COND(&IN03) THEN(DO)
+                        CHGVAR     VAR(&IN86)  VALUE('1')
+             DLTOVR     FILE(*ALL)
+     /***** CLR MEMBER --> REWF38                               *****/
+             RMVM       FILE(REWF38) MBR(&MBR)
+
+             RETURN
+             ENDDO
+             IF         COND(&IN12) THEN(DO)
+                        CHGVAR     VAR(&IN86)  VALUE('1')
+             DLTOVR     FILE(*ALL)
+     /***** CLR MEMBER --> REWF38                               *****/
+             RMVM       FILE(REWF38) MBR(&MBR)
+             GOTO       CMDLBL(START)
+             ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             IF         COND(&$EVR *EQ '1') THEN(DO)
+                        CALL       PGM(IMR061C1)
+             CHGVAR     VAR(&ERRCD)  VALUE(%SST(*LDA 680 1))
+             IF         COND(&ERRCD *EQ ' ') THEN(DO)
+                        CHGVAR     VAR(&IN98)  VALUE('1')
+                        ENDDO
+             ELSE       CMD(DO)
+                        CHGVAR     VAR(&IN87)  VALUE('1')
+                        ENDDO
+                        ENDDO
+             ELSE       CMD(DO)
+                        SBMJOB    JOB(IMR061C1) RQSDTA('CALL IMR061C1')
+             CHGVAR     VAR(&ERRCD)  VALUE(%SST(*LDA 680 1))
+             IF         COND(&ERRCD *EQ ' ') THEN(DO)
+                        CHGVAR     VAR(&IN97)  VALUE('1')
+                        ENDDO
+             ELSE       CMD(DO)
+                        CHGVAR     VAR(&IN87)  VALUE('1')
+                        ENDDO
+                        ENDDO
+             DLTOVR     FILE(*ALL)
+
+     /***** CLR MEMBER --> REWF38                               *****/
+             RMVM       FILE(REWF38) MBR(&MBR)
+
+             GOTO       START
+             ENDPGM
+

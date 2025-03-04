@@ -1,0 +1,249 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : DPA003                                        *
+      * AUTHER       : AANDY                                         *
+      * CREATE DATE  : 81/07/13                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :錯誤統一發票重開                             *
+      ****************************************************************
+     FARAALF01IF  E           K        DISK
+     FDPA003D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     FPA#FLF  IF  E           K        DISK
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      603 603 DSI03S
+     I                                      604 604 DSI03E
+     I                                      605 606 DSI04S
+     I                                      607 608 DSI04E
+     I                                      609 613 DSI05
+     I*(MM/DD/YY)
+     I                                      621 6280DSI06
+     I*(YY/MM/DD)
+B2MODI                                      640 6470WSI06
+     I*
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+B2000C           *LIKE     DEFN AA02      WAA02
+     C                     Z-ADD0         W6      60
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C*          KEY#A     KLIST
+     C*                    KFLD           #A01
+     C*                    KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  02-C           *IN03     IFEQ '0'
+  03-C           *IN04     IFEQ '1'
+    C**********************
+    C*  F4 PROMPT PROCESS *
+    C**********************
+    C                     EXSR RTNF4
+  03*C                     ELSE
+    C                     EXSR RTN100                     .CHECK      ?
+  03-C                     END
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DSI03S
+|    C                     MOVE *BLANK    DSI03E
+|    C                     MOVE *BLANK    DSI04S
+|    C                     MOVE *BLANK    DSI04E
+|    C                     MOVE *BLANK    DSI05
+B2000C                     Z-ADD$EGMDY    DSI06
+|    C                     Z-ADD0         WSI06
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*通路
+| 03-C           DSI03S    IFEQ *BLANK
+|   C                     MOVE *LOVAL    DSI03S
+| 03-C                     END
+|    C*
+| 04-C           DSI03E    IFEQ *BLANK
+|   C                     MOVE *HIVAL    DSI03E
+| 04-C                     END
+|    C*
+| 05-C           DSI03S    IFGT DSI03E
+|   C                     SETON                     6162
+|   C                     SETON                     9299
+| 05-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*型態
+| 06-C           DSI04S    IFEQ *BLANK
+|   C                     MOVE *LOVAL    DSI04S
+| 06-C                     END
+|    C*
+| 07-C           DSI04E    IFEQ *BLANK
+|   C                     MOVE *HIVAL    DSI04E
+| 07-C                     END
+|    C*
+| 08-C           DSI04S    IFGT DSI04E
+|   C                     SETON                     6364
+|   C                     SETON                     9299
+| 08-C                     END
+|    C   99                GOTO END100
+|    C*物流點
+| 10-C           DSI05     IFEQ *BLANK
+|   C                     SETON                     659599
+| 10*C                     ELSE
+|   C*
+|   C* ADD BY STEPHANIE 81/05/03
+|   C           DSI05     SETLLPA#FLF                   42
+| 11-C           *IN42     IFEQ '0'
+|   C                     SETON                     659499
+| 11-C                     END
+| 10-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*(CHECK DATE)-送貨日期
+B2CHKC           DSI06     IFEQ 0
+B2INF *CVR3012 sev.30 Field DSI06 contains more than one year
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|   C                     SETON                     669599
+| 14-C                     END
+|   C   99                GOTO END100
+|   C*
+|   C                     CALL 'P09'
+B2???C                     PARM DSI06     P0901I  60
+B2INF *CVR3012 sev.30 Field DSI06 contains more than one year
+B2INF *CVR3012 sev.30 Field P0901I contains more than one year
+|   C                     PARM           P0911O  1
+| 15-C           P0911O    IFEQ 'N'
+|   C                     SETON                     669399
+| 15-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*(CHANGE TO CHINESE DATE)
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C                     PARM DSI06     S001I2  60
+B2MODC           W6        PARM           S001OI  60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M004MC                     MOVE HB2@T8    WSI06   80
+     C                     MOVELWSI06     WAA02
+|    C*日期是否小於開立日期
+B2000C           WAA02     SETLLAA0
+B2000C           WAA02     READEAA0                      46
+     C           *IN46     DOWEQ'0'
+B2000C           AA09      IFGT WSI06
+     C                     SETON                     668899
+|    C   99                GOTO END100
+     C                     END
+B2000C           WAA02     READEAA0                      46
+     C                     END
+|    C*
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C*
+| 02-C           D#ROW     IFEQ 7
+|   C           D#COL     IFEQ 41
+|   C                     CALL 'WDS018'
+|   C                     PARM           DSI03S
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+|   C           D#COL     IFEQ 46
+|   C                     CALL 'WDS018'
+|   C                     PARM           DSI03E
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 02-C           D#ROW     IFEQ 8
+|   C           D#COL     IFGE 41
+|   C           D#COL     ANDLE42
+|   C                     CALL 'WDS009'
+|   C                     PARM DSI03S    PSI03S  1
+|   C                     PARM           DSI04S
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+|   C           D#COL     IFGE 46
+|   C           D#COL     ANDLE47
+|   C                     CALL 'WDS009'
+|   C                     PARM DSI03E    PSI03E  1
+|   C                     PARM           DSI04E
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 02-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE41
+|   C           D#COL     ANDLE42
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 01-C                     END
+     C*
+     C           ENDF4     TAG
+     C                     Z-ADD0         D#ROW
+     C                     Z-ADD0         D#COL
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+B2NEWC/COPY HBP2CVTR
+

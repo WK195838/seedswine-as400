@@ -1,0 +1,67 @@
+/********************************************************************/
+/* Program name . . . . . . . . . . . . . . :   P64                 */
+/* Source file change . . . . . . . . . . . :   92/09/22            */
+/* PURPOSE :選擇列印環境與印表機                                  */
+/* USE     : &PRTF : PRINT FILE ID                                  */
+/*           &PENV : 0- INQUIRY   1- ON-LINE PROCESS                */
+/*                                2- BATCH PROCESS                  */
+/*           &CPY  :列印份數                                      */
+/*           &PRTCD: PRINTER ID ( CHAIN P64F GET OUTQ FOR CHGSPLFA  */
+/*                                AND PRT DEV NAME FOR STRPRTWTR)   */
+/********************************************************************/
+ PGM PARM(&PRTF &PENV &CPY &PRTCD)
+
+     DCLF FILE(P64F)
+     DCL VAR(&PENV)    TYPE(*CHAR) LEN(1)
+     DCL VAR(&PRTF)    TYPE(*CHAR) LEN(10)
+     DCL VAR(&CPY)     TYPE(*DEC)  LEN(3 0)
+     DCL VAR(&PRTCD)   TYPE(*CHAR) LEN(2)
+     DCL VAR(&PRTNAME) TYPE(*CHAR) LEN(10)
+     DCL VAR(&OUTQ)    TYPE(*CHAR) LEN(10)
+     DCL VAR(&P64S1)   TYPE(*CHAR) LEN(1)
+
+     DCL VAR(&FLAG) TYPE(*CHAR) LEN(8) VALUE('GIANT/PT')
+     CALL PGM(R@S005) PARM(&FLAG)
+
+  /*查詢*/
+     IF COND(&PENV = '0') THEN(DO)
+        DSPSPLF FILE(&PRTF) SPLNBR(*LAST)
+        MONMSG  MSGID(CPF3309) EXEC(GOTO CMDLBL(ENDPGM))
+        MONMSG  MSGID(CPF0000)
+        CALL    PGM(P64S) PARM(&P64S1 &CPY &PRTCD)
+        IF COND(&P64S1 = 'N') THEN(DO)
+           DLTSPLF FILE(&PRTF) SPLNBR(*LAST)
+           MONMSG  MSGID(CPF0000)
+           GOTO    CMDLBL(ENDPGM)
+        ENDDO
+     ENDDO
+
+  /*印表機選擇*/
+     OPNDBF FILE(P64F) OPTION(*INP)
+READ: +
+     RCVF
+     MONMSG MSGID(CPF0864) EXEC(GOTO CMDLBL(ENDPGM))
+     IF COND(&PRTCD = &P6401) THEN(DO)
+        CHGVAR VAR(&PRTNAME) VALUE(&P6402)
+        CHGVAR VAR(&OUTQ) VALUE(&P6403)
+        GOTO   CMDLBL(NEXT)
+     ENDDO
+     GOTO CMDLBL(READ)
+
+  /* CHGSPLFA & STRPRTWTR */
+NEXT: +
+     IF COND(&CPY = 0) THEN(CHGVAR VAR(&CPY) VALUE(1))
+     CHGSPLFA FILE(&PRTF) SPLNBR(*LAST) OUTQ(&OUTQ) COPIES(&CPY) -
+              SAVE(*NO) SCHEDULE(*IMMED)
+     MONMSG MSGID(CPF0000)
+
+     CHGJOB INQMSGRPY(*SYSRPYL)
+     STRPRTWTR DEV(&PRTNAME) OUTQ(&OUTQ) MSGQ(*REQUESTER)
+     MONMSG MSGID(CPF0000)
+     CHGJOB INQMSGRPY(*RQD)
+
+ENDPGM: +
+     RCLRSC
+     RETURN
+     ENDPGM
+

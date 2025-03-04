@@ -1,0 +1,412 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INR0462  (REF INR0452)                        *
+      * AUTHER       : A1492  TERRY                                  *
+      * CREATE DATE  : 2011/05/27                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :                                             *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :現場產品庫存表-依分店                      *
+      *--------------------------------------------------------------*
+      *00A需求單號: 1040769
+      *00A 2015/08/19 DEREK修正錯誤:通路迄值判斷錯誤             *
+      ****************************************************************
+     FINTXLF07IF  E           K        DISK
+     FINTAPF  IF  E           K        DISK
+     FINTBLF02IF  E           K        DISK
+     FSEHALF02IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FSCWK185 UF  E           K        DISK                      A
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      601 602 DTO01
+     I                                      603 604 DDOC
+     I                                      605 606 DTO02S
+     I                                      607 608 DTO02E
+     I                                      609 613 DTO03S
+     I                                      614 618 DTO03E
+     I                                      619 6190DATA
+     I                                      621 629 DTO04S
+     I                                      631 639 DTO04E
+     I                                      641 6460DTO05
+     I                                      641 6420DTOYY
+     I*  截止日期
+     I                                      651 6580Y0DATE
+     I*  最後日結日期
+     I                                      661 6680Y1DATE
+     I*  最接近月結日期
+     I                                      671 6780Y2DATE
+     I                                      671 6760Y2YYMM
+     I*  異動資料起始日期
+     I                                      681 6880Y3DATE
+     I*  最後日結日期+ 1
+     I                                      691 6980Y4DATE
+     I*
+      *==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYTA     KLIST
+     C                     KFLD           DTO01
+     C                     KFLD           Y2YYMM
+     C           KEYTB     KLIST
+     C                     KFLD           DTO01
+     C                     KFLD           Y2YYMM
+     C                     KFLD           TA03
+     C           KEYTX     KLIST
+     C                     KFLD           DTO01            公司
+     C           KEYTX1    KLIST
+     C                     KFLD           DTO01            公司
+     C                     KFLD           Y3DATE           異動起始日期
+     C           KEYW8     KLIST
+     C                     KFLD           Y801    2        公司
+     C                     KFLD           Y802    2        通路
+     C                     KFLD           Y803    5        分店
+     C                     KFLD           Y805    9        產品
+     C           KEYNC     KLIST
+     C                     KFLD           W801
+     C                     KFLD           W805
+     C           KEYNE     KLIST
+     C                     KFLD           W801
+     C                     KFLD           W802
+     C                     KFLD           W803
+     C           KEYHA     KLIST
+     C                     KFLD           DTO01            公司
+     C                     KFLD           Y4DATE           銷售起始日期
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     INITIAL
+     C                     EXSR RTN100                     INTA,INTB
+     C                     EXSR RTN200                     INTX
+     C                     EXSR RTN250                     SEHA
+     C                     EXSR RTN300                     GET產品名稱
+     C                     SETON                     LR
+      *==============================================================*
+      *    RTN100  GET DATA FROM INTBPF
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C           KEYTA     SETLLTA0
+|    C           KEYTA     READETA0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C           KEYTB     SETLLTB0
+|   C           KEYTB     READETB0                      41
+| 02-C           *IN41     DOWEQ'0'
+|   C*CHECK通路
+| 03-C           TB03      IFGE DTO02S
+|00A+C           TB03      ANDLEDTO02E
+|   C*00A-      TB03      ANDLEDTO04E
+|   C*CHECK分店
+|   C           TB04      ANDGEDTO03S
+|   C           TB04      ANDLEDTO03E
+|   C*CHECK產品
+|   C           TB05      ANDGEDTO04S
+|   C           TB05      ANDLEDTO04E
+|   C*
+|   C                     EXSR RTN110
+|   C*
+| 03-C                     ENDIF
+|   C*
+|   C           KEYTB     READETB0                      41
+| 02-C                     ENDDO
+|   C*
+|   C           KEYTA     READETA0                      40
+| 01-C                     ENDDO
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN010....GET HEADING
+     C*==============================================================*
+02===C           RTN010    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     IN   LDA
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*   PREPARE WCSK184  FROM INTBPF
+     C*==============================================================*
+03===C           RTN110    BEGSR
+|    C                     MOVELTB01      Y801
+|    C                     MOVELTB03      Y802
+|    C                     MOVELTB04      Y803
+|    C                     MOVELTB05      Y805
+|    C           KEYW8     CHAINW185                 48
+| 01-C           *IN48     IFEQ '1'
+|   C                     CLEARW185
+|   C                     MOVELTB01      W801             公司別
+|   C                     MOVELTB03      W802             通路代號
+|   C                     MOVELTB04      W803             分店代號
+|   C                     MOVELTB05      W805             產品代號
+|   C                     Z-ADDTB07      W807             帳列期初量
+|   C           TB17      ADD  TB16      W807A            陳列期初量
+|   C                     SUB  TB18      W807A
+|   C                     Z-ADD0         W808             帳列異動量
+|   C                     Z-ADD0         W808A            陳列異動量
+|   C                     Z-ADDW807      W809             帳列庫存量
+|   C                     Z-ADDW807A     W809A            陳列餘量
+|   C           W809      ADD  W809A     W810             總庫存量
+|   C                     WRITEW185
+| 01*C                     ELSE
+|   C                     ADD  TB06      W807
+|   C                     ADD  TB06      W809
+|   C                     ADD  TB06      W810
+|   C*          TB16      ADD  TB17      W807X   60
+|   C*                    SUB  TB18      W807X
+|   C*                    ADD  W807X     W807A
+|   C*                    ADD  W807X     W809A
+|   C*                    ADD  W807X     W810
+|   C*
+|   C                     ADD  TB17      W807A
+|   C                     ADD  TB17      W809A
+|   C                     ADD  TB17      W810
+|   C*
+|   C                     UPDATW185
+| 01-C                     ENDIF
+03===C                     ENDSR
+     C*==============================================================*
+     C*                    EXSR RTN200                     INTX
+     C*==============================================================*
+04===C           RTN200    BEGSR
+|    C           KEYTX1    SETLLTX0
+|    C           KEYTX     READETX0                      43
+| 01-C           *IN43     DOWEQ'0'
+     C*
+     C           TX06A     IFEQ 0
+     C                     Z-ADDTX06      TX06A
+     C                     ENDIF
+|   C*CHECK日期
+| 02-C           TX06A     IFLE Y0DATE
+|   C*CHECK通路
+|   C           TX27      ANDGEDTO02S
+|00A+C           TX27      ANDLEDTO02E
+|   C*00A-      TX27      ANDLEDTO04E
+|   C*CHECK分店
+|   C           TX12      ANDGEDTO03S
+|   C           TX12      ANDLEDTO03E
+|   C*CHECK產品
+|   C           TX11      ANDGEDTO04S
+|   C           TX11      ANDLEDTO04E
+|   C*
+|   C                     EXSR RTN210
+|   C*
+| 02-C                     ENDIF
+|   C*
+|   C           KEYTX     READETX0                      43
+| 01-C                     ENDDO
+04===C                     ENDSR
+     C*==============================================================*
+     C*                    EXSR RTN210                     INTX
+     C*==============================================================*
+05===C           RTN210    BEGSR
+|    C                     Z-ADD0         Y808    60
+|    C                     Z-ADD0         Y808A   60
+|    C* A1 A2  存貨調整
+| 01-C           TX03      IFEQ 'A1'
+|   C           TX03      OREQ 'A2'
+|   C                     ADD  TX15      Y808             帳列異動量
+| 01-C                     ENDIF
+|    C* A4  陳列調整
+| 02-C           TX03      IFEQ 'A4'
+|   C                     ADD  TX15      Y808A            陳列異動量
+| 02-C                     ENDIF
+|    C* A5  自動盤盈調整
+| 03-C           TX03      IFEQ 'A5'
+|   C                     ADD  TX15      Y808             帳列異動量
+| 03-C                     ENDIF
+|    C* A6  年度盤點
+| 04-C           TX03      IFEQ 'A6'
+|   C                     ADD  TX15      Y808             帳列異動量
+|   C                     ADD  TX16      Y808A            陳列異動量
+| 04-C                     ENDIF
+|    C* B1 進貨退出
+| 05-C           TX03      IFEQ 'B1'
+|   C                     SUB  TX15      Y808             帳列異動量
+| 05-C                     ENDIF
+|    C*
+|    C* B2 陳列退出
+| 06-C           TX03      IFEQ 'B2'
+|   C                     SUB  TX15      Y808A            陳列異動量
+| 06-C                     ENDIF
+|    C*
+|    C* C1    進貨驗收
+| 07-C           TX03      IFEQ 'C1'
+|   C           TX06A     ANDLEY0DATE
+|   C                     ADD  TX15      Y808             帳列異動量
+| 07-C                     ENDIF
+|    C* C2    進貨驗收
+| 08-C           TX03      IFEQ 'C2'
+|   C           TX06A     ANDLEY0DATE
+|   C                     ADD  TX15      Y808             帳列異動量
+| 08-C                     ENDIF
+|    C*
+|    C* C3    陳列驗收
+| 09-C           TX03      IFEQ 'C3'
+|   C           TX06A     ANDLEY0DATE
+|   C                     ADD  TX15      Y808A            陳列異動量
+| 09-C                     ENDIF
+|    C*
+|    C* E1    陳列轉進貨
+| 10-C           TX03      IFEQ 'E1'
+|   C                     SUB  TX15      Y808A            陳列異動量
+|   C                     ADD  TX15      Y808             帳列異動量
+| 10-C                     ENDIF
+|    C*
+|    C* M1    調撥
+| 11-C           TX03      IFEQ 'M1'
+| 12-C           TX04      IFEQ 1                          調入
+|   C                     ADD  TX15      Y808             調整入庫
+|   C                     ADD  TX16      Y808A            陳列調整
+| 12*C                     ELSE                            調出
+|   C                     SUB  TX15      Y808             調整出庫
+|   C                     SUB  TX16      Y808A            陳列調整
+| 12-C                     ENDIF
+| 11-C                     ENDIF
+|    C*
+|    C* S1 銷售
+| 13-C           TX03      IFEQ 'S1'
+|   C                     SUB  TX14      Y808             帳列異動量
+| 13-C                     ENDIF
+|    C*
+|    C* S2 借貨
+| 14-C           TX03      IFEQ 'S2'
+     C           TX22      ANDNE'PI'
+|   C                     SUB  TX16      Y808A            陳列異動量
+|   C                     ADD  TX16      Y808             帳列異動量
+| 14-C                     ENDIF
+|    C*
+|    C* S3 盤盈
+| 15-C           TX03      IFEQ 'S3'
+|   C                     ADD  TX15      Y808             帳列異動量
+| 15-C                     ENDIF
+|    C*
+|    C                     MOVELTX01      Y801
+|    C                     MOVELTX27      Y802
+|    C                     MOVELTX12      Y803
+|    C                     MOVELTX11      Y805
+|    C*
+|    C           KEYW8     CHAINW185                 46
+| 16-C           *IN46     IFEQ '0'
+|   C                     ADD  Y808      W808
+|   C                     ADD  Y808A     W808A
+|   C                     UPDATW185
+| 16*C                     ELSE
+|   C                     MOVELY801      W801
+|   C                     MOVELY802      W802
+|   C                     MOVELY803      W803
+|   C                     MOVEL*BLANK    W804
+|   C                     MOVELY805      W805
+|   C                     MOVEL*BLANK    W806
+|   C                     Z-ADD0         W807
+|   C                     Z-ADD0         W807A
+|   C                     Z-ADDY808      W808
+|   C                     Z-ADDY808A     W808A
+|   C                     Z-ADD0         W809
+|   C                     Z-ADD0         W809A
+|   C                     Z-ADD0         W810
+|   C                     WRITEW185
+| 16-C                     ENDIF
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*                    EXSR RTN250                     SEHA
+     C*==============================================================*
+06===C           RTN250    BEGSR
+|    C           KEYHA     SETLLHA0
+|    C           KEYTX     READEHA0                      43
+| 01-C           *IN43     DOWEQ'0'
+|   C*CHECK日期
+| 02-C           HA03      IFLE Y0DATE
+|   C*CHECK通路
+|   C           HA02      ANDGEDTO02S
+|00A+C           HA02      ANDLEDTO02E
+|   C*00A-      HA02      ANDLEDTO04E
+|   C*CHECK分店
+|   C           HA04      ANDGEDTO03S
+|   C           HA04      ANDLEDTO03E
+|   C*CHECK產品
+|   C           HA05      ANDGEDTO04S
+|   C           HA05      ANDLEDTO04E
+|   C*QTY > 0
+|   C           HA06      ANDGT0
+|   C*
+|   C                     Z-SUBHA06      Y808             帳列異動量
+|   C*
+|   C                     MOVELHA01      Y801
+|   C                     MOVELHA02      Y802
+|   C                     MOVELHA04      Y803
+|   C                     MOVELHA05      Y805
+|   C*
+|   C           KEYW8     CHAINW185                 46
+| 03-C           *IN46     IFEQ '0'
+|   C                     ADD  Y808      W808
+|   C                     UPDATW185
+| 03*C                     ELSE
+|   C                     MOVELY801      W801
+|   C                     MOVELY802      W802
+|   C                     MOVELY803      W803
+|   C                     MOVEL*BLANK    W804
+|   C                     MOVELY805      W805
+|   C                     MOVEL*BLANK    W806
+|   C                     Z-ADD0         W807
+|   C                     Z-ADD0         W807A
+|   C                     Z-ADDY808      W808
+|   C                     Z-ADD0         W808A
+|   C                     Z-ADD0         W809
+|   C                     Z-ADD0         W809A
+|   C                     Z-ADD0         W810
+|   C                     WRITEW185
+| 03-C                     ENDIF
+|   C*
+| 02-C                     ENDIF
+|   C*
+|   C           KEYTX     READEHA0                      43
+| 01-C                     ENDDO
+06===C                     ENDSR
+     C*==============================================================*
+     C*                    EXSR RTN300                     INTX
+     C*==============================================================*
+07===C           RTN300    BEGSR
+|    C           *LOVAL    SETLLW185
+|    C                     READ W185                     49
+| 01-C           *IN49     DOWEQ'0'
+|   C           KEYNC     CHAINNC0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVELNC05      W806
+| 02*C                     ELSE
+|   C                     MOVEL*BLANK    W806
+| 02-C                     ENDIF
+|   C           KEYNE     CHAINNE0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVELNE05      W804
+| 03*C                     ELSE
+|   C                     MOVEL*BLANK    W804
+| 03-C                     ENDIF
+|   C*
+|   C           W807      ADD  W808      W809
+|   C           W807A     ADD  W808A     W809A
+|   C           W809      ADD  W809A     W810
+|   C*
+| 04-C           W807      IFEQ 0
+|   C           W807A     ANDEQ0
+|   C           W808      ANDEQ0
+|   C           W808A     ANDEQ0
+|   C                     DELETW185
+| 04*C                     ELSE
+|   C                     UPDATW185
+| 04-C                     ENDIF
+|   C*
+|   C                     READ W185                     49
+| 01-C                     ENDDO
+07===C                     ENDSR
+     C*==============================================================*
+

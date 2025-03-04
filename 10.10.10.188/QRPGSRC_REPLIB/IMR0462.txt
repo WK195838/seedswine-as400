@@ -1,0 +1,170 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0461                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/02/27                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :客戶送貨明細表                               *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.12.10 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSEPF  IP  E           K        DISK
+     FSOSFPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FIMR046BPO   E             39     PRINTER
+     ISE0
+     I                                              SE02  L1
+     I                                              SE05  L2
+     I                                              SE04  L3
+     I                                              SE24  L4
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 601 COMP
+     I                                      602 602 DSEL
+     I                                      603 603 DSE27S
+     I                                      604 604 DSE27E
+     I                                      605 606 DSE28S
+     I                                      607 608 DSE28E
+     I                                      609 613 DSE07S
+     I                                      614 618 DSE07E
+     I                                      619 627 DSE04S
+     I                                      628 636 DSE04E
+     I*(MM/DD/YY)
+     I                                      637 6420DSE21S
+     I                                      643 6480DSE21E
+     I*(YY/MM/DD)
+M001MI*                                     650 6550YSE21S
+M001MI*                                     656 6610YSE21E
+M001MI                                      650 6570YSE21S
+M001MI                                      658 6650YSE21E
+     I*(MM/DD/YY)
+     I                                      671 6760DSE24S
+     I                                      681 6860DSE24E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSE     KLIST
+     C                     KFLD           SE04
+     C                     KFLD           SE05
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C           *IN10     IFEQ '0'
+     C                     EXSR RTN010
+|    C                     SETON                         10
+     C                     END
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     EXSR RTN200                     *READE DETAIL
+     C                     SETOF                     293031
+     C*
+     CL1 10                SETON                     29
+     CL2 10                SETON                     2930
+     CL4 10                SETON                     293031
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C                     WRITEPH1
+|    C                     SETON                     293031
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+M001AC                     Z-ADDSE24      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SE24      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           PSE24     PARM           S001OI  60
+|    C*
+|    C           SE02      SETLLSF0
+|    C           SE02      READESF0                      45
+|    C*
+| 01-C           *IN45     DOWEQ'0'
+|   C                     EXSR RTN300                     *CHAIN DATA
+|   C                     EXSR RTN400                     *JUDGE TOT  L
+|   C                     EXSR RTN500                     *WRITE DETAIL
+|   C           SE02      READESF0                      45
+| 01-C                     END
+|    C*
+|    C                     SETOF                         45
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*客戶簡稱
+|    C           KEYSE     CHAINME0                  42
+| 01-C           *IN42     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 01-C                     END
+|    C*
+|    C*產品簡稱
+|    C           SF03      CHAINMA0                  44
+| 02-C           *IN44     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+| 02-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....JUDGE TOT
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*
+| 01-C           SE03      IFEQ 'D4'
+|   C*試飲數量
+|   C                     Z-ADD0         PSF041
+|   C                     Z-ADDSF19      PSF042
+| 01*C                     ELSE
+|   C*訂購數量
+|   C                     Z-ADD0         PSF042
+|   C                     Z-ADDSF19      PSF041
+| 01-C                     END
+|    C*確認總數
+|    C           SF19      ADD  SF20      PTOT
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN500....WRITE DETAIL
+      *==============================================================*
+05===C           RTN500    BEGSR
+|    C                     WRITEPD1
+|    C                     SETOF                     293031
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW   　　　　　
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     293031
+|    C                     SETOF                     39
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+07===C           RTN999    BEGSR
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|    C                     WRITEPE31
+| 01-C                     END
+|    C                     WRITEPE2
+07===C                     ENDSR
+

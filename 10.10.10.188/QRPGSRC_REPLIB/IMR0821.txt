@@ -1,0 +1,176 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : IMR082                                        *
+      * AUTHER       : SAM                                           *
+      * CREATE DATE  : 85/07/25                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      *  REMARK      : FORECAST                                      *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.04  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FREW106  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FSOSVPF  IF  E           K        DISK
+     FIMINLF04IF  E           K        DISK
+     FREW105  UF  E           K        DISK                      A
+B2MODE                    ARE         6  6 0
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*
+     I*SELECT起迄日期
+     I*YY/MM
+     I                                      600 6030DIN02
+B2MODI                                      609 6160PART1
+B2MODI                                      609 6140YM1
+B2MODI                                      615 6160D01
+B2MODI                                      617 6220YM2
+B2MODI                                      623 6280YM3
+B2MODI                                      629 6340YM4
+B2MODI                                      635 6400YM5
+B2MODI                                      641 6480PART2
+B2MODI                                      641 6460YM6
+B2MODI                                      647 6480D31
+     I*產品
+B2MODI                                      650 658 DIN04S
+B2MODI                                      659 667 DIN04E
+     I*
+     IPB          DS
+M001MI*                                     651 6560DATA
+M001MI*                                     651 6540YYMM
+M001MI                                      671 6780DATA
+M001MI                                      671 6760YYMM
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF105A
+     C                     KFLD           WF105B
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN10
+     C                     EXSR RTN20                      *MTMAPF
+     C                     EXSR RTN30                      *REW105
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN10     DEFINE
+      *==============================================================*
+01===C           RTN10     BEGSR
+|    C*
+B2000C                     Z-ADDYM1       ARE,1
+B2000C                     Z-ADDYM2       ARE,2
+B2000C                     Z-ADDYM3       ARE,3
+B2000C                     Z-ADDYM4       ARE,4
+B2000C                     Z-ADDYM5       ARE,5
+B2000C                     Z-ADDYM6       ARE,6
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN20
+      *==============================================================*
+02===C           RTN20     BEGSR
+|    C                     READ MA0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     Z-ADD1         X       10
+| 02-C           X         DOUEQ7
+|   C                     MOVELMA01      WF105A            產品代號
+B2000C                     MOVEAARE,X     WF105B            年月
+|   C                     Z-ADD0         WF105C            INV
+|   C                     Z-ADD0         WF105D            ARR
+|   C                     Z-ADD0         WF105E            DEP
+|   C                     WRITEWF105
+|   C                     ADD  1         X
+|   C                     ENDDO
+|   C                     READ MA0                      46
+|   C                     ENDDO
+|   C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN30
+      *==============================================================*
+03===C           RTN30     BEGSR
+|   C           *LOVAL    SETLLWF105
+|   C                     READ WF105                    46
+|   C*
+| 01-C           *IN46     DOWEQ'0'
+| 02-C           YY        IFEQ 6
+|   C                     EXSR RTN120
+| 02-C                     END
+|   C*
+B2000C           KEYWF     CHAININ0                  40     *IMINLF04
+|   C*
+| 03-C           *IN40     IFEQ '0'
+|   C                     Z-ADD0         TEMP    60
+|   C*
+| 04-C           *IN44     DOUEQ'1'
+|   C                     ADD  IN05      IN05T   60
+|   C                     ADD  IN06      IN06T   60
+|   C                     ADD  IN17      IN17T   60
+|   C                     READEIN0                      44
+| 04-C                     END
+|   C*
+|   C                     Z-ADDIN05T     WF105C            "INV"
+|   C                     Z-ADDIN06T     WF105D            "ARR"
+|   C           WF105C    ADD  WF105D    TEMP1   60       暫存欄位
+|   C           TEMP1     SUB  IN17T     WF105E            "DEP"
+|   C*
+|   C                     Z-ADDIN17T     TEMP             保留下月期初
+|   C                     UPDATWF105
+|   C                     Z-ADD0         IN05T
+|   C                     Z-ADD0         IN06T
+|   C                     Z-ADD0         IN17T
+| 03*C                     ELSE
+|   C*
+|   C                     Z-ADDTEMP      WF105C            "INV"
+|   C                     Z-ADD0         TEMP
+|   C                     EXSR RTN100
+|   C*
+B2000C           KEYWF     CHAINSV0                  40     *SOSVPF
+| 05-C           *IN40     IFEQ '0'
+|   C                     Z-ADDSV06      WF105E            "DEP"
+| 05*C                     ELSE
+|   C                     Z-ADD0         WF105E
+|   C                     ENDIF
+|   C           WF105C    ADD  WF105D    TEMP2   60       暫存欄位
+|   C           TEMP2     SUB  WF105E    TEMP             下月期初
+|   C                     UPDATWF105
+|   C*
+|   C                     ENDIF
+|   C                     ADD  1         YY      10
+|   C                     READ WF105                    46
+|   C*
+|   C                     ENDDO
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN100    找尋採檔購預計交貨日及數量
+      *==============================================================*
+04===C           RTN100    BEGSR
+|   C           WF105A    CHAINPBC                  40     *REW106
+| 01-C           *IN40     DOWEQ'0'
+B2000C                     MOVELPB06      DATA
+B2000C           YYMM      IFEQ WF105B
+|   C                     ADD  PC06      TOTAL   60
+|   C                     ENDIF
+|   C                     READEPBC                      40
+|   C                     ENDDO
+|   C                     Z-ADDTOTAL     WF105D            "ARR"
+|   C                     Z-ADD0         TOTAL
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN120    DEFINE
+      *==============================================================*
+05===C           RTN120    BEGSR
+|   C* 產品改變不必將保留量保留到下一個產品
+|   C                     Z-ADD0         TEMP
+|   C                     Z-ADD0         YY
+05===C                     ENDSR
+

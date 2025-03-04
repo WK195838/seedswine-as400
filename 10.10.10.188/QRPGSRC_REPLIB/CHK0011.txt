@@ -1,0 +1,179 @@
+      ****************************************************************
+      *                                                              *
+      * PROGRAM NAME : CHK0011                                       *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 06/08/94                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :檢核月檔沖帳檔　　                           *
+      ****************************************************************
+     FARAKPF  IP  E           K        DISK
+     FARADLF07IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+B2CHKFCHK001P O   E             39     PRINTER
+B2INF *CVR3009 sev.30 PRINTER file CHK001P must be converted, because
+B2INF *   field AK01 is shared by name with other database fields which
+B2INF *   require to be expanded. Please convert CHK001P, enlarging AK01
+B2INF *   prior to compilation, or manually insert in this source the
+B2INF *   proper RENAME and MOVE statements to avoid name-sharing.
+     IAK0
+     I                                              AK03  L2
+     I                                              AK04  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*公司別
+     I                                      601 602 DAK03S
+     I                                      603 604 DAK03E
+     I*客戶別
+     I                                      631 635 DAK04S
+     I                                      641 645 DAK04E
+     I*
+     I                                      611 6140DAK01S
+     I                                      615 6180DAK01E
+     I            DS
+B2MODI                                        1   80AD12
+B2MODI                                        1   60AD12A
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYAD     KLIST
+     C                     KFLD           AK03
+     C                     KFLD           AK04
+     C                     KFLD           AK01A
+     C           KEYAD1    KLIST
+     C                     KFLD           AK03
+     C                     KFLD           AK04
+     C                     KFLD           AK01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN010                     *SET INIT
+     C*
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          AK01      IFNE 9209
+B2NEWC           AK01      IFNE 199209
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+    C                     EXSR RTN100                     *READE DETAIL
+  01-C                     END
+     C*
+     CL1 10                EXSR RTNL1
+     CL2 10                EXSR RTNL2
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*公司簡稱
+|    C           AK03      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    #B03
+|    C*
+|    C                     WRITEPH1
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     Z-ADD0         TOT01   90
+|    C                     Z-ADD0         TOT02   90
+|    C*
+B2MODC           AK01      MULT 100       AK01A   80
+B2000C                     ADD  1         AK01A
+|    C*
+|    C                     EXSR RTN110                                 L
+|    C*
+| 01-C           TOT01     IFNE AK07
+|   C           TOT02     ORNE AK08
+|   C*
+|   C           AK07      SUB  TOT01     TOT03
+|   C           AK08      SUB  TOT02     TOT04
+|   C*
+|   C   39                EXSR RTN900                     *READE DETAIL
+|   C                     WRITEPD1
+|   C                     SETON                     3031
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN110....READE DETAIL
+      *==============================================================*
+03===C           RTN110    BEGSR
+|    C*
+B2000C           KEYAD     SETLLAD0
+|    C                     READ AD0                      41
+B2000C           *IN41     DOWEQ'0'
+|   C           AD10      ANDEQAK03
+|   C           AD02      ANDEQAK04
+|   C           AD12A     ANDEQAK01
+|   C*
+| 02-C           AD05      IFNE '50'
+|   C                     ADD  AD08      TOT01
+| 02*C                     ELSE
+|   C                     ADD  AD08      TOT02
+| 02-C                     END
+|   C*
+|   C                     READ AD0                      41
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C*公司簡稱
+|    C           AK03      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    #B03
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNL1.....LEVER BREAK
+      *==============================================================*
+05===C           RTNL1     BEGSR
+|    C*
+| 01-C           *IN30     IFEQ '1'
+|   C                     SETON                     20
+| 01-C                     END
+|    C                     SETOF                     30
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNL2.....LEVER BREAK
+      *==============================================================*
+06===C           RTNL2     BEGSR
+|    C*
+| 01-C           *IN31     IFEQ '1'
+|   C                     EXSR RTN900
+| 01-C                     END
+|    C                     SETOF                     31
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTNLR.....ENDPGM
+      *==============================================================*
+07===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+07===C                     ENDSR
+

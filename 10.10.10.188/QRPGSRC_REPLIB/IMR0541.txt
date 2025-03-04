@@ -1,0 +1,220 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0541                                       *
+      * AUTHER       : A1118  PHILIP                                 *
+      * CREATE DATE  : 81/04/21                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :滯銷產品明細表                               *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 99.01.04 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FMTMALF02IP  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOSFLF02IF  E           K        DISK
+     FIMIALF01IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#FLF  IF  E           K        DISK
+     F                                              KINFDS #FRCDN
+     F            #A0                               KRENAME#F0L
+     FPOPELF02IF  E           K        DISK
+     FPOPILF02IF  E           K        DISK
+     FIMR054P O   E             39     PRINTER
+     IMA0
+     I                                              MA10  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      139 139 $RMK01
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 6060DSF25
+B2MODI                                      607 6140WSF25
+     I*物流點 RECORD NAME
+     I#FRCDN      DS
+     I                                     *RECORD  RCDN
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYPI     KLIST
+     C                     KFLD           MA01
+     C                     KFLD           WPI05
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C           *IN10     IFEQ '0'
+     C                     EXSR RTN010
+|    C                     SETON                         10
+     C                     END
+     C*
+     C   L1 10             SETON                     3031
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C           MA58      IFEQ 'A'
+     C                     EXSR RTN200                     *READE DETAIL
+     C                     END
+     C*
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C                     WRITEPH1
+|    C                     SETON                     3031
+|    C*存貨成本列印控制
+| 01-C           $RMK01    IFEQ 'Y'
+|   C                     SETON                     32
+| 01*C                     ELSE
+|   C                     SETOF                     32
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C*若送貨明細檔最後出貨日小於螢幕值則列印
+|    C           MA01      CHAINSF0                  40
+B2000C           *IN40     IFEQ '0'
+|   C           SF25      ANDLEWSF25
+|   C           *IN40     OREQ '1'
+|   C*產品庫存檔讀取
+|   C           MA01      SETLLIA0
+|   C           MA01      READEIA0                      41
+| 02-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN300                     *CHAIN DATA
+|   C                     EXSR RTN400                     *JUDGE TOT  L
+|   C                     EXSR RTN500                     *WRITE DETAIL
+|   C           MA01      READEIA0                      41
+| 02-C                     END
+|   C                     WRITEPD2
+|   C                     SETON                     31
+|   C*小計清零
+|   C                     Z-ADD0         TIA06
+|   C                     Z-ADD0         TIA06C
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*最近進貨日
+| 01-C           *IN30     IFEQ '1'
+B2MODC                     MOVE *HIVAL    WPI05   80
+B2000C           KEYPI     SETLLPI0
+|   C           MA01      REDPEPI0                      45
+| 02-C           *IN45     IFEQ '1'
+|   C                     Z-ADD0         PI05
+| 02-C                     END
+B2000C           KEYPI     SETLLPE0
+|   C           MA01      REDPEPE0                      45
+| 03-C           *IN45     IFEQ '1'
+|   C                     Z-ADD0         PE05
+| 03-C                     END
+|   C*比較日期大小
+B2000C           PI05      IFGT PE05
+B2MODC                     Z-ADDPI05      WPIPE   80
+| 04*C                     ELSE
+B2000C                     Z-ADDPE05      WPIPE
+| 04-C                     END
+|   C* 日期轉換
+M001AC                     Z-ADDWPIPE     W6      60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM WPIPE     S001I2  80
+M001MC                     PARM W6        S001I2  60
+|   C           PIPE05    PARM           S001O1  60
+|   C* 日期轉換
+M001AC                     Z-ADDSF25      W6
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SF25      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|   C           PSF25     PARM           S001O1  60
+|   C**最近進貨日 END
+| 01-C                     END
+|    C*物流點
+|    C                     MOVE *BLANK    P#A03
+|    C           IA02      CHAINPA#FLF               40
+| 05-C           *IN40     IFEQ '0'
+|   C           RCDN      ANDEQ'MD0'
+|   C           IA02      CHAINME0                  40
+|   C   40                MOVE *BLANKS   P#A03
+|   C  N40                MOVELME04      P#A03
+| 05-C                     END
+|    C****
+| 06-C           P#A03     IFEQ *BLANK
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'STORAGE' #A01
+|   C                     MOVELIA02      #A02
+|   C*
+|   C           KEY#A     CHAIN#A0                  40
+| 07-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      P#A03
+| 07*C                     ELSE
+|   C                     MOVE *BLANK    P#A03
+| 07-C                     END
+| 06-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....JUDGE TOT
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*存貨量小計
+|    C                     ADD  IA06      TIA06
+|    C*存貨成本及小計
+| 01-C           *IN31     IFEQ '1'
+|   C                     Z-ADD0         IA06C
+|   C           IA06      MULT MA34      IA06C
+|   C                     ADD  IA06C     TIA06C
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN500....WRITE DETAIL
+      *==============================================================*
+05===C           RTN500    BEGSR
+|    C*OVERFLOW
+| 01-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN900
+| 01-C                     END
+|    C*
+|    C                     WRITEPD1
+|    C                     SETOF                     3031
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     3031
+|    C                     SETOF                     39
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+07===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+     C                     WRITEPE31
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+07===C                     ENDSR
+

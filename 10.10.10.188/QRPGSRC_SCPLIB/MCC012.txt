@@ -1,0 +1,120 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : MCC011                                        *
+      * AUTHER       : A1010  JOHN CHIOU                             *
+      * CREATE DATE  : 2010/11/01                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存數量重算                                 *
+      ****************************************************************
+     FINTAPF  UF  E           K        DISK
+     FINTXLF02IF  E           K        DISK
+     FC#EHPF  IF  E           K        DISK
+     E*===============================================================
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYEH     KLIST
+     C                     KFLD           INCOMP
+     C*
+     C           KEYTX     KLIST
+     C                     KFLD           EH01             公司別
+     C                     KFLD           EH02             年月
+     C                     KFLD           TA03             產品代號
+     C           KEYTA     KLIST
+     C                     KFLD           EH01             公司別
+     C                     KFLD           EH02             年月
+     C*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN000                     GET DATE FROM C#EHPF
+     C                     EXSR RTN100                     UPDATE INTAPF
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN000....GET DATE FROM C#EHPF
+      *===============================================================*
+01===C           RTN000    BEGSR
+|    C*
+|    C                     SETON                     10
+|    C*
+|    C           KEYEH     CHAINEH0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     SETON                     LR
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....UPDATE INTAPF
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           KEYTA     SETLLTA0
+|    C           KEYTA     READETA0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C                     Z-ADDTA06      WQTY    90
+|   C                     Z-ADDTA05      WAMT   112
+|   C                     Z-ADD0         TA09
+|   C           KEYTX     SETLLTX0
+|   C           KEYTX     READETX0                      41
+| 02-C           *IN41     DOWEQ'0'
+|   C*
+| 03-C           TX22      IFNE 'PI'                       來源
+| 04-C           TX03      IFEQ 'B1'
+|   C                     SUB  TX15      WQTY
+|   C                     SUB  TX19      WAMT
+| 04*C                     ELSE
+|   C                     ADD  TX15      WQTY
+|   C                     ADD  TX19      WAMT
+| 04-C                     ENDIF
+| 03-C                     ENDIF
+|   C*
+|   C           KEYTX     READETX0                      41
+| 02-C                     ENDDO
+|   C*
+| 05-C           WQTY      IFEQ 0
+|   C                     Z-ADDTA04      TA07
+| 05*C                     ELSE
+|   C           WAMT      DIV  WQTY      TA07      H      單位成本
+| 05-C                     ENDIF
+|   C*
+| 06-C           TA07      IFEQ 0
+|   C                     EXSR RTN200
+| 06-C                     END
+|   C*
+|   C           TA07      MULT TA10      TA08      H      帳列庫存金額
+|   C                     UPDATTA0
+|   C*
+|   C           KEYTA     READETA0                      40
+|   C*
+| 01-C                     ENDDO
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN200....GET COST FROM POCCPF
+      *===============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C                     MOVEL'C1'      WCC02
+|    C*
+|    C                     CALL 'MCC0021'
+|    C                     PARM           TA01             公司別
+|    C                     PARM           WCC02   2        通路別
+|    C                     PARM           TA03             產品代號
+|    C                     PARM           EH08             單據日期
+|    C                     PARM           WTA07   82       單價
+|    C*
+|    C                     Z-ADDWTA07     TA07
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+

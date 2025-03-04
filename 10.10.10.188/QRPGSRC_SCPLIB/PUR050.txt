@@ -1,0 +1,274 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : PUR050                                        *
+      * AUTHER       : A1388  WIND                                   *
+      * CREATE DATE  : 2008/11/03                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :                                             *
+      * SUBSYSTEM    :採購系統                                     *
+      * REMARK       :供應商負擔運費表                             *
+      ****************************************************************
+     FPA#BPF  IF  E           K        DISK
+     FPUR050D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      600 600 DOWNL
+     I                                      601 602 DCK01
+     I                                      603 604 DDOC
+     I                                      605 6100DCK03S
+     I                                      611 6160DCK03E
+     I                                      617 6170DATA
+     I                                      618 622 DCK08S
+     I                                      623 627 DCK08E
+     I                                      628 628 DCK09S
+     I                                      629 629 DCK09E
+     I                                      631 6380DATES
+     I                                      641 6480DATEE
+     I*
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+     C*
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+    C                     MOVEL*BLANK    DOWNL
+  02-C           *IN03     IFEQ '0'
+    C*
+    C*  F4 PROMPT PROCESS *
+    C           *IN04     IFEQ '1'
+    C                     EXSR RTNF4
+    C                     SETON                     99
+    C                     ITER
+    C                     ENDIF
+    C*
+    C                     EXSR RTN100                     .CHECK      ?
+    C*  F7 DOWNLOAD*
+    C           *IN99     IFEQ '0'
+    C           *IN07     ANDEQ'1'
+    C                     MOVEL'1'       DOWNL
+    C                     SETON                     99
+    C                     OUT  *NAMVAR
+    C                     CALL 'PUR050C1'
+    C                     IN   LDA
+  03-C                     ENDIF
+    C*
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     IN   LDA
+|    C*
+|    C                     Z-ADD2         $EVR
+|    C                     MOVEL$USER     AUT     3
+|    C*
+|    C*          AUT       IFNE 'D91'
+|    C*          AUT       ANDNE'REP'
+|    C*                    SETON                     31
+|    C*                    END
+|    C*
+|    C                     MOVE *BLANK    DCK01
+|    C                     Z-ADD0         DCK03S
+|    C                     Z-ADD0         DCK03E
+|    C                     Z-ADD0         DATES   80
+|    C                     Z-ADD0         DATEE   80
+|    C                     Z-ADD1         DATA
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C**公司別
+| 01-C           DCK01     IFEQ *BLANKS
+|   C                     SETON                     60  99
+|   C                     MOVEL'ERR0001' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     MOVEL*BLANK    D#B03
+| 01-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C           DCK01     CHAINPA#BPF               40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVEL#B03      D#B03
+| 02*C                     ELSE
+|   C                     SETON                     6099
+|   C                     MOVEL*BLANK    D#B03
+|   C                     MOVEL'ERR0018' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 02-C                     END
+|    C   99                GOTO END100
+|    C**供應商代號
+| 02-C           DCK08S    IFEQ *BLANKS
+|   C                     MOVE *LOVAL    DCK08S
+| 02-C                     END
+|    C*
+| 03-C           DCK08E    IFEQ *BLANKS
+|   C                     MOVE *HIVAL    DCK08E
+| 03-C                     END
+|    C*
+| 04-C           DCK08S    IFGT DCK08E
+|   C                     SETON                     616299
+|   C                     MOVEL'ERR0005' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 04-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C**到分店日期
+| 05-C           DCK03S    IFEQ 0
+|   C                     Z-ADD010192    DCK03S
+| 05*C                     ELSE
+|   C                     CALL 'P30'
+|   C                     PARM DCK03S    P3001I  80
+|   C                     PARM '3'       P3002I  1
+|   C                     PARM '1'       P3003I  1
+|   C                     PARM           P3011O  1
+| 06-C           P3011O    IFEQ 'N'
+|   C                     SETON                     63  99
+|   C                     MOVEL'ERR0004' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 06-C                     END
+| 05-C                     END
+|    C   99                GOTO END100
+|    C*
+| 07-C           DCK03E    IFEQ 0
+|   C                     Z-ADD123129    DCK03E
+| 07*C                     ELSE
+|   C                     CALL 'P30'
+|   C                     PARM DCK03E    P3001I  80
+|   C                     PARM '3'       P3002I  1
+|   C                     PARM '1'       P3003I  1
+|   C                     PARM           P3011O  1
+| 08-C           P3011O    IFEQ 'N'
+|   C                     SETON                     64  99
+|   C                     MOVEL'ERR0004' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 08-C                     END
+| 07-C                     END
+|    C   99                GOTO END100
+|    C**
+|    C                     CALL 'P31'
+|    C                     PARM DCK03S    P3101I  80
+|    C                     PARM '3'       P3102I  1
+|    C                     PARM '1'       P3103I  1
+|    C                     PARM '2'       P3104I  1
+|    C                     PARM '1'       P3105I  1
+|    C           DATES     PARM           P3101O  80
+|    C*
+|    C                     CALL 'P31'
+|    C                     PARM DCK03E    P3101I  80
+|    C                     PARM '3'       P3102I  1
+|    C                     PARM '1'       P3103I  1
+|    C                     PARM '2'       P3104I  1
+|    C                     PARM '1'       P3105I  1
+|    C           DATEE     PARM           P3101O  80
+|    C*
+| 09-C           DATES     IFGT DATEE
+|   C                     SETON                     636499
+|   C                     MOVEL'ERR0005' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 09-C                     END
+|    C   99                GOTO END100
+|    C*
+| 10-C           DCK09S    IFEQ *BLANKS
+|   C                     MOVE *LOVAL    DCK09S
+| 10-C                     END
+|    C*
+| 11-C           DCK09E    IFEQ *BLANKS
+|   C                     MOVE *HIVAL    DCK09E
+| 11-C                     END
+|    C*
+| 12-C           DCK09S    IFGT DCK09E
+|   C                     SETON                     656699
+|   C                     MOVEL'ERR0005' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 12-C                     END
+|    C   99                GOTO END100
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C*
+|   C*供應商
+| 02-C           D#ROW     IFEQ 08
+|   C           D#COL     ANDGE38
+|   C           D#COL     ANDLE42
+|   C                     CALL 'SWD002'
+|   C           DCK08S    PARM DCK08S    P101I1  5
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 03-C           D#ROW     IFEQ 08
+|   C           D#COL     ANDGE46
+|   C           D#COL     ANDLE50
+|   C                     CALL 'SWD002'
+|   C           DCK08E    PARM DCK08E    P101I1
+|   C                     GOTO ENDF4
+| 03-C                     END
+|   C*
+| 04-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE38
+|   C           D#COL     ANDLE39
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 04-C                     END
+|   C*
+| 01-C                     END
+|    C*
+03===C           ENDF4     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+      *===============================================================*
+     C/COPY HBP2CVTR
+

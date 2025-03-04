@@ -1,0 +1,158 @@
+      ****************************************************************
+      * PROGRAM ID : P02                                             *
+      * SYSTEM ID  : PTPTLIB                                         *
+      * FUNTCTION  :驗証身份証字號                                 *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P0201I    I   *CHAR  10   待驗身份証字號  *
+      *             02   P0211O    O   *CHAR   1   驗証結果...     *
+      *                                             Y=OK , N =ERROR  *
+      *             03   P0212O    O   *CHAR   1   驗証性別...     *
+      *                                             M=MALE F =FEMALE *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P0201     N   *CHAR  10   身份証字號      *
+      *             02   P0202     N   *CHAR   1   字號第一碼      *
+      *             03   P0203     N   *DEC    9 0 二至十碼        *
+      *             04   P0204     N   *CHAR   9   二至十碼        *
+      *             05   P0205     N   *CHAR  26   英文字母        *
+      *             06   P0206     N   *CHAR  10   阿拉伯數字      *
+      *             07   P0207     N   *DEC    1 0 乘數            *
+      *             08   P0208     N   *DEC    1 0 乘數            *
+      *             09   P0209     N   *DEC    4 0 合計            *
+      *             10   P0210     N   *DEC    4 0 總數            *
+      *             11   P0211     N   *DEC    1 0 餘數            *
+      *             12   P0212     N   *DEC    1 0 檢查數          *
+      *                                                              *
+      * ID-CARD-NO CHECK FLOW.....                                   *
+      *                        (N)                                   *
+      *                         +- P0211O=N , P0212O=*BLANK          *
+      *                CHARACTER|            (N)                     *
+      *  CHECK 1ST CODE --------+             +- P0211O=N , P0212O=  *
+      *                         | CHECK 2-10  |             *BLANK   *
+      *                         | CODE        |         (N)          *
+      *                         +-------------+ CHECK    +- P0211O=N *
+      *                        (Y)  DIGIT     | 10TH CODE|  P0212O=  *
+      *                                       +----------+    *BLANK *
+      *                                      (Y)         |           *
+      *                                                  +- P0211O=Y *
+      *                                                 (Y) P0212O=M *
+      *                                                      OR  O=F *
+      ****************************************************************
+     E                    P0205  26  26  1               CHECK CHARACTER
+     E                    P0206  10  10  1               CHECK CHARACTER
+     E                    P0207  26  26  1 0 P0208   1 0 CHECK DIGIT
+     E                    P0203       9  1 0             INPUT CHARACTER
+     E                    P0204       9  1               INPUT DIGIT
+     IP0201I      DS
+     I                                        1  10 P0201
+     I                                        1   1 P0202
+     I                                        2  100P0203
+     I                                        2  10 P0204
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P0201I 10
+     C                     PARM           P0211O  1
+     C                     PARM           P0212O  1
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     SETOF                     404142
+     C                     SETOF                     44
+     C                     EXSR CHKID1
+     C           *IN40     IFEQ '1'
+     C           *IN42     ANDEQ'0'
+     C                     EXSR CHKID2
+     C                     END
+      *
+     C                     RETRN
+      /EJECT
+      *--------------------------------------------------------------*
+      *          CHKID1....CHECK ID-CARD-NO CHARACTER OR DIGIT       *
+      *--------------------------------------------------------------*
+     C           CHKID1    BEGSR
+     C           P0202     LOKUPP0205                    40
+     C*
+     C           *IN40     IFEQ '0'
+     C                     MOVE 'N'       P0211O
+     C                     MOVE *BLANK    P0212O
+     C                     ELSE
+     C                     Z-ADD1         I       20
+     C*
+     C           I         DOWLE9
+     C           P0204,I   LOKUPP0206                    41
+     C           *IN41     IFEQ '0'
+     C                     MOVE 1         *IN42
+     C                     END
+     C                     ADD  1         I
+     C                     END
+     C*
+     C           *IN42     IFEQ '1'
+     C                     MOVE 'N'       P0211O
+     C                     MOVE *BLANK    P0212O
+     C                     ADD  9         I
+     C                     END
+     C*
+     C                     END
+     C                     ENDSR
+      /EJECT
+      *--------------------------------------------------------------*
+      *          CHKID2....CHECK CODE                                *
+      *--------------------------------------------------------------*
+     C           CHKID2    BEGSR
+     C                     Z-ADD1         J       20
+     C           P0202     LOKUPP0205,J                  44
+     C                     Z-ADDP0207,J   P0209   40
+     C           P0208,J   MULT 9         P0210   40
+     C                     ADD  P0210     P0209
+     C           P0203,1   MULT 8         P0210
+     C                     ADD  P0210     P0209
+     C*
+     C           P0203,1   IFEQ 2
+     C                     MOVE 'F'       P0212O
+     C                     ELSE
+     C                     MOVE 'M'       P0212O
+     C                     END
+     C*
+     C           P0203,2   MULT 7         P0210
+     C                     ADD  P0210     P0209
+     C           P0203,3   MULT 6         P0210
+     C                     ADD  P0210     P0209
+     C           P0203,4   MULT 5         P0210
+     C                     ADD  P0210     P0209
+     C           P0203,5   MULT 4         P0210
+     C                     ADD  P0210     P0209
+     C           P0203,6   MULT 3         P0210
+     C                     ADD  P0210     P0209
+     C           P0203,7   MULT 2         P0210
+     C                     ADD  P0210     P0209
+     C           P0203,8   MULT 1         P0210
+     C                     ADD  P0210     P0209
+     C           P0209     DIV  10        P0210
+     C                     MVR            P0211   10
+     C*
+     C           P0211     IFNE 0
+     C           10        SUB  P0211     P0212   10
+     C                     ELSE
+     C                     MOVE 0         P0212
+     C                     END
+     C*
+     C           P0203,9   IFNE P0212
+     C                     MOVE 'N'       P0211O
+     C                     MOVE *BLANK    P0212O
+     C                     ELSE
+     C                     MOVE 'Y'       P0211O
+     C                     END
+     C*
+     C                     ENDSR
+**
+ABCDEFGHJKLMNPQRSTUVXYWZIO
+**
+1234567890
+**
+1011121314151617181920212223242526272829303132333435
+

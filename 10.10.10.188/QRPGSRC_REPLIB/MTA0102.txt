@@ -1,0 +1,263 @@
+     FSOS5PF  UF  E           K        DISK
+     FMTA010D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      201 2080$EG8
+     I                                      598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I                                      506 506 $PURID
+     I                                      507 508 $TRNID
+     I                                      509 513 $APAUT
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN RRN       WRRN
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+     C           *LIKE     DEFN S501      WS501
+     C           *LIKE     DEFN S501      KEP1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYDWN    KLIST
+     C                     KFLD           WS501
+      *==============================================================*
+      *                    MDIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN110                     *INIT SFL
+      *
+     C                     EXSR RTN120                     *READ NEXT PAGE
+     C                     EXSR RTN140                     *EXFMT
+     C                     MOVE *ALL'0'   *IN,60
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+     C                     EXSR RTN500                     CHECK SCREEN
+     C           *IN99     IFEQ '0'
+      *
+  02-C           DBGN1     IFNE KEP1
+    C                     MOVELDBGN1     WS501
+    C                     MOVELDBGN1     KEP1
+    C                     EXSR RTN110                     *INIT SFL
+    C                     EXSR RTN120                     *READ NEXT PAGE
+  02*C                     ELSE
+      *
+  03-C           *IN25     IFEQ '1'
+    C           WS501     SETGTS50
+    C                     EXSR RTN120
+  03*C                     ELSE
+     C*          *IN09     IFEQ '1'
+     C*                    EXSR RTN990
+     C* N99                CALL 'MTR010C'
+     C*                    ELSE
+    C                     EXSR RTN171
+     C*                    END
+  03-C                     END
+  02-C                     END
+     C                     END
+      *
+    C  N03                EXSR RTN140
+    C                     MOVE *ALL'0'   *IN,60
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         DATE    60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM $EGMDY    S001I2  60
+|    C           DATE      PARM           S001O1  60
+     C                     MOVEL*BLANKS   CODE    1
+     C                     Z-ADD*ZERO     W6      60
+     C                     Z-ADD*ZERO     WS502   60
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN171....READC SFL
+      *==============================================================*
+02===C           RTN171    BEGSR
+|    C                     READCSFLSR                  4040*NF
+| 01-C           *IN40     DOWEQ'0'                        *40 LOOP
+|   C*
+|   C           S501      CHAINS50                  41    *CHK
+| 02-C           *IN41     IFEQ '0'
+     C           DS502     IFNE *ZERO
+     C                     CALL 'RES001'
+     C                     PARM 'MDY'     S001I1  3
+     C                     PARM DS502     S001I2  60
+     C           W6        PARM           S001O1  60
+     C                     MOVE W6        HB2@F6  6
+     C                     EXSR HB@68L
+     C                     MOVE HB2@T8    S502    80
+     C                     END
+     C                     Z-ADDDS503     S503
+     C                     Z-ADDDS504     S504
+     C                     MOVELDS506     S506
+     C                     Z-ADD$EG8      S5XX
+     C                     TIME           S5YY
+     C                     MOVEL$USER     S5ZZ
+|   C*將資料寫入SOS5PF
+|   C                     UPDATS50
+| 02-C                     END
+|   C                     Z-ADDRRN       DRRN
+|   C*
+|   C                     UPDATSFLSR
+|   C                     READCSFLSR                    40*NF
+|   C*
+| 01-C                     END                             *40 END
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN110....INITIAL                              *
+      *=========================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C                     Z-ADD1         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         WRRN
+|    C                     Z-ADD14        WPRCD
+|    C                     Z-ADD0         DSPRCD
+|    C                     MOVE 'N'       WBOTOM  1
+|    C                     SETON                     52
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C           WS501     SETLLS50
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN120 .. ROLLUP MDIN ROUTINE
+      *=========================================================*
+04===C           RTN120    BEGSR
+|    C*
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                     97    *LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+|   C                     EXSR RTN130
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *=========================================================*
+      *          RTN130 .. ADD SUBFILE DATA
+      *=========================================================*
+05===C           RTN130    BEGSR
+|    C*
+|    C                     SETOF                     54
+|    C                     Z-ADDWRRN      RRN
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C                     READ S50                      46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C                     MOVE S501      WS501
+     C                     Z-ADDS502      WS502
+     C                     CALL 'RES001'
+     C                     PARM 'YMD'     S001I1  3
+     C                     PARM WS502     S001I2  60
+     C           DS502     PARM           S001O1  60
+|   C                     Z-ADDS503      DS503
+|   C                     Z-ADDS504      DS504
+|   C                     MOVELS506      DS506
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVE 'Y'       WBOTOM
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C           *LOVAL    SETLLS50
+|    C*
+|    C                     Z-ADDRRN       DRRN
+|    C                     Z-ADDRRN       WRRN
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN140... EXFMT SFL                                 *
+      *==============================================================*
+06===C           RTN140    BEGSR
+|    C*
+| 01-C           RRN       IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC11
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN500....SCREEN CHECK
+     C*==============================================================*
+20===C           RTN500    BEGSR
+      *
+     C                     SETOF                     999594
+     C                     SETOF                     60
+     C                     SETON                     54
+     C                     READCSFLSR                  5757
+     C           *IN57     DOWEQ'0'
+     C           DS503     IFNE 0
+     C           DS502     ANDEQ0
+     C           DS504     ORNE 0
+     C           DS502     ANDEQ0
+     C                     SETON                     959960
+     C                     ELSE
+     C           DS502     IFNE 0
+     C                     CALL 'P09'
+     C                     PARM DS502     P0401I  60
+     C           CODE      PARM           P0111O  1
+     C           CODE      IFEQ 'N'
+     C                     SETON                     609499
+     C                     END
+     C                     END
+     C                     END
+     C   99                GOTO DSP
+      *
+     C           DSP       TAG
+     C   99                Z-ADDRRN       DRRN
+     C                     UPDATSFLSR
+     C                     READCSFLSR                    57
+     C* READC DOW LOOP
+     C                     END
+      *
+     C   99                GOTO END500
+      *
+     C           END500    TAG
+     C           *LOVAL    SETLLS50
+      *
+     C                     ENDSR
+     C*
+     C*==============================================================*
+     C*          RTN990....AUT CHK (CALL SUBPGM)
+     C*==============================================================*
+20===C           RTN990    BEGSR
+     C*
+     C                     MOVEL'MTA010C' PGMID  10
+|    C*
+|    C                     CALL 'S#S01'
+|    C                     PARM $USER     S0101I 10
+|    C                     PARM PGMID     S0102I 10
+|    C                     PARM           S0101O  1
+| 01-C           S0101O    IFEQ 'N'
+|   C                     SETON                     9099
+| 01-C                     END
+|    C*
+20===C                     ENDSR
+     C*==============================================================*
+B2NEWC/COPY HBP2CVTR
+

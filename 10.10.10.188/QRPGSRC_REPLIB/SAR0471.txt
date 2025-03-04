@@ -1,0 +1,336 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SAR0471                                       *
+      * AUTHER       : A1084  CHARLES                                *
+      * CREATE DATE  : 81/05/04                                      *
+      * CREATE DATE  : 83/08/27                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :產品銷售統計表                               *
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FRES18WF IF  E           K        DISK                           UC
+     FREWF17  UF  E           K        DISK                      A
+     E                    WFC        12  9 0
+     E                    WFA        12 12 0
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*辦事處
+     I                                      600 600 COMP
+     I                                      601 601 COMPS
+     I                                      602 602 COMPE
+     I                                      645 645 DSC33S
+     I                                      646 646 DSC33E
+     I                                      651 652 DSC34S
+     I                                      653 654 DSC34E
+     I                                      661 664 DSC28S
+     I                                      665 668 DSC28E
+      *MM//YY
+     I                                      611 6140DSC39
+     I                                      611 6120DSC39M
+     I                                      613 6140DSC39Y
+      *YY/MM--------------------------------------------------------
+      *本年月
+     I                                      615 6180SC39E
+     I                                      615 6160SC39EY
+     I                                      617 6180SC39EM
+      *螢幕上年下月
+     I                                      619 6220SC39S
+     I                                      619 6200SC39SY
+     I                                      621 6220SC39SM
+      *
+     I                                      623 623 DSEL
+     I                                      624 632 DSD03S
+     I                                      633 641 DSD03E
+     I                                      701 7020DSC08M
+     I                                      703 7040DSC08Y
+     I                                      705 705 DSEL1
+     I                                      750 750 IN20
+     I            DS
+B2MODI                                        1   80SC39
+B2MODI                                        5   60MSC39
+     I            DS
+B2MODI                                        1   80SC08
+B2MODI                                        5   60MSC08
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN MA41      WAMT
+B2000C           *LIKE     DEFN SC08      WSC08
+B2000C           *LIKE     DEFN SC08      DATES
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF1702
+     C                     KFLD           WF1703
+     C                     KFLD           WF1704
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN100
+      *分析方式－禮盒(A)
+  01-C           DSEL      IFEQ 'A'
+    C                     EXSR RTN200
+  01-C                     END
+      *
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+  02-C           DSEL      IFEQ 'B'
+    C                     EXSR RTN400
+  02-C                     END
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....INIT.
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....月銷售數量及金額
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     READ SC0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C* FOR DEBUG
+| 02-C*          SC02      IFEQ A,1
+|   C*                    DSPLY          SC02
+| 02-C*                    END
+|   C*
+|   C                     MOVE 'Y'       MYN     1
+| 03-C           DSEL1     IFEQ '1'
+|   C           DSEL1     OREQ '2'
+| 04-C           SC03      IFEQ 'S4'
+|   C                     MOVE 'N'       MYN     1
+| 04-C                     END
+| 03-C                     END
+| 05-C           MYN       IFEQ 'Y'
+|   C           SC02      SETLLSD0
+|   C           SC02      READESD0                      46
+| 06-C           *IN46     DOWEQ'0'
+| 07-C           SD03      IFGE DSD03S
+|   C           SD03      ANDLEDSD03E
+|   C                     MOVELSD03      WF1702
+|   C                     MOVELSC33      WF1703
+|   C                     MOVELSC34      WF1704
+|   C                     MOVE *BLANK    WF1705
+|   C           KEYWF     CHAINWF170                40
+|   C                     EXSR RTN300
+| 07-C                     END
+|   C           SC02      READESD0                      46
+| 06-C                     END
+| 05-C                     END
+|   C*
+|   C                     READ SC0                      45
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE OR UPDATE REWF17
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+|    C                     Z-ADD0         WFC
+|    C                     Z-ADD0         WFA
+|    C*計算月份欄位
+| 02-C           IN20      IFEQ '0'
+|   C                     Z-ADDMSC08     DSCMM   20
+| 02*C                     ELSE
+|   C                     Z-ADDMSC39     DSCMM   20
+| 02-C                     END
+|    C           DSCMM     ADD  12        L       20
+|    C           L         SUB  SC39EM    L
+| 01-C           L         IFGT 12
+|   C           L         SUB  12        L
+| 01-C                     END
+|    C*
+| 02-C           IN20      IFEQ '0'
+B2000C                     Z-ADDSC08      DATES
+| 02*C                     ELSE
+B2000C                     Z-ADDSC39      DATES
+| 02-C                     END
+|    C*
+|    C*累計數量
+|    C                     Z-ADDSD04      WFC,L
+|    C*累計金額
+|    C                     Z-ADDSD07      WFA,L
+|    C*累計搭贈數量
+| 03-C           DSEL1     IFEQ '2'
+|   C           DSEL1     OREQ '4'
+|   C                     ADD  SD05      WFC,L
+| 03-C                     END
+|    C*
+| 04-C           *IN40     IFEQ '0'
+|   C                     ADD  WFC,1     WF1706
+|   C                     ADD  WFA,1     WF1707
+|   C                     ADD  WFC,2     WF1708
+|   C                     ADD  WFA,2     WF1709
+|   C                     ADD  WFC,3     WF1710
+|   C                     ADD  WFA,3     WF1711
+|   C                     ADD  WFC,4     WF1712
+|   C                     ADD  WFA,4     WF1713
+|   C                     ADD  WFC,5     WF1714
+|   C                     ADD  WFA,5     WF1715
+|   C                     ADD  WFC,6     WF1716
+|   C                     ADD  WFA,6     WF1717
+|   C                     ADD  WFC,7     WF1718
+|   C                     ADD  WFA,7     WF1719
+|   C                     ADD  WFC,8     WF1720
+|   C                     ADD  WFA,8     WF1721
+|   C                     ADD  WFC,9     WF1722
+|   C                     ADD  WFA,9     WF1723
+|   C                     ADD  WFC,10    WF1724
+|   C                     ADD  WFA,10    WF1725
+|   C                     ADD  WFC,11    WF1726
+|   C                     ADD  WFA,11    WF1727
+|   C                     ADD  WFC,12    WF1728
+|   C                     ADD  WFA,12    WF1729
+|   C*
+|   C                     UPDATWF170
+| 04*C                     ELSE
+|   C                     Z-ADDWFC,1     WF1706
+|   C                     Z-ADDWFA,1     WF1707
+|   C                     Z-ADDWFC,2     WF1708
+|   C                     Z-ADDWFA,2     WF1709
+|   C                     Z-ADDWFC,3     WF1710
+|   C                     Z-ADDWFA,3     WF1711
+|   C                     Z-ADDWFC,4     WF1712
+|   C                     Z-ADDWFA,4     WF1713
+|   C                     Z-ADDWFC,5     WF1714
+|   C                     Z-ADDWFA,5     WF1715
+|   C                     Z-ADDWFC,6     WF1716
+|   C                     Z-ADDWFA,6     WF1717
+|   C                     Z-ADDWFC,7     WF1718
+|   C                     Z-ADDWFA,7     WF1719
+|   C                     Z-ADDWFC,8     WF1720
+|   C                     Z-ADDWFA,8     WF1721
+|   C                     Z-ADDWFC,9     WF1722
+|   C                     Z-ADDWFA,9     WF1723
+|   C                     Z-ADDWFC,10    WF1724
+|   C                     Z-ADDWFA,10    WF1725
+|   C                     Z-ADDWFC,11    WF1726
+|   C                     Z-ADDWFA,11    WF1727
+|   C                     Z-ADDWFC,12    WF1728
+|   C                     Z-ADDWFA,12    WF1729
+|   C                     WRITEWF170
+| 04-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....禮盒單瓶牌價計算數量及金額
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*
+|    C                     READ SC0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+| 02-C*          SC02      IFEQ A,1
+|   C*                    DSPLY          SC02
+| 02-C*                    END
+      *
+|   C                     MOVE 'Y'       MYN     1
+| 03-C           DSEL1     IFEQ '1'
+|   C           DSEL1     OREQ '2'
+| 04-C           SC03      IFEQ 'S4'
+|   C                     MOVE 'N'       MYN     1
+| 04-C                     END
+| 03-C                     END
+| 05-C           MYN       IFEQ 'Y'
+B2CHKC           SC08      IFNE 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2000C                     Z-ADDSC08      WSC08
+| 06*C                     ELSE
+B2000C                     Z-ADDSC07      WSC08
+| 06-C                     END
+|   C*
+|   C           SC02      SETLLSD0
+|   C           SC02      READESD0                      46
+| 07-C           *IN46     DOWEQ'0'
+| 08-C           SD03      IFGE DSD03S
+|   C           SD03      ANDLEDSD03E
+|   C           SD03      CHAINMA0                  40
+|   C*禮盒碼
+| 09-C           MA54      IFEQ 'Y'
+|   C*禮盒單瓶牌價
+|   C                     EXSR RTN500
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN600
+|   C                     CLOSERES18WF
+|   C*ELSE非禮盒處理同禮盒處禮DSEL='A'
+| 09*C                     ELSE
+|   C                     MOVELSD03      WF1702
+|   C                     MOVELSC33      WF1703
+|   C                     MOVELSC34      WF1704
+|   C                     MOVE *BLANK    WF1705
+|   C           KEYWF     CHAINWF170                40
+|   C                     MOVELSD03      WF1701
+|   C                     EXSR RTN300
+|   C*
+| 09-C                     END
+| 08-C                     END
+|   C*
+|   C           SC02      READESD0                      46
+| 07-C                     END
+| 05-C                     END
+|   C*
+|   C                     READ SC0                      45
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN500....禮盒單瓶牌價
+      *==============================================================*
+05===C           RTN500    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SD02      S08I2  12        訂單號碼
+B2MODC                     PARM SC07      S08I3   80       牌價判斷日
+|    C                     PARM SD04      S08I4   60       禮盒訂購數量
+|    C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|    C                     PARM SD06      S08I6   92       禮盒金額
+      *部份－單位成本
+|    C                     PARM SD10      S08I7   92       禮盒成本FOB
+|    C                     PARM SD11      S08I8   92       禮盒成本FHI
+|    C                     PARM SD12      S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM SD22      S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM SD23      S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM SD24      S08IC   92       禮盒轉帳成本DUTY
+|    C*
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE OR UPDATE REWF69
+      *==============================================================*
+06===C           RTN600    BEGSR
+|    C*
+|    C                     MOVELSC33      WF1703
+|    C                     MOVELSC34      WF1704
+|    C                     MOVE *BLANK    WF1705
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVELR181      WF1701
+|   C                     MOVELR181      WF1702
+|   C                     Z-ADDR182      SD04
+|   C                     Z-ADDR183      SD05
+|   C                     Z-ADDR184      SD07
+|   C           KEYWF     CHAINWF170                40
+|   C                     EXSR RTN300
+|   C                     READ RE18R                    46
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+06===C                     ENDSR
+

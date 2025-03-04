@@ -1,0 +1,481 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM NAME : BAA150                                     *
+     H*    AUTHOR       : A1034  STEPHANIE                           *
+     H*    CREATE DATE  : 79/07/30                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :                                            *
+     H*    SUBSYSTEM    :基本資料作業系統                          *
+     H*    REMARK       :供應商零件對應資料維護                    *
+     H****************************************************************
+     FBAQEPF  UF  E           K        DISK                      A
+     F                                              KINFDS BAQEDS
+     F                                              KINFSR ERRSR
+     FBAQBPF  IF  E           K        DISK
+     FBAQCPF  IF  E           K        DISK
+     FBAA150D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     IBAQEDS      DS
+     I                                     *STATUS  WCODE
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *LIKE     DEFN QE02      WQE02T
+     C           *LIKE     DEFN QE02      WQE02B
+     C           *LIKE     DEFN QE03      WQE03T
+     C           *LIKE     DEFN QE03      WQE03B
+     C*          *LIKE     DEFN QB28      WQB28
+     C*                    MOVE '13'      WQB28
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYQE     KLIST
+     C                     KFLD           DQE01
+     C                     KFLD           DQE02
+     C                     KFLD           DQE03
+@8/13C           KEYQB     KLIST
+@8/13C*                    KFLD           WQB28
+@8/13C                     KFLD           DQE01
+     C           KEYQET    KLIST                           *KEY TOP
+     C                     KFLD           DQE01
+     C                     KFLD           WQE02T
+     C                     KFLD           WQE03T
+     C*
+     C           KEYQEB    KLIST                           *KEY BOTTOM
+     C                     KFLD           DQE01
+     C                     KFLD           WQE02B
+     C                     KFLD           WQE03B
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C  N99                EXSR RTN010
+     C           *IN03     DOWEQ'0'
+     C*
+     C           SCID      CASEQ'SC01'    RTN100
+     C           SCID      CASEQ'SC02'    RTN200
+     C                     END
+     C*
+     C                     END
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INIT SCR01
+     C*==============================================================*
+     C           RTN010    BEGSR
+     C                     MOVE 'SC01'    SCID    4
+     C                     MOVE *BLANKS   DQE01
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....'SC01' SCREEN MAIN ROUTINE
+     C*==============================================================*
+     C           RTN100    BEGSR
+     C*
+     C                     EXFMTDSPD1
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN03     IFEQ '0'                        *03 OFF
+     C                     EXSR RTN110                     *SCR CHK
+     C  N99                MOVE 'SC02'    SCID
+     C                     END                             *03 END
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN110....SCREEN CHECK
+     C*==============================================================*
+     C           RTN110    BEGSR
+     C*
+     C* IN38 ON --> SETON 99 BEFORE ENDSR
+     C                     SETOF                     38
+     C*
+     C*挑選供應商代號
+     C*
+     C                     MOVELDQE01     WQUERY  1
+  ---C           WQUERY    IFEQ '?'
+  |  C                     CALL 'BAS141'
+  |  C                     PARM '13'      S141I1  2
+  |  C           DQE01     PARM           S141O1  8
+  |  C                     SETON                     38
+  ---C                     END
+     C*
+     C           DQE01     IFEQ *BLANKS
+     C                     SETON                     609899
+     C                     END
+     C   99                GOTO END110
+     C*
+@8/13C**         DQE01     CHAINQB0                  40
+@8/13C           KEYQB     CHAINQB0                  40
+     C           *IN40     IFEQ '1'
+     C           QB27      ORNE '1'
+     C           QB27      ANDNE'3'
+     C                     SETON                     609799
+     C                     END
+     C   99                GOTO END110
+     C*
+     C   38                SETON                     99
+     C           END110    ENDSR
+     C*==============================================================*
+     C*          RTN200....'SC02' SCREEN MAIN ROUTINE
+     C*==============================================================*
+     C           RTN200    BEGSR
+     C*
+     C                     EXSR RTN205                      INIT SFL
+     C                     EXSR RTN800                      INIT DTA
+     C           KEYQEB    SETLLQE0                        *1 SETLL
+     C                     EXSR RTN810                     *1 READ NEXT
+     C                     EXSR RTN260                      EXFMTSFL
+     C*
+     C           *IN03     DOWEQ'0'
+     C           SCID      ANDEQ'SC02'
+     C*
+     C           *IN12     IFEQ '0'
+     C*
+     C           *IN25     CASEQ'1'       RTN210           下一頁
+     C           *IN26     CASEQ'1'       RTN220           上一頁
+     C           *IN19     CASEQ'1'       RTN230           零件明細
+     C           *IN13     CASEQ'1'       RTN240           整筆刪除
+     C                     CAS            RTN250            CHK & SAV
+     C                     END
+     C* *IN13 ON --> SETON IN12
+     C  N12                EXSR RTN260                      EXFMTSFL
+     C* IN12 ON
+     C                     ELSE
+     C           *LOVAL    SETLLQE0
+     C                     MOVE 'SC01'    SCID
+     C                     END
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN205....INIT SFL
+     C*=============================================================*
+     C           RTN205    BEGSR
+     C*
+     C                     SETOF                     53    *SFLEND
+     C                     SETON                     5251
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C*SET KEYQE TOP VALUES
+     C                     MOVE *BLANK    WQE02T
+     C                     MOVE *BLANK    WQE03T
+     C*SET KEYQE BOTTOM VALUES
+     C                     MOVE *BLANK    WQE02B
+     C                     MOVE *BLANK    WQE03B
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN210....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+     C           RTN210    BEGSR
+     C*
+     C           *IN08     IFEQ '0'                        *LAST PAGE
+     C           KEYQEB    SETGTQE0                        *AFTER 1 SETLL
+     C                     EXSR RTN810                     *READ NEXT
+     C                     ELSE
+     C                     SETON                     97
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN220....ROLLDOWN MAIN ROUTINE
+     C*=============================================================*
+     C           RTN220    BEGSR
+     C*
+     C           *IN07     IFEQ '0'                        *FIRST PAGE
+     C           KEYQET    SETLLQE0
+     C                     EXSR RTN820                     *READ PREV
+     C                     ELSE
+     C                     SETON                     97
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN230....零件明細
+     C*=============================================================*
+     C           RTN230    BEGSR
+     C*
+     C                     MOVEL'BAI110'  S0102I           *FOR RTN990
+     C                     EXSR RTN990                     *AUT CHK
+     C*
+     C           *IN99     IFEQ '0'
+     C                     CALL 'BAI110'
+     C                     PARM DQE02     S110I1 15
+     C                     PARM           S110O1  2
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN240....整筆刪除
+     C*=============================================================*
+     C           RTN240    BEGSR
+     C*
+     C           DQE01     SETLLQE0
+     C           DQE01     READEQE0                      44
+     C           *IN44     DOWEQ'0'
+     C                     DELETQE0
+     C           DQE01     READEQE0                      44
+     C                     END
+     C*
+     C                     SETON                     12
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN250....CHECK & SAVE
+     C*=============================================================*
+     C           RTN250    BEGSR
+     C*
+     C                     EXSR RTN300                     *CHECK
+     C*
+     C           *IN99     IFEQ '0'
+     C           *IN05     ANDEQ'0'
+     C*
+     C                     EXSR RTN400                     *SAVE
+     C                     EXSR RTN800                      INIT DTA
+     C           KEYQET    SETLLQE0                        *1 SETLL
+     C                     EXSR RTN810                     *1 READ NEXT
+     C           RRN       IFEQ 0
+     C           KEYQET    SETLLQE0
+     C                     EXSR RTN820                     *READ PREV
+     C                     SETON                     0853
+     C                     END
+     C*
+     C                     SETOF                     97
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN260....EXFMT DSPF
+     C*=============================================================*
+     C           RTN260    BEGSR
+     C*
+     C           RRN       IFGT 0
+     C                     SETON                     50    *SFLDSP
+     C                     END
+     C*
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR
+     C                     SETOF                     50
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN300....CHECK & SAVE
+     C*=============================================================*
+     C           RTN300    BEGSR
+     C* KEY1
+     C           DQE02     IFEQ *BLANKS
+     C                     SETON                     609599
+     C                     ELSE
+     C           DQE02     SETLLQC0                      42
+     C           *IN42     IFEQ '0'
+     C                     SETON                     608999
+     C                     END
+     C                     END
+     C   99                GOTO END300
+     C* KEY2
+     C           DQE03     IFEQ 0
+     C                     SETON                     619599
+     C                     ELSE
+     C                     CALL 'P04'
+     C                     PARM DQE03     S0401I  60
+     C                     PARM           S0401O  1
+     C           S0401O    IFEQ 'N'
+     C                     SETON                     619199
+     C                     END
+     C                     END
+     C   99                GOTO END300
+     C* KEY1+KEY2
+     C           KEYQE     SETLLQE0                      42
+     C*
+     C           DOPT      IFEQ '1'
+     C           *IN42     ANDEQ'1'
+     C                     SETON                     6061
+     C                     SETON                     9399
+     C                     END
+     C   99                GOTO END300
+     C*
+     C           DOPT      IFNE '1'
+     C           *IN42     ANDEQ'0'
+     C                     SETON                     6061
+     C                     SETON                     9299
+     C                     END
+     C   99                GOTO END300
+     C*
+     C           *IN05     IFEQ '1'
+     C           DOPT      ANDNE'1'
+     C           KEYQE     CHAINQE0                  40
+     C                     Z-ADDQE03      DQE03
+     C                     Z-ADDQE04      DQE04
+     C                     Z-ADDQE05      DQE05
+     C                     Z-ADDQE06      DQE06
+     C                     Z-ADDQE07      DQE07
+     C                     END
+     C*
+     C           DOPT      IFNE '4'
+     C           DQE04     ANDLE0
+     C                     SETON                     628899
+     C                     END
+     C*
+     C           END300    ENDSR
+     C*=============================================================*
+     C*          RTN400....SAVE
+     C*=============================================================*
+     C           RTN400    BEGSR
+     C*
+     C           KEYQE     CHAINQE0                  40
+     C*
+     C                     MOVE DQE01     QE01
+     C                     MOVE DQE02     QE02
+     C                     Z-ADDDQE03     QE03
+     C                     Z-ADDDQE04     QE04
+     C                     Z-ADDDQE05     QE05
+     C                     Z-ADDDQE06     QE06
+     C                     Z-ADDDQE07     QE07
+     C*
+     C           DOPT      IFEQ '1'
+     C                     WRITEQE0
+     C                     ELSE
+     C           DOPT      IFEQ '2'
+     C                     UPDATQE0
+     C                     ELSE
+     C                     DELETQE0
+     C                     END
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN800....INIT DTA ENTRY
+     C*=============================================================*
+     C           RTN800    BEGSR
+     C*
+     C                     MOVE '1'       DOPT
+     C                     MOVE *BLANKS   DQE02
+     C                     Z-ADD0         DQE03
+     C                     Z-ADD0         DQE04
+     C                     Z-ADD0         DQE05
+     C                     Z-ADD0         DQE06
+     C                     Z-ADD0         DQE07
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....READ NEXT
+     C*=============================================================*
+     C           RTN810    BEGSR
+     C                     Z-ADD*ZEROS    RRN
+     C                     SETOF                     070853
+     C*
+     C           DQE01     READEQE0                      44
+     C  N44                EXSR RTN910                     *GET KEY TOP
+     C*
+@    C                     DO   9
+     C*
+     C           *IN44     IFEQ '0'
+     C                     MOVE QE02      WQE02B           *GET KEY BOT
+     C                     MOVE QE03      WQE03B           *GET KEY BOT
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C                     ELSE
+     C                     SETON                     5397  *MSG
+     C                     SETON                     08    *LAST PAGE
+     C                     GOTO END810
+     C                     END
+     C*
+     C           DQE01     READEQE0                      44
+     C                     END
+     C*
+     C           *LOVAL    SETLLQE0
+     C   44                SETON                     085397
+     C           END810    ENDSR
+     C*==============================================================*
+     C*          RTN820....READ PREVIOUS
+     C*==============================================================*
+     CSR         RTN820    BEGSR
+     C                     Z-ADD10        RRN              PAG(9)+1
+     C                     SETOF                     0708
+     C*
+     C           DQE01     REDPEQE0                      45*READ EQ DIV
+     C                     EXSR RTN920                     *GET KEY BOTTOM
+     C*
+     C                     DO   9                          *SFL FULL
+     C*
+     C           *IN45     IFEQ '1'                        *READP EOF
+     C                     SETON                     97    *MSG
+     C                     SETON                     07    *FIRST PAGE
+     C                     MOVE WQE02T    WQE02B
+     C                     MOVE WQE03T    WQE03B
+     C           KEYQEB    SETLLQE0
+     C                     EXSR RTN810                     *READ NEXT
+     C                     GOTO END820
+     C                     END
+     C*
+     C                     SETOF                     53    *DSP '+'
+     C                     MOVE QE02      WQE02T           *GET KEY TOP
+     C                     MOVE QE03      WQE03T           *GET KEY TOP
+     C                     SUB  1         RRN
+     C                     WRITESFLSR
+     C*
+     C           DQE01     REDPEQE0                      45*READ EQ DIV
+     C                     END
+     C*
+     C           *LOVAL    SETLLQE0
+     C   45                SETON                     9707
+     C           END820    ENDSR
+     C*==============================================================*
+     C*          RTN910....READ NEXT CLEAR & INIT
+     C*==============================================================*
+     CSR         RTN910    BEGSR
+     C*
+     C                     SETON                     52
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C*
+     C                     MOVE QE02      WQE02T           *KEY TOP
+     C                     MOVE QE03      WQE03T           *KEY TOP
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN920....READ PREV CLEAR & INIT
+     C*==============================================================*
+     CSR         RTN920    BEGSR
+     C*
+     C                     SETON                     52
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C*
+     C                     MOVE QE02      WQE02B           *KEY BOTTOM
+     C                     MOVE QE03      WQE03B           *KEY
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN990....AUT CHK (CALL SUBPGM)
+     C*==============================================================*
+     C           RTN990    BEGSR
+     C*
+     C                     CALL 'S#S01'
+     C                     PARM $USER     S0101I 10
+     C                     PARM           S0102I 10
+     C                     PARM           S0101O  1
+     C           S0101O    IFEQ 'N'
+     C                     SETON                     9099
+     C                     END
+     C*
+     C                     ENDSR
+@    C*==============================================================*
+@    C*          ERRSR ....FILE STATUS HANDLING
+@    C*==============================================================*
+@    C           ERRSR     BEGSR
+@    C*
+@    C           WCODE     IFEQ 01021
+@    C           WCODE     OREQ 01218
+@    C                     CALL 'P50'
+@    C           DMSG      PARM           P5001O 78
+@    C                     SETON                     2899
+@    C                     MOVEL'*DETC'   WENDSR  6
+@    C                     ELSE
+@    C                     MOVE *BLANKS   WENDSR
+@    C                     END
+@    C*
+@    C                     MOVE 'SC01'    SCID
+@    C                     ENDSRWENDSR
+

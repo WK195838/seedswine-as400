@@ -1,0 +1,163 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *--------------------------------------------------------------*
+      *    PROGRAM ID   : POI027                                     *
+      *    AUTHOR       : AN MING HSIA                               *
+      *    DATE WRITTEN : 01/18/94                                   *
+      *    UPDATE DATE  :                                            *
+      *    SYSTEM       :人頭馬匯東                                *
+      *    SUBSYSTEM    :採購系統                                  *
+      *    REMARK       :採購單／驗收單查詢                        *
+      ****************************************************************
+     FPOPCPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMBPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FPOI0271DCF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     F                                        RRN1  KSFILE SFLSR1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+     I*
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PB02   12
+     C                     PARM           DPB04   60
+     C                     PARM *IN03     I021O1  1
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+     C*
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C           *IN12     ANDEQ'0'                        *03    OFF
+    C*
+    C                     WRITEDSPC1
+    C                     EXFMTSFLCR1
+    C                     MOVEA*ALL'0'   *IN,60
+    C*
+  02-C           *IN03     IFEQ '0'
+    C           *IN12     ANDEQ'0'
+    C                     SETON                     12
+  02-C                     END
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE 'SCR001'  APPSCR  6
+|    C                     Z-ADD0         DATE    60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM $EGMDY    S001I2  60
+|    C           DATE      PARM           S001O1  60
+|    C*
+|    C           PB02      SETLLPC0
+|    C*
+01===C                     ENDSR
+     C*=========================================================*
+     C*          RTN191....INITIAL                              *
+     C*=========================================================*
+02===C           RTN191    BEGSR
+|    C*
+|    C                     Z-ADD0         DRRN1   40
+|    C                     Z-ADD0         RRN1    40
+|    C                     Z-ADD0         WRRN1   40
+|    C                     Z-ADD10        WPRCD1  30
+|    C                     Z-ADD10        DSPRC1  40
+|    C                     MOVE 'N'       WBOTM1  1
+|    C                     SETON                     5254
+|    C                     WRITESFLCR1
+|    C                     SETOF                     525053
+|    C                     SETON                     51
+|    C*
+|    C           PB02      SETLLPC0
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+03===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTM1    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN1      DRRN1
+| 01*C                     ELSE
+|   C                     EXSR RTN193
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+04===C           RTN193    BEGSR
+|    C*
+|    C                     SETOF                     54
+|    C                     Z-ADDWRRN1     RRN1
+|    C                     ADD  WPRCD1    DSPRC1
+|    C*
+| 01-C           RRN1      DOWLTDSPRC1
+|   C           PB02      READEPC0                      46
+| 02-C           *IN46     IFEQ '0'
+|   C*
+|   C*公司名稱
+|   C           PC01      CHAIN#B0                  40
+|   C   40                MOVE *BLANK    #B03
+|   C*供應商簡稱
+|   C           PC05      CHAINMB0                  40
+|   C   40                MOVE *BLANK    MB03
+|   C* GET 產品名稱
+|   C           PC03      CHAINMA0                  40
+|   C   40                MOVE *BLANKS   MA03
+|   C*
+|   C           PC06      SUB  PC11      WPC61
+|   C*
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+| 02*C                     ELSE
+|   C                     Z-ADDRRN1      DSPRC1
+|   C                     MOVE 'Y'       WBOTM1
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN1      DRRN1      50
+|    C                     Z-ADDRRN1      WRRN1
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN990....AUT CHK (CALL SUBPGM)
+     C*==============================================================*
+05===C           RTN990    BEGSR
+|    C*
+|    C                     CALL 'S#S01'
+|    C                     PARM $USER     S0101I 10
+|    C                     PARM           S0102I 10
+|    C                     PARM           S0101O  1
+| 01-C           S0101O    IFEQ 'N'
+|   C                     SETON                     9699
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+

@@ -1,0 +1,210 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : SOR082                                        *
+      * AUTHOR       : TINA                                          *
+      * CREATE DATE  : 02/16/95                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :月客戶銷售統計表                             *
+      ****************************************************************
+     FSOR082D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     FSOR082Z O   E             39     PRINTER                        UC
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*專櫃
+     I                                      600 604 DST01S
+     I                                      605 609 DST01E
+     I*MM//YY
+     I                                      611 6140DST02
+     I                                      611 6120DST02M
+     I                                      613 6140DST02Y
+     I*YY/MM--------------------------------------------------------
+     I*本年月
+     I                                      615 6180ST02E
+     I                                      615 6160ST02EY
+     I                                      617 6180ST02EM
+     I*螢幕上年下月
+     I                                      619 6220ST02S
+     I                                      619 6200ST02SY
+     I                                      621 6220ST02SM
+M001AI*(YYYY/MM/DD)
+M001AI                                      850 855 YMD8S
+M001AI                                      858 863 YMD8E
+     I*
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  02-C           *IN03     IFEQ '0'
+  03-C           *IN04     IFEQ '1'
+    C**********************
+    C*  F4 PROMPT PROCESS *
+    C**********************
+    C                     EXSR RTNF4
+  03*C                     ELSE
+    C                     EXSR RTN100                     .CHECK      ?
+  03-C                     END
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     IN   LDA
+|    C                     Z-ADD2         $EVR
+|    C                     MOVEL$USER     AUT     3
+| 04-C           AUT       IFNE 'D91'
+|   C           AUT       ANDNE'REP'
+|   C                     SETON                     31
+| 04-C                     END
+|    C                     MOVE *BLANK    DST01S
+|    C                     MOVE *BLANK    DST01E
+|    C                     Z-ADD0         DST02
+|    C                     Z-ADD0         ST02E
+|    C                     Z-ADD0         ST02S
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*專櫃
+| 01-C           DST01S    IFEQ *BLANK
+|   C                     MOVE *LOVAL    DST01S
+| 01-C                     END
+|    C*
+| 02-C           DST01E    IFEQ *BLANK
+|   C                     MOVE *HIVAL    DST01E
+| 02-C                     END
+|    C*
+| 03-C           DST01S    IFGT DST01E
+|   C                     SETON                     6061
+|   C                     SETON                     9299
+| 03-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*(CHECK DATE)-日期
+| 04-C           DST02     IFNE 0
+|   C*
+| 05-C           DST02M    IFGT 12
+|   C           DST02M    ORLT 1
+|   C                     SETON                     629399
+| 05-C                     END
+|   C   99                GOTO END100
+|   C*
+|   C*(CHANGE TO CHINESE DATE)
+|   C*本年月YY/MM
+|   C                     Z-ADDDST02Y    ST02EY
+|   C                     Z-ADDDST02M    ST02EM
+|   C*
+|   C*去年下月OR本年一月
+|   C           ST02EM    ADD  1         ST02SM
+| 06-C           ST02SM    IFEQ 13
+|   C                     Z-ADD1         ST02SM
+|   C                     Z-ADDST02EY    ST02SY
+| 06*C                     ELSE
+M001AC                     MOVE ST02EY    HB2@YY  2
+M001AC                     EXSR HB@24Y
+M001AC                     MOVE HB2@Y4    ST02EX  40
+|   C           ST02EX    SUB  1         ST02SY
+| 06-C                     END
+| 04*C                     ELSE
+|   C                     SETON                     629399
+| 04-C                     END
+|    C   99                GOTO END100
+M001AC                     MOVE '004N7'   HB2@FA
+M001AC                     MOVE ST02S     HB2@F
+M001AC                     MOVE '006N7'   HB2@TA
+M001AC                     EXSR HB@ADD                     ADD CENTURY
+M001AC                     MOVE HB2@T     YMD8S
+M001AC                     MOVE '004N7'   HB2@FA
+M001AC                     MOVE ST02E     HB2@F
+M001AC                     MOVE '006N7'   HB2@TA
+M001AC                     EXSR HB@ADD                     ADD CENTURY
+M001AC                     MOVE HB2@T     YMD8E
+      *SCREEN LOG
+|    C                     OPEN SOR082Z
+|    C                     WRITEPH1
+|    C                     CLOSESOR082Z
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C* 物流點
+| 02-C           D#ROW     IFEQ 7
+|   C           D#COL     ANDGE40
+|   C           D#COL     ANDLE44
+|   C                     CALL 'WDS013'
+|   C                     PARM 'B       'S013I1  8
+|   C           DST01S    PARM DST01S    S013O1  5
+| 02-C                     END
+| 03-C           D#ROW     IFEQ 7
+|   C           D#COL     ANDGE48
+|   C           D#COL     ANDLE53
+|   C                     CALL 'WDS013'
+|   C                     PARM 'BWT     'S013I1  8
+|   C           DST01E    PARM DST01E    S013O1  5
+| 03-C                     END
+|   C*
+| 04-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE41
+|   C           D#COL     ANDLE42
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 04-C                     END
+|   C*
+| 01-C                     END
+|    C*
+03===C           ENDF4     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C*          *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+M001AC/COPY HBP2CVTR
+

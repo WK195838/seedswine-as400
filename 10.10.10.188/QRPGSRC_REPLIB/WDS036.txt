@@ -1,0 +1,229 @@
+     H****************************************************************
+     H*    PROGRAM NAME : WDS036                                     *
+     H*    AUTHOR       : ANDY                                       *
+     H*    CREATE DATE  : 81/08/10                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :人頭馬匯東洋酒股份有限公司                *
+     H*    SUBSYSTEM    :                                            *
+     H*    REMARK       :費用單位查詢    (WINDOW)                  *
+     F****************************************************************
+     FPA#3PF  IF  E           K        DISK
+     FWDS036D CF  E                    WORKSTN
+     F*
+     E*OPT X(1)
+     E                    WOP         8  1
+     E*
+     E*#301 X(05) & FILLER X(07) & #302 X(02)
+     E                    W01         8 14
+     E*
+     IWOP0        DS
+     I                                        1   8 WOP
+     I                                        1   1 OPT1
+     I                                        2   2 OPT2
+     I                                        3   3 OPT3
+     I                                        4   4 OPT4
+     I                                        5   5 OPT5
+     I                                        6   6 OPT6
+     I                                        7   7 OPT7
+     I                                        8   8 OPT8
+     I*
+     IW01D        DS
+     I                                        1 112 W01
+     I                                        1  14 D01
+     I                                       15  28 D02
+     I                                       29  42 D03
+     I                                       43  56 D04
+     I                                       57  70 D05
+     I                                       71  84 D06
+     I                                       85  98 D07
+     I                                       99 112 D08
+     I*
+     I            DS
+     I                                        1  14 WT
+     I                                        1   5 D#301
+     I                                       13  14 D#302
+     I*
+     I            DS
+     I                                        1  14 WCONT
+     I                                        1   5 WCONT1
+     I*
+      *****************************************************************
+      *          KLIST
+      *****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           CUNT1   5
+     C*
+     C           *LIKE     DEFN DBGN1     BBGN
+     C           *LIKE     DEFN DBGN1     WBGN
+     C           *LIKE     DEFN #301      PBGN0
+     C           *LIKE     DEFN #301      OBGN0
+     C*
+     C           KEY#3     KLIST
+     C                     KFLD           PBGN0
+     C*
+     C           KEY#31    KLIST
+     C                     KFLD           OBGN0
+      *****************************************************************
+      *          MAIN ROUTINE
+      *****************************************************************
+     C                     EXSR RTN000                     *SET INIT
+     C                     EXSR RTN191                     *INIT DATA
+     C                     EXSR RTN194                     *ADD DATA
+     C*
+     C                     EXFMTDSPC1
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+  02-C           *IN25     CASEQ'1'       RTN192           *ROLL UP
+  02-C           *IN26     CASEQ'1'       RTN193           *ROLL DOWN
+     C                     CAS            RTN170           *ENTER
+  02-C                     ENDCS
+    C*
+  05-C           *IN03     IFEQ '0'
+    C                     EXFMTDSPC1
+  05-C                     END
+    C                     SETOF                     98
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+      *****************************************************************
+      *          RTN000....SET INIT
+      *****************************************************************
+01===C           RTN000    BEGSR
+|    C*
+|    C                     MOVE *BLANK    WOP
+|    C                     MOVE *BLANK    W01
+     C                     MOVEA'1111111' *IN,60
+|    C                     MOVE *LOVAL    DBGN1
+|    C                     MOVE *LOVAL    WBGN
+|    C                     MOVE *LOVAL    PBGN0
+|    C                     MOVE *LOVAL    OBGN0
+|    C                     Z-ADD0         NU      20
+|    C*
+01===C                     ENDSR
+      *****************************************************************
+      *          RTN170....ENTER
+      *****************************************************************
+02===C           RTN170    BEGSR
+     C*
+     C           DBGN1     IFEQ *BLANK
+     C                     MOVE *LOVAL    DBGN1
+     C                     END
+     C*
+     C           DBGN1     IFNE WBGN
+     C                     MOVE *BLANK    WOP
+     C                     MOVE *BLANK    W01
+     C                     MOVEA'1111111' *IN,60
+     C                     MOVE DBGN1     BBGN
+     C                     MOVE DBGN1     WBGN
+|   C                     EXSR RTN191                     *INIT KEY
+|   C                     EXSR RTN194                     *ADD DATA
+     C                     ELSE
+     C                     EXSR RTN300                     *GET CUNTNO
+     C                     END
+     C*
+     C                     ENDSR
+      *****************************************************************
+      *          RTN191....INIT KEY
+      *****************************************************************
+02===C           RTN191    BEGSR
+     C*
+     C                     MOVELDBGN1     PBGN0
+     C*
+     C           KEY#3     SETLL#30
+|    C*
+06===C                     ENDSR
+      *****************************************************************
+      *          RTN192....ROLL UP
+      *****************************************************************
+03===C           RTN192    BEGSR
+     C*
+     C           KEY#3     SETGT#30
+     C*
+     C                     EXSR RTN194                     *ADD DATA
+     C*
+     C                     ENDSR
+      *****************************************************************
+      *          RTN193....ROLL DOWN
+      *****************************************************************
+03===C           RTN193    BEGSR
+     C*
+|    C                     Z-ADD0         NU1     10
+|    C*
+|    C           KEY#31    SETLL#30
+|    C                     READP#30                      41
+|    C*
+| 01-C           *IN41     IFEQ '1'
+|   C                     MOVE *LOVAL    PBGN0
+     C                     END
+     C*
+     C           *IN41     DOWEQ'0'
+|   C           NU1       ANDLE7
+     C                     MOVE #301      PBGN0
+|   C                     READP#30                      41
+|   C                     ADD  1         NU1
+| 02-C                     END
+|    C*
+|    C                     SETOF                     41
+     C           KEY#3     SETLL#30
+|    C                     EXSR RTN194
+|    C*
+03===C           END193    ENDSR
+      *****************************************************************
+      *          RTN194....ADD  DATA
+      *****************************************************************
+02===C           RTN194    BEGSR
+     C*
+|    C                     Z-ADD0         NU      20
+     C*
+|    C                     READ #30                      40
+     C*
+     C           *IN40     IFEQ '1'
+     C                     GOTO END194
+     C                     ELSE
+|    C                     MOVE *BLANK    WOP
+|    C                     MOVE *BLANK    W01
+     C                     MOVEL#301      OBGN0
+     C                     END
+|    C*
+| 01-C           *IN40     DOWEQ'0'
+|   C           NU        ANDLE7
+|   C                     ADD  1         NU
+     C                     MOVE #301      D#301
+     C                     MOVEL#302      D#302
+     C                     MOVE WT        W01,NU
+|   C                     READ #30                      40
+| 01-C                     END
+|    C*
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+|    C           NU        ADD  60        NU
+|    C*
+| 02-C           NU        DOWLE67
+|   C                     MOVE '1'       *IN,NU
+|   C                     ADD  1         NU
+| 02-C                     END
+|    C*
+02===C           END194    ENDSR
+      *****************************************************************
+      *          RTN300....GET CUNTNO
+      *****************************************************************
+04===C           RTN300    BEGSR
+|    C*
+|    C                     Z-ADD1         ND      10
+|    C*
+| 01-C           WOP,ND    DOWEQ*BLANK
+|   C           ND        ANDLE7
+|   C                     ADD  1         ND
+| 01-C                     END
+|    C*
+| 02-C           WOP,ND    IFEQ '/'
+|   C                     MOVE W01,ND    WCONT
+     C                     MOVE WCONT1    CUNT1
+|   C                     SETON                     9803
+| 02-C                     END
+|    C*
+04===C                     ENDSR
+

@@ -1,0 +1,183 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0551                                       *
+      * AUTHER       : A1118  PHILIP                                 *
+      * CREATE DATE  : 81/04/20                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :存貨月報表                                   *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.04  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FIMINPF  IP  E           K        DISK
+     FIMIYLF01IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     F*PA#BPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FIMR055P O   E             39     PRINTER
+     IIN0
+     I                                              IN03  L1
+     I                                              IN01  L2
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+ @   I                                      139 139 $RMK01
+     I                                      598 5990$LPRT
+     I                                      601 601 DIN01S
+     I                                      634 634 DIN01E
+     I                                      603 607 DIN03S
+     I                                      636 640 DIN03E
+     I                                      608 616 DIN04S
+     I                                      617 625 DIN04E
+     I                                      626 6290DIN02
+     I*
+     I            DS
+B2MODI                                        1   60IN02
+B2MODI                                        5   60INMM
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYIY     KLIST
+     C                     KFLD           IN02
+     C                     KFLD           IN04
+     C                     KFLD           IN03
+     C                     KFLD           IN01
+     C           KEYIY1    KLIST
+     C                     KFLD           IN021
+     C                     KFLD           IN04
+     C                     KFLD           IN03
+     C                     KFLD           IN01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01*C                     ELSE
+  02-C           *INL1     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     EXSR RTN200                     *READE DETAIL
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*公司
+|    C                     MOVE *BLANK    #A01
+|    C                     MOVE *BLANK    #A02
+|    C                     MOVEL'COMPANY' #A01
+|    C                     MOVELIN01      #A02
+|    C*
+|    C                     MOVEL*BLANKS   P#A031
+|    C*
+|    C           KEY#A     CHAIN#A0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      P#A031
+| 03-C                     END
+|    C*
+|    C*物流點
+|    C                     MOVE *BLANK    #A01
+|    C                     MOVE *BLANK    #A02
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELIN03      #A02
+|    C*
+|    C           KEY#A     CHAIN#A0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      P#A03
+| 04*C                     ELSE
+|   C           IN03      CHAINME0                  40
+| 05-C           *IN40     IFEQ '0'
+|   C                     MOVE ME04      P#A03
+| 05*C                     ELSE
+|   C                     MOVE *BLANK    P#A03
+| 05-C                     END
+| 04-C                     END
+|    C                     WRITEPH1
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C*期初存貨年月
+| 06-C           INMM      IFEQ 1
+B2MODC           IN02      SUB  100       IN021   60
+B2CHKC                     ADD  11        IN021
+| 06*C                     ELSE
+B2MODC           IN02      SUB  1         IN021   60
+| 06-C                     END
+|    C*
+|    C*產品簡稱
+|    C           IN04      CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+| 01-C                     END
+|    C*IN02<9404用IMINPF
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          IN02      IFLT 9404
+B2NEWC           IN02      IFLT 199404
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C                     Z-ADDIN05      DIN05
+|   C                     Z-ADDIN17      DIN17
+| 02*C                     ELSE
+|   C*IN02>=9404用IMINPF
+|   C                     Z-ADD0         DIN05
+|   C                     Z-ADD0         DIN17
+B2000C           KEYIY     CHAINIY0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     Z-ADDIY06      DIN17
+| 03-C                     END
+B2000C           KEYIY1    CHAINIY0                  41
+| 04-C           *IN41     IFEQ '0'
+|   C                     Z-ADDIY06      DIN05
+| 04-C                     END
+| 02-C                     END
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN999....END
+      *==============================================================*
+04===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE31
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+04===C                     ENDSR
+

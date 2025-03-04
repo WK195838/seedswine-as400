@@ -1,0 +1,208 @@
+      ****************************************************************
+      *人頭馬匯東洋酒股份有限公司－版權所有         TEL:5042266    *
+      * PROGRAM NAME : ARR0622                                       *
+      * AUTHER       : CHARLES CHENG                                 *
+      * CREATE DATE  : 81/10/23                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款系統                                 *
+      *  REMARK      :統一發票調節參考表                           *
+      *===============================================================
+      * CODE |  AUTHOR  |  DATE  | DESCRIPTION
+      *---------------------------------------------------------------
+      * M002 | MICHELLE | 030600 |發票跨月確認且重開金額
+      *      |          |        |不等於原訂單金額作＊示之
+      *---------------------------------------------------------------
+     A* M003 | MICHELLE |02.03.14|顯示未確認稅額
+     A*----------------------------------------------------------------
+     A* M004 | MICHELLE |04.05.21|顯示稅額及發票金額
+     A*----------------------------------------------------------------
+      ****************************************************************
+     FREWF44  IP  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARR062P O   E             39     PRINTER
+     E*
+     IWF440
+     I                                              WF4401L2
+     I                                              WF4402L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      605 6080DSI21
+     I                                      613 613 DSEL
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01*C                     ELSE
+  02-C           *INL2     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010                     *HEADING
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+|    C*公司
+|    C           WF4401    CHAIN#B0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   #B03
+| 03-C                     END
+|    C                     WRITEPH1
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*客戶
+|    C                     MOVELWF4405    ME01
+|    C                     MOVELWF4406    ME02
+|    C           KEYME     CHAINME0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   ME04
+| 01-C                     END
+|    C*
+|    C*日期轉換
+M001AC                     Z-ADDWF4416    XF4416  60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WF4416    S001I2  80
+M001AC                     PARM XF4416    S001I2  60
+|    C           DF4416    PARM           S001O1  60
+|    C*
+M001AC                     Z-ADDWF4403    XF4403  60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WF4403    S001I2  80
+M001AC                     PARM XF4403    S001I2  60
+|    C           DF4403    PARM           S001O1  60
+|    C*
+|    C                     MOVEL*BLANKS   MARK
+| 02-C           WF4417    IFEQ ' '
+     C*
+     C*發票淨額不等於未確認淨額（原金額）時，
+     C*以＊表示跨月確認且發票重開
+     C*
+M002AC*M004M     WF4409    IFNE WF4415
+M004MC           WF4407    IFNE WF4415
+M002AC                     MOVEL'＊'    MARK
+M002AC                     ELSE
+M002AC                     MOVEL*BLANKS   MARK
+M002AC                     END
+|   C                     SETOF                     30
+| 02*C                     ELSE
+| 03-C*M004M     WF4409    IFNE WF4412
+M004MC           WF4407    IFNE WF4410
+| 04-C*M004M     WF4412    IFEQ 0
+M004MC           WF4410    IFEQ 0
+|   C*M004M               MOVEL'取消'  MARK
+M004MC                     MOVEL'Ｃ'    MARK
+| 04*C                     ELSE
+|   C*M003M               MOVEL'修改'  MARK
+M003MC                     MOVEL'Ｍ'    MARK
+| 04-C                     END
+|   C*                    Z-ADDWF4410    WF4407
+|   C*                    Z-ADDWF4411    WF4408
+|   C*                    Z-ADDWF4412    WF4409
+| 03-C                     END
+|   C                     SETON                     30
+| 02-C                     END
+|    C*
+| 05-C           WF4419    IFEQ '*'
+| 06-C*M004M     WF4412    IFEQ 0
+M004MC           WF4410    IFEQ 0
+|   C*M003M               MOVEL'待作廢'MARK
+M003MC                     MOVEL'廢'    MARK
+| 06*C                     ELSE
+|   C*M003M               MOVEL'待重開'MARK
+M003MC                     MOVEL'重'    MARK
+| 06-C                     END
+| 05-C                     END
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     ADD  WF4407    T14407
+|    C                     ADD  WF4408    T14408
+|    C                     ADD  WF4409    T14409
+|    C                     ADD  WF4410    T14410
+|    C                     ADD  WF4411    T14411
+|    C                     ADD  WF4412    T14412
+|    C                     ADD  WF4413    T14413
+|    C                     ADD  WF4414    T14414
+|    C                     ADD  WF4415    T14415
+M003AC                     ADD  WF4420    T14420
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C                     ADD  T14407    T24407
+|    C                     ADD  T14408    T24408
+|    C                     ADD  T14409    T24409
+|    C                     ADD  T14410    T24410
+|    C                     ADD  T14411    T24411
+|    C                     ADD  T14412    T24412
+|    C                     ADD  T14413    T24413
+|    C                     ADD  T14414    T24414
+|    C                     ADD  T14415    T24415
+M003AC                     ADD  T14420    T24420
+|    C                     Z-ADD0         T14407
+|    C                     Z-ADD0         T14408
+|    C                     Z-ADD0         T14409
+|    C                     Z-ADD0         T14410
+|    C                     Z-ADD0         T14411
+|    C                     Z-ADD0         T14412
+|    C                     Z-ADD0         T14413
+|    C                     Z-ADD0         T14414
+|    C                     Z-ADD0         T14415
+M003AC                     Z-ADD0         T14420
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+      *
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....LR
+      *==============================================================*
+05===C           RTNLR     BEGSR
+      *
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE3
+| 01*C                     ELSE
+|   C                     WRITEPT2
+| 01-C                     END
+|    C                     WRITEPE2
+      *
+05===C                     ENDSR
+

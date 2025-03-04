@@ -1,0 +1,217 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*                                                              *
+     A*    DSPF NAME    : KIP013D                                    *
+     A*    AUTHOR       : A1491 EASON                                *
+     A*    CREATE DATE  : 98/06/09                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    PROGRAM NAME : KIP013                                     *
+     A*    SYSTEM       :茂世專櫃                                  *
+     A*    SUBSYSTEM    :盤點系統                                  *
+     A*    REMARK       :專櫃銷售年終成本庫存更新                  *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+      *針對異動日期與實際銷售日期不符的單據
+      *因為目前專櫃的單據在確認時才會寫入日期
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FIMIYPF  UF  E           K        DISK                      A
+     FIMIXPF  UF  E           K        DISK
+     F*IMI2PF  UF  E           K        DISK                      A
+     F*            IY0                               KRENAMEIYY
+     FIMI1PF  UF  E           K        DISK
+     F            IX0                               KRENAMEIXX
+     FMTMAPF  IF  E           K        DISK
+     FMTMHPF  IF  E           K        DISK
+     F            MA0                               KRENAMEMH0
+     FPA#KPF  UF  E           K        DISK                      A
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+M001AI                                      201 2080DATE
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I                                      513 513 $WRHTY
+     I*
+      *物流點
+     I                                      601 605 DSC04S
+     I                                      606 610 DSC04E
+      *YYMM
+     I                                      630 6330DMMYY
+     I                                      630 6310MM
+     I                                      632 6330YY
+B2MODI                                      640 6470YMD
+B2MODI                                      640 6450YYMM
+B2MODI                                      646 6470DD
+     I            DS
+     I                                        1   80SC39
+     I                                        1   60SC39X
+     I            DS
+     I                                        1   80SCXX
+     I                                        1   60SCXXX
+     I            DS
+     I                                        1   80SDXX
+     I                                        1   60SDXXX
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYIX     KLIST
+     C                     KFLD           YYMM
+     C                     KFLD           IX01
+     C           KEYIY     KLIST
+     C                     KFLD           IY15
+     C                     KFLD           IY01
+     C                     KFLD           IY02
+     C                     KFLD           IY03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN010
+      *
+     C                     Z-ADDYYMM      IY15
+     C*SOSCPF----------------------------------------------------------
+     C                     READ SC0                      45
+  01-C           *IN45     DOWEQ'0'
+  02-C           SCXXX     IFNE SC39X
+    C           SC02      CHAIN#K0                  41    *單據對照
+  03-C           *IN41     IFEQ '1'                        *NOT FOUNT
+    C           SC02      SETLLSD0
+    C           SC02      READESD0                      46
+  04-C           *IN46     DOWEQ'0'
+      *
+     C                     Z-ADD0         SD045   60
+     C           SD04      ADD  SD05      SD045
+      *
+  02-C           SDXXX     IFNE SC39X
+    C           SD03      CHAINMA0                  40
+  05-C           MA07      IFEQ 'K'
+    C                     EXSR RTN100
+    C                     EXSR RTN110
+  05*C                     ELSE
+    C                     EXSR RTN120
+    C                     EXSR RTN110
+  05-C                     ENDIF
+  05-C                     ENDIF
+      *
+    C           SC02      READESD0                      46
+  04-C                     END
+    C*
+    C                     MOVELSC02      #K01
+    C                     Z-ADDSC39      #K02
+    C                     Z-ADDDATE      #KXX
+    C                     TIME           #KYY
+    C                     MOVEL$USER     #KZZ
+    C                     WRITE#K0
+  03-C                     END
+    C*
+  02-C                     END
+    C                     READ SC0                      45
+  01-C                     END
+      *
+     C                     SETON                     LR
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+     C                     Z-ADD0         TEST   150
+     C                     Z-ADD0         COUNT  150
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....IMI1PF
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     MOVELSD03      IX01
+|    C           KEYIX     CHAINIXX                  40
+| 01-C           *IN40     IFEQ '0'
+|   C           SD045     MULT SD22      FOB    152
+|   C           SD045     MULT SD23      FHI    152
+|   C           SD045     MULT SD24      DUTY   152
+|   C                     SUB  FOB       IX08
+|   C                     SUB  FHI       IX09
+|   C                     SUB  DUTY      IX10
+|   C                     SUB  SD045     IX07
+|   C                     Z-ADDDATE      IXXX
+|   C                     TIME           IXYY
+|   C                     MOVE $USER     IXZZ
+|   C                     UPDATIXX
+| 01-C                     END
+|    C*
+     C                     ADD  FOB       TEST
+     C                     ADD  1         COUNT
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+      *          RTN110....IMIYPF
+      *===============================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C                     MOVEL'R'       IY01
+|    C                     MOVELSC04      IY02
+|    C                     MOVELSD03      IY03
+|    C           KEYIY     CHAINIY0                  40
+|    C                     Z-ADDDATE      IYXX
+|    C                     TIME           IYYY
+|    C                     MOVE $USER     IYZZ
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANK    IY04
+|   C                     MOVEL*BLANK    IY05
+|   C           IY03      CHAINMH0                  41
+| 02-C           *IN41     IFEQ '0'
+|   C                     MOVELMA09      IY04
+|   C                     MOVELMA08      IY05
+| 02-C                     END
+|   C                     Z-SUBSD045     IY06
+|   C                     Z-SUBSD045     IY07
+|   C                     Z-ADD0         IY08
+|   C                     Z-ADD0         IY09
+|   C                     Z-SUBSD045     IY10
+|   C                     WRITEIY0
+|    *
+| 01*C                     ELSE
+|   C                     SUB  SD045     IY06
+|   C                     SUB  SD045     IY07
+|   C                     SUB  SD045     IY10
+|   C                     UPDATIY0
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+      *          RTN120....IMIXPF
+      *===============================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C                     MOVELSD03      IX01
+|    C           KEYIX     CHAINIX0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C           SD045     MULT SD22      FOB    152
+|   C           SD045     MULT SD23      FHI    152
+|   C           SD045     MULT SD24      DUTY   152
+|   C                     SUB  FOB       IX08
+|   C                     SUB  FHI       IX09
+|   C                     SUB  DUTY      IX10
+|   C                     SUB  SD045     IX07
+|   C                     Z-ADDDATE      IXXX
+|   C                     TIME           IXYY
+|   C                     MOVE $USER     IXZZ
+|   C                     UPDATIX0
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+

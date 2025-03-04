@@ -1,0 +1,337 @@
+     FMTMELF02IF  E           K        DISK
+     FPA#DPF  IF  E           K        DISK
+     FPA#EPF  IF  E           K        DISK
+     FMTI022D CF  E                    WORKSTN
+     F                                        RRN1  KSFILE SFLSR1
+     F                                              KINFDS DSPFDS
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C*
+     C           *LIKE     DEFN ME07      OBGN1            *START KEY
+     C           *LIKE     DEFN ME08      OBGN2            *START KEY
+     C           *LIKE     DEFN ME01      OBGN3            *START KEY
+     C*  FOR SUBFILE (PGM CONTROL)
+     C           *LIKE     DEFN ME07      KUP1                         OM
+     C           *LIKE     DEFN ME08      KUP2                         OM
+     C           *LIKE     DEFN ME01      KUP3                         OM
+     C           *LIKE     DEFN ME07      KDN1                         OM
+     C           *LIKE     DEFN ME08      KDN2                         OM
+     C           *LIKE     DEFN ME01      KDN3                         OM
+     C           *LIKE     DEFN ME07      WORK1
+     C           *LIKE     DEFN ME08      WORK2
+     C           *LIKE     DEFN ME01      WORK3
+      *SFL FIELD
+     C           *LIKE     DEFN RRN1      WRRN1
+     C           *LIKE     DEFN RRN1      WPRCD
+     C           *LIKE     DEFN RRN1      DSPRCD
+     C           *LIKE     DEFN #D02      D#D02
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEY#E     KLIST
+     C                     KFLD           WORK1
+     C                     KFLD           WORK2
+      *SCREEN SETLL KEY
+     C           KEYBGN    KLIST
+     C                     KFLD           DBGN1
+     C                     KFLD           DBGN2
+     C                     KFLD           DBGN3
+      *FILE SETGT KEY
+     C           KEYUP     KLIST
+     C                     KFLD           KUP1
+     C                     KFLD           KUP2
+     C                     KFLD           KUP3
+     C           KEYDN     KLIST
+     C                     KFLD           KDN1
+     C                     KFLD           KDN2
+     C                     KFLD           KDN3
+     C*==============================================================*
+     C*                    MAIN RO TINE
+     C*==============================================================*
+     C                     EXSR RTN110                     *INIT SFL
+     C                     EXSR RTN120                     *READ DATA
+     C                     EXSR RTN140                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN04     IFEQ '1'
+     C*IN04(WINDOW)客戶簡稱查詢
+    C                     EXSR RTNF4
+  02*C                     ELSE
+  03-C           *IN08     IFEQ '1'
+    C*IN08(WINDOW)客戶全稱查詢
+    C                     EXSR RTNF8
+  03*C                     ELSE
+  04-C           *IN25     IFEQ '1'
+    C*IN25(ROLLUP)最後一頁
+    C           KEYDN     SETGTME0
+    C                     EXSR RTN110
+    C                     EXSR RTN120
+  04*C                     ELSE
+  05-C           *IN26     IFEQ '1'
+    C*IN26(ROLLDOWN)最前一頁
+    C           KEYUP     SETLLME0
+    C                     EXSR RTN110
+    C                     EXSR RTN130
+  05*C                     ELSE
+    C*ENTER
+  06-C           DBGN1     IFNE OBGN1
+    C           DBGN2     ORNE OBGN2
+    C           DBGN3     ORNE OBGN3
+    C           KEYBGN    SETLLME0
+    C                     EXSR RTN110
+    C                     EXSR RTN120
+    C*KEEP SCREEN SETLL KEY
+    C                     MOVELDBGN1     OBGN1
+    C                     MOVELDBGN2     OBGN2
+    C                     MOVELDBGN3     OBGN3
+  06-C                     END
+  05-C                     END
+  04-C                     END
+  03-C                     END
+  02-C                     END
+    C  N03                EXSR RTN140
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN110....INITTAL SFL
+      *==============================================================*
+01===C           RTN110    BEGSR
+|    C*WORK = FIELD FOR NONE DISPLAY (ND)
+|    C                     MOVEL*BLANKS   WORK1
+|    C                     MOVEL*BLANKS   WORK2
+|    C                     MOVEL*BLANKS   WORK3
+|    C*SFL
+|    C                     Z-ADD0         RRN1
+|    C                     Z-ADD0         WRRN1
+|    C                     Z-ADD10        WPRCD
+|    C                     SETOF                     53
+|    C                     SETON                     52
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+|     *
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN120 .. READ DATA TO SFL
+      *=========================================================*
+02===C           RTN120    BEGSR
+|    C*
+|    C                     READ ME0                      46
+| 01-C           *IN46     IFEQ '0'
+|   C*KEEP SETLL KEY
+|   C                     EXSR RTN810
+| 01-C                     END
+|    C*
+| 02-C           *IN46     DOWEQ'0'
+|   C           RRN1      ANDLTWPRCD
+|   C*分店則不出現，挑總店
+| 03-C           ME01      IFNE WORK3
+|   C*
+|   C*GET DATA
+|   C                     EXSR RTN121
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+|   C*FOR (ND)
+|   C                     SETOF                     3031
+|   C*KEEP SETGT KEY
+|   C                     EXSR RTN820
+| 03-C                     END
+|   C*
+|   C                     READ ME0                      46
+| 02-C                     END
+|    C*
+| 04-C           RRN1      IFLT WPRCD
+|   C*BOTOM
+|   C                     SETON                     97
+| 04-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN121....GATA DATA TO SFL
+      *==============================================================*
+03===C           RTN121    BEGSR
+|    C*
+| 01-C           ME07      IFEQ WORK1
+|   C                     SETON                     30
+| 02-C           ME08      IFEQ WORK2
+|   C                     SETON                     31
+| 02-C                     END
+| 01-C                     END
+|    C                     MOVELME07      WORK1
+|    C                     MOVELME08      WORK2
+|    C*地區
+|    C           ME07      CHAIN#D0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVEL#D02      D#D02
+| 03*C                     ELSE
+|   C                     MOVEL*BLANKS   D#D02
+| 03-C                     END
+|    C*區域
+|    C           KEY#E     CHAIN#E0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C                     MOVEL#E03      D#E03
+| 04*C                     ELSE
+|   C                     MOVEL*BLANKS   D#E03
+| 04-C                     END
+|    C*控制分店不要出現
+|    C                     MOVELME01      WORK3
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN130 .. READP DATA TO SFL
+      *=========================================================*
+04===C           RTN130    BEGSR
+|    C*
+|    C                     Z-ADDWPRCD     RRN1
+|    C*
+|    C                     READPME0                      46
+| 01-C           *IN46     IFEQ '0'
+|   C*KEEP SETGT KEY
+|   C                     EXSR RTN820
+| 01-C                     END
+|    C*
+| 02-C           *IN46     DOWEQ'0'
+|   C           RRN1      ANDGT0
+| 03-C           ME01      IFNE WORK3
+|   C                     SUB  1         RRN1
+|   C*
+|   C                     SETOF                     3031
+|   C*KEEP SETLL KEY
+|   C                     EXSR RTN810
+|   C                     MOVELME01      WORK3
+| 03-C                     END
+|   C*
+|   C                     READPME0                      46
+| 02-C                     END
+|    C*
+| 04-C           RRN1      IFEQ 0
+|   C           KEYUP     SETLLME0
+| 04*C                     ELSE
+|   C           *LOVAL    SETLLME0
+|   C*PAGE TOP
+| 05-C           RRN1      IFEQ WPRCD
+|   C                     SETON                     98
+| 05-C                     END
+|   C*
+| 04-C                     END
+|    C                     EXSR RTN110
+|    C                     EXSR RTN120
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN140... EXFMT SFL                                 *
+      *==============================================================*
+05===C           RTN140    BEGSR
+|    C*
+| 01-C           RRN1      IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     Z-ADD0         D#ROW
+|    C                     Z-ADD0         D#COL
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN810... KEEY SETLL KEY                            *
+      *==============================================================*
+06===C           RTN810    BEGSR
+|    C*
+|    C                     MOVELME07      KUP1
+|    C                     MOVELME08      KUP2
+|    C                     MOVELME01      KUP3
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN820... KEEY SETGT KEY                            *
+      *==============================================================*
+07===C           RTN820    BEGSR
+|    C*
+|    C                     MOVELME07      KDN1
+|    C                     MOVELME08      KDN2
+|    C                     MOVELME01      KDN3
+|    C*
+07===C                     ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+08===C           RTNF4     BEGSR
+|    C*
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C*
+|    C** 游標位置即為(D#ROW,D#COL)
+|    C*地區
+| 01-C           D#ROW     IFEQ 8
+|   C           D#COL     ANDGE2
+|   C           D#COL     ANDLE3
+|   C                     CALL 'WDS007'
+|   C           DBGN1     PARM DBGN1     S018O1  1
+|   C                     GOTO ENDF4
+| 01-C                     END
+|    C*區域
+| 02-C           D#ROW     IFEQ 8
+|   C           D#COL     ANDGE28
+|   C           D#COL     ANDLE29
+|   C                     CALL 'WDS010'
+|   C                     PARM DBGN1     PARMI1  1
+|   C           DBGN2     PARM DBGN2     PARMO1  2
+|   C                     GOTO ENDF4
+| 02-C                     END
+|    C*客戶簡稱
+| 03-C           D#ROW     IFEQ 8
+|   C           D#COL     ANDGE54
+|   C           D#COL     ANDLE58
+|   C                     CALL 'WDS003'
+|   C                     PARM           S003O1  9
+|   C                     MOVELS003O1    DBGN1
+|   C                     GOTO ENDF4
+| 03-C                     END
+      *
+08===C           ENDF4     ENDSR
+      *===============================================================*
+      *          RTNF8 ....F8 HELP
+      *===============================================================*
+09===C           RTNF8     BEGSR
+|    C*
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C*
+|    C** 游標位置即為(D#ROW,D#COL)
+|    C*客戶全稱
+| 01-C           D#ROW     IFEQ 8
+|   C           D#COL     ANDGE54
+|   C           D#COL     ANDLE58
+|   C                     MOVE *BLANK    PBGN2
+|   C                     CALL 'WDS024'
+|   C           DBGN3     PARM DBGN3     PBGN1   5
+|   C                     PARM           PBGN2   4
+|   C                     GOTO ENDF8
+| 01-C                     END
+|    C*
+09===C           ENDF8     ENDSR
+

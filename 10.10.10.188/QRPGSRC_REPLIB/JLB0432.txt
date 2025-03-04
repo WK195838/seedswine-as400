@@ -1,0 +1,758 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM ID   : JLB043                                     *
+     H*    PROGRAM NAME : 國內採購傳票批次                         *
+     H*    AUTHOR       : D910074 TINA                               *
+     H*    CREATE DATE  : 1993.05.28                                 *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       : 進銷存收TO總帳                         *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.18 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     H*  M002      98.12.09  FOR專櫃會計科目
+     H*            00.05.02 專櫃擴點
+     H*---------------------------------------------------------------
+     A* M003      | 02.01.03 |菸酒稅開徵，新增進項稅額科目
+     A*---------------------------------------------------------------
+     F****************************************************************
+     FWFJL10PFUF  E           K        DISK                      A
+     FWFJL10LFIF  E           K        DISK
+     F            WFJL10R                           KRENAMEWFJL10L
+     FWFJL19PFUF  E           K        DISK                      A
+     FPA#GPF  UF  E           K        DISK                      A
+     FPOPHPF  IF  E           K        DISK
+     FPOPIPF  IF  E           K        DISK
+     FGLAAPF  IF  E           K        DISK
+     FGLAFPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FGLAHPF  O   E           K        DISK
+     F*WF#GPF  O   E           K        DISK
+     E*---------------------------------------------------------------*
+     E*輸入欄位代碼 ... EX.( 10 )=>AH05A
+     E                    CHK1        7  2
+     E*輸入欄位內容 ... EX.( R&D )=>AH05
+     E                    CHK2        4 20
+     E*輸入欄位說明 EX.(研發部)=>CALL 檢核程式&AA04得之.
+     E                    CHK3        7 20
+     I*LOCAL DATA AREA
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$ADMDY
+M001MI                                      187 1920$ADYMD
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      152 161 $USERN
+M001MI                                      201 2080ADYYMD
+      *確認年月
+B2MODI                                      601 6060F01
+     I            DS
+     I                                        1   2 PH01
+     I                                        1   1 WPH01
+      *計算確認年月最後一天
+     I            DS
+B2MODI                                        1   80ADYMD
+B2MODI                                        1   60YM
+B2MODI                                        7   80DD
+     I*檢核程式之參數.....................................
+     ICHKPGM      DS
+     I                                        1   2 AH01
+     I                                        3  22 WPARM1
+     I                                       23  32 WPARM2
+     I                                       33  33 WCHK
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *LIKE     DEFN #G01      W#G01
+B2MODC           *LIKE     DEFN #G02      W#G02 - 2
+     C           *LIKE     DEFN AH03      WAH03
+B2000C           *LIKE     DEFN JL1001    WL1001
+     C           *LIKE     DEFN JL1002    WL1002
+     C           *LIKE     DEFN J1002$    W1002$
+     C           *LIKE     DEFN JL1003    WL1003
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYAA     KLIST
+     C                     KFLD           AH01
+     C                     KFLD           CHK1,I
+     C           KEYW10    KLIST
+     C                     KFLD           JL1001           *進貨日期
+     C                     KFLD           JL1002           *公司別2
+     C                     KFLD           J1002$           *辦事處1
+     C                     KFLD           JL1003           *傳票別
+     C                     KFLD           JL1004           *會計科目
+     C                     KFLD           JL1005           *成本中心
+     C                     KFLD           JL1006           *對項別
+     C                     KFLD           JL1007           *相關號碼１
+     C                     KFLD           JL1008           *相關號碼２
+     C                     KFLD           JL1009           *日期
+     C                     KFLD           JL1010           *數量
+     C                     KFLD           JL1011           *其它
+     C           KEYW19    KLIST
+     C                     KFLD           JL1901           *公司別
+     C                     KFLD           JL1902           *供應商
+     C                     KFLD           JL1903           *進貨日
+     C                     KFLD           JL1904           *驗收單號
+     C                     KFLD           JL1905           *產品
+     C           KEY#G     KLIST
+     C                     KFLD           W#G01            *驗收單號
+     C           KEYAF     KLIST
+     C                     KFLD           AH01             *公司別
+     C                     KFLD           AH04             *會計科目
+     C           KEY#A     KLIST
+     C                     KFLD           #A01             *公司別
+     C                     KFLD           #A02             *會計科目
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR R0100                      *INITIAL
+     C*
+     C                     EXSR R2000
+     C                     EXSR R4000
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R0100 ....INITIAL VALUE
+     C*==============================================================*
+01===C           R0100     BEGSR
+|    C*--------------------------------------------------------------*
+|    C                     Z-ADD*ZERO     W01    132
+|    C                     Z-ADD*ZERO     W02    132
+|    C                     Z-ADD0         WAMT   154
+      *計算確認年月最後一天ADYMD =YM+DD
+|    C                     Z-ADD0         ADYMD
+B2000C                     Z-ADDF01       YM
+|    C                     CALL 'P34'
+B2MODC                     PARM F01       P3401I  60
+M001MC                     PARM '2'       P3402I  1
+|    C                     PARM '1'       P3403I  1
+|    C                     PARM           P3401O  1
+|    C           DD        PARM           P3402O  20
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R2000 .計算國內採購驗收檔           P3-2.3-(4)
+     C*==============================================================*
+02===C           R2000     BEGSR
+|    C*READ國內驗收主檔
+|    C           *LOVAL    SETLLPH0
+|    C                     READ PH0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*CHK是否存在介面控制檔
+|   C                     MOVELPH02      W#G01
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#2
+|   C*
+|   C                     MOVEL'NOACCT'  #A01
+|   C                     MOVELPH06      #A02
+|   C           KEY#A     CHAIN#A0                  43
+| 02-C           *IN43     IFEQ '1'
+      *INITIAL檔案共同欄位WFJL10PF/WFJL19PF KEY VALUES
+|   C                     EXSR RINT
+      *傳票WFJL10PF
+|   C                     EXSR R2A00
+      *
+|   C           PH02      SETLLPI0
+|   C           PH02      READEPI0                      46
+| 03-C           *IN46     DOWEQ'0'
+      *國內採購成本WFJL19PF
+|   C                     EXSR R2C00
+|   C*
+|   C           PH02      READEPI0                      46
+| 03-C                     END
+|   C*WRITE介面控制檔
+|   C                     EXSR R2E00
+|   C*
+| 02*C                     ELSE
+      *未處理
+|   C                     MOVELPH02      W#G01
+|   C                     EXSR R2F00
+| 02-C                     END
+|   C           TAG#2     TAG
+|   C                     READ PH0                      45
+| 01-C                     END
+|    C*
+02===C           E2000     ENDSR
+     C*==============================================================*
+     C*          RINT  ....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL19
+     C*==============================================================*
+03===C           RINT      BEGSR
+|    C*--------------------------------------------------------------*
+|    C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|    C                     MOVEL'RM'      JL1002
+|    C                     MOVE WPH01     J1002$           辦事處
+|    C                     MOVEL'9'       JL1003
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL19PF
+|    C                     MOVEL'RM'      JL1901
+|    C                     MOVE PH06      JL1902
+B2000C                     Z-ADDPH04      JL1903
+|    C                     MOVELPH02      JL1904
+|    C                     MOVELPH05      JL1909
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          R2A00 ... 國內驗收檔                 P3-2.3-(4)
+     C*                    (POPHPF/POPIPF)
+     C*==============================================================*
+04===C           R2A00     BEGSR
+      *----------------------------------------------------------------
+      *一．會計科目－存貨
+|    C*
+|    C                     EXSR R2A10                      INIT
+|    C*
+|    C                     MOVEL'1141    'JL1004
+| 01-C           PH11      IFGE 0
+|   C                     Z-ADDPH11      W01
+| 01*C                     ELSE
+|   C           PH11      MULT -1        W02
+| 01-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+      *二．會計科目－其他成本－進項稅額
+|    C*
+|    C                     EXSR R2A10                      INIT
+|    C*
+M003AC           YM        IFGE 200201
+M003AC                     MOVEL*BLANKS   JL1004
+M003AC                     MOVEL'115501  'JL1004           開徵菸酒稅
+M003AC                     MOVEL*BLANKS   JL1005
+M003AC                     ELSE
+|    C                     MOVEL'613503  'JL1004
+|    C*成本中心
+| 02-C           PH05      IFEQ 'B0001'
+|   C                     MOVEL'10601'   JL1005
+| 02-C                     END
+| 03-C           PH05      IFEQ 'B0002'
+|   C                     MOVEL'10602'   JL1005
+| 03-C                     END
+| 04-C           PH05      IFEQ 'B0003'
+|   C                     MOVEL'10603'   JL1005
+| 04-C                     END
+| 05-C           PH05      IFEQ 'B0004'
+|   C                     MOVEL'10604'   JL1005
+| 05-C                     END
+| 06-C           PH05      IFEQ 'B0005'
+|   C                     MOVEL'10605'   JL1005
+| 06-C                     END
+| 07-C           PH05      IFEQ 'B0006'
+|   C                     MOVEL'10606'   JL1005
+| 07-C                     END
+| 08-C           PH05      IFEQ 'B0007'
+|   C                     MOVEL'10607'   JL1005
+| 08-C                     END
+| 09-C           PH05      IFEQ 'B0008'
+|   C                     MOVEL'10608'   JL1005
+| 09-C                     END
+| 10-C           PH05      IFEQ 'B0009'
+|   C                     MOVEL'10609'   JL1005
+| 10-C                     END
+| 11-C           PH05      IFEQ 'B0010'
+|   C                     MOVEL'10610'   JL1005
+| 11-C                     END
+| 12-C           PH05      IFEQ 'B0011'
+|   C                     MOVEL'10611'   JL1005
+| 12-C                     END
+| 13-C           PH05      IFEQ 'B0012'
+|   C                     MOVEL'10612'   JL1005
+| 13-C                     END
+| 14-C           PH05      IFEQ 'B0013'
+|   C                     MOVEL'10613'   JL1005
+| 14-C                     END
+| 15-C           PH05      IFEQ 'B0014'
+|   C                     MOVEL'10614'   JL1005
+| 15-C                     END
+| 16-C           PH05      IFEQ 'B0015'
+|   C                     MOVEL'10615'   JL1005
+| 16-C                     END
+| 17-C           PH05      IFEQ 'B0016'
+|   C                     MOVEL'10616'   JL1005
+| 17-C                     END
+| 18-C           PH05      IFEQ 'B0017'
+|   C                     MOVEL'10617'   JL1005
+| 18-C                     END
+| 19-C           PH05      IFEQ 'B0018'
+|   C                     MOVEL'10618'   JL1005
+| 19-C                     END
+| 20-C           PH05      IFEQ 'B0019'
+|   C                     MOVEL'10619'   JL1005
+| 20-C                     END
+| 21-C           PH05      IFEQ 'B0020'
+|   C                     MOVEL'10620'   JL1005
+| 21-C                     END
+M002AC           PH05      IFEQ 'B0021'
+M002AC                     MOVEL'10621'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0022'
+M002AC                     MOVEL'10622'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0023'
+M002AC                     MOVEL'10623'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0024'
+M002AC                     MOVEL'10624'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0025'
+M002AC                     MOVEL'10625'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0026'
+M002AC                     MOVEL'10626'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0027'
+M002AC                     MOVEL'10627'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0028'
+M002AC                     MOVEL'10628'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0029'
+M002AC                     MOVEL'10629'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0030'
+M002AC                     MOVEL'10630'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0031'
+M002AC                     MOVEL'10631'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0032'
+M002AC                     MOVEL'10632'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0033'
+M002AC                     MOVEL'10633'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0034'
+M002AC                     MOVEL'10634'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0035'
+M002AC                     MOVEL'10635'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0036'
+M002AC                     MOVEL'10636'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0037'
+M002AC                     MOVEL'10637'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0038'
+M002AC                     MOVEL'10638'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0039'
+M002AC                     MOVEL'10639'   JL1005
+M002AC                     END
+M002AC           PH05      IFEQ 'B0040'
+M002AC                     MOVEL'10640'   JL1005
+M002AC                     END
+| 22-C           PH05      IFEQ 'B0099'
+| 22-C           PH05      OREQ 'B0000'
+|   C                     MOVEL'10699'   JL1005
+| 22-C                     END
+|    C*
+M003AC                     END                             用新科目
+|    C*
+| 23-C           PH12      IFGE 0
+|   C                     Z-ADDPH12      W01
+| 23*C                     ELSE
+|   C           PH12      MULT -1        W02
+| 23-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+      *三．會計科目－應付貨款－國內貨款
+|    C*
+|    C                     EXSR R2A10                      INIT
+|    C*
+|    C                     MOVEL'212211  'JL1004
+|    C                     MOVELPH06      JL1006
+|    C*
+|    C           PH11      ADD  PH12      WAMT
+| 24-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 24*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 24-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          R2A10 ... INITIAL WFJL10PF
+     C*==============================================================*
+05===C           R2A10     BEGSR
+|    C*
+|    C                     MOVE *BLANK    JL1004
+|    C                     MOVE *BLANK    JL1005
+|    C                     MOVE *BLANK    JL1006
+|    C                     MOVE *BLANK    JL1007
+|    C                     MOVE *BLANK    JL1008
+|    C                     MOVE *BLANK    JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVE *BLANK    JL1011
+|    C                     Z-ADD0         JL1012
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          R2C00 ... 寫入暫存檔－國內採購成本檔
+     C*==============================================================*
+06===C           R2C00     BEGSR
+|    C*
+|    C                     MOVELPI04      JL1905
+|    C           KEYW19    CHAINWFJL19R              41
+|    C*
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADDPI06      JL1906
+|   C                     Z-ADDPI10      JL1907
+|   C                     Z-ADDPI09      JL1908
+|   C                     WRITEWFJL19R
+| 01*C                     ELSE
+|   C                     ADD  PI06      JL1906
+|   C                     ADD  PI10      JL1907
+|   C                     ADD  PI09      JL1908
+|   C                     UPDATWFJL19R
+| 01-C                     END
+|    C*
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          R2E00 ... READ POPHPF=>WRITE PA#GPF
+     C*==============================================================*
+07===C           R2E00     BEGSR
+|    C*
+|    C                     MOVELPH02      #G01
+B2000C                     Z-ADDPH04      #G02
+B2000C                     Z-ADDADYYMD    #GXX
+B2000C                     TIME           #GYY
+|    C                     MOVEL$USER     #GZZ
+|    C                     WRITE#G0
+|    C*                    WRITEWF#GR
+|    C*
+07===C                     ENDSR
+     C*==============================================================*
+     C*          R2F00 ... READ FILE  =>
+     C*==============================================================*
+08===C           R2F00     BEGSR
+|    C*
+|    C*
+08===C                     ENDSR
+     C*==============================================================*
+     C*          RWF10 ... 寫入．更新傳票暫存檔WFJL10PF
+     C*==============================================================*
+09===C           RWF10     BEGSR
+|    C*
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADDW01       JL1012
+|   C                     Z-ADDW02       JL1013
+      *判別借貸方
+|   C           JL1012    SUB  JL1013    WAMT
+| 02-C           WAMT      IFGT 0
+|   C                     MOVEL'1'       J1003$
+| 02-C                     END
+| 03-C           WAMT      IFLT 0
+|   C                     MOVEL'2'       J1003$
+| 03-C                     END
+      *
+|   C                     WRITEWFJL10R
+      *
+| 01*C                     ELSE
+|   C                     ADD  W01       JL1012
+|   C                     ADD  W02       JL1013
+      *判別借貸方
+|   C           JL1012    SUB  JL1013    WAMT
+| 04-C           WAMT      IFGT 0
+|   C                     MOVEL'1'       J1003$
+| 04-C                     END
+| 05-C           WAMT      IFLT 0
+|   C                     MOVEL'2'       J1003$
+| 05-C                     END
+|   C                     UPDATWFJL10R
+| 01-C                     END
+|    C*
+09===C                     ENDSR
+     C*==============================================================*
+     C*          R4000 .產生銷售傳票
+     C*==============================================================*
+10===C           R4000     BEGSR
+|    C*
+B2000C                     MOVEL*BLANKS   WL1001
+|    C                     MOVEL*BLANKS   WL1002
+|    C                     MOVEL*BLANKS   W1002$
+|    C                     MOVEL*BLANKS   WL1003
+      *
+B2000C           *LOVAL    SETLLWFJL10L
+|    C                     READ WFJL10L                  46
+| 01-C           *IN46     DOWEQ'0'
+|   C*借－貨＝０者不寫入
+|   C           JL1012    SUB  JL1013    WAMT
+| 02-C           WAMT      IFNE 0
+|   C                     EXSR R4100
+| 02-C                     END
+      *
+|   C                     READ WFJL10L                  46
+| 01-C                     END
+|    C*
+10===C           E4000     ENDSR
+     C*==============================================================*
+     C*          R4100 .  產生銷售傳票
+     C*==============================================================*
+11===C           R4100     BEGSR
+|    C*
+|    C* <<清除傳票檔部份欄位 >>
+|    C                     EXSR R40XX
+      *----------------------------------------------------------------
+      *傳票日期
+|    C                     Z-ADD*ZEROS    AH10
+M001AC                     Z-ADDJL1001    AH10
+|    C*M001D               CALL 'P31'
+B2MODC*                    PARM JL1001    P310I1 100
+|    C*                    PARM '1'       P310I2  1
+|    C*                    PARM '1'       P310I3  1
+|    C*                    PARM '2'       P310I4  1
+|    C*                    PARM '1'       P310I5  1
+|    C*M001D     AH10      PARM           P311O1  80
+      *1994年6月前公司別不變，以後ＲＥ－＞ＲＭ，ＷＬ－＞ＷＮ
+| 01-C           AH10      IFGE 19940601
+| 02-C           JL1002    IFEQ 'RE'
+|   C                     MOVEL'RM'      JL1002
+| 02-C                     END
+| 03-C           JL1002    IFEQ 'WL'
+|   C                     MOVEL'WH'      JL1002
+| 03-C                     END
+| 01-C                     END
+|    C                     MOVELJL1002    AH01
+      *1994年6月前公司別不變，以後ＲＥ－＞ＲＭ，ＷＬ－＞ＷＮ
+|    C*
+|    C*傳票號碼
+B2000C           JL1001    IFNE WL1001
+|   C           JL1002    ORNE WL1002
+|   C           J1002$    ORNE W1002$
+|   C           JL1003    ORNE WL1003
+|   C                     MOVEL*BLANKS   AH02
+|   C                     CALL 'GLS002'
+|   C                     PARM AH01      P002I1  2
+|   C                     PARM AH10      P002I2  80
+|   C                     PARM 'F'       P002I3  1
+|   C           AH02      PARM           P002O1  9
+B2000C                     MOVELJL1001    WL1001
+|   C                     MOVELJL1002    WL1002
+|   C                     MOVELJ1002$    W1002$
+|   C                     MOVELJL1003    WL1003
+|   C                     Z-ADD0         WAH03
+| 04-C                     END
+      *
+|    C                     MOVELJL1004    AH04
+|    C           KEYAF     CHAINAF0                  40
+| 05-C           *IN40     IFEQ '0'
+      *
+| 06-C           AF11      IFNE *BLANK
+|   C                     MOVELJL1005    AH05
+| 06-C                     END
+      *
+| 07-C           AF12      IFNE *BLANK
+|   C                     MOVELJL1006    AH06
+| 07-C                     END
+      *
+| 08-C           AF13      IFNE *BLANK
+|   C                     MOVELJL1007    AH07
+| 08-C                     END
+      *
+| 09-C           AF14      IFNE *BLANK
+|   C                     MOVELJL1008    AH08
+| 09-C                     END
+      *
+| 10-C           AF15      IFNE *BLANK
+|   C                     MOVELJL1009    AH09
+| 10-C                     END
+      *
+|   C                     Z-ADDJL1012    AH12
+|   C                     Z-ADDJL1013    AH13
+      *
+| 11-C           AF16      IFNE *BLANK
+|   C                     MOVELJL1010    AH14
+| 11-C                     END
+      *
+| 12-C           AF17      IFNE *BLANK
+|   C                     MOVELJL1011    AH15
+| 12-C                     END
+      *
+|   C                     MOVEL'P3'      AH17
+|   C                     MOVEL*BLANKS   AH18
+|   C                     MOVEL'V'       AH19
+|   C                     MOVEL*BLANKS   AH20
+|   C                     Z-ADD*ZEROS    AH21
+|   C                     MOVEL*BLANKS   AH22
+|   C                     Z-ADD*ZEROS    AH23
+|   C                     MOVEL*BLANKS   AH24
+|   C                     Z-ADDADYYMD    AH25
+|   C                     MOVEL$USER     AH26
+B2000C                     TIME           AH97
+|   C                     Z-ADDADYYMD    AH98
+|   C                     MOVEL$USER     AH99
+|   C* <<取得會計科目資料 >>
+|   C                     EXSR R40YY
+|   C* <<寫入傳票檔 >>
+|   C                     EXSR R40ZZ
+| 05-C                     END
+|    C*
+11===C           E4A00     ENDSR
+     C*==============================================================*
+     C*          R40XX ...清除傳票檔部份欄位
+     C*==============================================================*
+12===C           R40XX     BEGSR
+|    C*
+|    C                     MOVEL*BLANKS   AH04
+|    C                     MOVEL*BLANKS   AH05
+|    C                     MOVEL*BLANKS   AH05A
+|    C                     MOVEL*BLANKS   AH06
+|    C                     MOVEL*BLANKS   AH06A
+|    C                     MOVEL*BLANKS   AH07
+|    C                     MOVEL*BLANKS   AH07A
+|    C                     MOVEL*BLANKS   AH08
+|    C                     MOVEL*BLANKS   AH08A
+|    C                     Z-ADD*ZEROS    AH09
+|    C                     MOVEL*BLANKS   AH09A
+|    C                     Z-ADD*ZEROS    AH12
+|    C                     Z-ADD*ZEROS    AH13
+|    C                     MOVEL*BLANKS   AH14
+|    C                     MOVEL*BLANKS   AH14A
+|    C                     MOVEL*BLANKS   AH15
+|    C                     MOVEL*BLANKS   AH15A
+|    C                     MOVEL*BLANKS   AH16
+|    C                     MOVEL'P3'      AH17
+|    C                     MOVEL*BLANKS   AH18
+|    C                     MOVEL'V'       AH19
+|    C                     MOVEL*BLANKS   AH20
+|    C                     Z-ADD*ZEROS    AH21
+|    C                     MOVEL*BLANKS   AH22
+|    C                     Z-ADD*ZEROS    AH23
+|    C                     MOVEL*BLANKS   AH24
+|    C                     Z-ADDADYYMD    AH25
+|    C                     MOVEL$USER     AH26
+B2000C                     TIME           AH97
+|    C                     Z-ADDADYYMD    AH98
+|    C                     MOVEL$USER     AH99
+|    C*
+12===C                     ENDSR
+     C*==============================================================*
+     C*          R40YY ...取得會計科目資料
+     C*==============================================================*
+13===C           R40YY     BEGSR
+|    C*
+|    C                     MOVEA*BLANKS   CHK1
+|    C                     MOVEA*BLANKS   CHK2
+|    C                     MOVEA*BLANKS   CHK3
+|    C*<<取得會計科目各欄位名稱>>
+|    C           KEYAF     CHAINAF0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVELAF11      AH05A
+|   C                     MOVELAF12      AH06A
+|   C                     MOVELAF13      AH07A
+|   C                     MOVELAF14      AH08A
+|   C                     MOVELAF15      AH09A
+|   C                     MOVELAF16      AH14A
+|   C                     MOVELAF17      AH15A
+|   C*
+|   C                     MOVELAF11      CHK1,1
+|   C                     MOVELAF12      CHK1,2
+|   C                     MOVELAF13      CHK1,3
+|   C                     MOVELAF14      CHK1,4
+|   C                     MOVELAF15      CHK1,5
+|   C                     MOVELAF16      CHK1,6
+|   C                     MOVELAF17      CHK1,7
+| 01-C                     END
+|    C* << 輸入欄位說明CHK3 >>
+|    C*
+|    C                     MOVELAH05      CHK2,1
+|    C                     MOVELAH06      CHK2,2
+|    C                     MOVELAH07      CHK2,3
+|    C                     MOVELAH08      CHK2,4
+| 02-C                     DO   4         I       10
+| 03-C           CHK2,I    IFNE *BLANKS
+|   C           KEYAA     CHAINAA0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C           AA04      ANDNE*BLANKS
+|   C*
+|   C                     MOVELCHK2,I    WPARM1
+|   C                     MOVELAA05      WPARM2
+|   C                     MOVEL'0'       WCHK
+|   C                     CALL AA04
+|   C                     PARM           CHKPGM
+|   C                     PARM           TORN    1
+|   C           CHK3,I    PARM           DESC   20
+| 04*C                     ELSE
+|   C                     MOVELCHK2,I    CHK3,I
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+|    C*
+| 05-C           AH09      IFNE 0
+|   C                     CALL 'P56'                      *P56(GET'/')
+|   C                     PARM AH09      P5601I  80
+|   C                     PARM           P5601O 10
+|   C                     MOVELP5601O    CHK3,5
+| 05-C                     END
+|    C*
+| 06-C           AH14      IFNE 0
+|   C                     CALL 'P55'                      *P55(GET,.)
+|   C                     PARM AH14      P5501I 185
+|   C                     PARM 2         P5502I  10
+|   C                     PARM           P5501O 24
+|   C                     MOVELP5501O    CHK3,6
+| 06-C                     END
+|    C*
+| 07-C           AH15      IFNE *BLANK
+|   C                     Z-ADD7         I
+|   C           KEYAA     CHAINAA0                  40
+| 08-C           *IN40     IFEQ '0'
+|   C           AA04      ANDNE*BLANKS
+|   C*
+|   C                     MOVELAH15      WPARM1
+|   C                     MOVELAA05      WPARM2
+|   C                     MOVEL'0'       WCHK
+|   C                     CALL AA04
+|   C                     PARM           CHKPGM
+|   C                     PARM           TORN    1
+|   C           CHK3,7    PARM           DESC   20
+| 08*C*                    ELSE
+|   C                     MOVELAH15      CHK3,7
+| 08-C                     END
+| 07-C                     END
+|    C*<<摘要 >>
+| 09-C                     DO   7         K       10
+| 10-C           CHK3,K    IFNE *BLANKS
+|   C                     CALL 'GLS001'
+|   C                     PARM AH16      S001I1 80
+|   C                     PARM CHK3,K    S001I2 80
+|   C                     PARM 49        S001I3  30
+|   C           AH16      PARM           S001O1 80
+| 10-C                     END
+| 09-C                     END
+|    C*
+13===C                     ENDSR
+     C*==============================================================*
+     C*          R40ZZ ... WRITE GLAHPF
+     C*==============================================================*
+14===C           R40ZZ     BEGSR
+|    C*
+|    C                     ADD  1         WAH03
+|    C                     Z-ADDWAH03     AH03
+|    C                     WRITEAH0
+|    C*
+14===C                     ENDSR
+

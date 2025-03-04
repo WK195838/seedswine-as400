@@ -1,0 +1,161 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0461                                       *
+      * AUTHER       : A1118 PHILIP TSAI                             *
+      * CREATE DATE  : 81/04/15                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款子系統                               *
+      * REMARK       :銷貨成本明細表                               *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.22  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FREWF10  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     F*PA#BPF  IF  E           K        DISK
+     FARR046P O   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 601 DSI01
+     I                                      602 602 COMP
+     I                                      603 6080DSI35S
+     I                                      609 6140DSI35E
+     I*M001M                                615 6200WSI35S
+     I*M001M                                621 6260WSI35E
+M001MI                                      661 6680WSI35S
+M001MI                                      671 6780WSI35E
+     I                                      629 629 COMPS
+     I                                      630 630 COMPE
+     I                                      631 635 DSI12S
+     I                                      636 640 DSI12E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C**         KEYMA     KLIST
+     C**                   KFLD           MA01
+     C*
+     C***        *LIKE     DEFN SDISC     WDISC
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN100
+     C                     SETON                     10
+     C*明細列印
+     C                     EXSR RTN200
+     C*
+     CLRN10                EXSR RTNLR
+     CLR 10                EXSR RTN300
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C**
+|    C**辦事處
+     C           COMP      IFEQ '1'
+     C                     MOVEL'台北'  #B03
+     C                     ELSE
+     C           COMP      IFEQ '2'
+     C                     MOVEL'台中'  #B03
+     C                     ELSE
+     C           COMP      IFEQ '3'
+     C                     MOVEL'高雄'  #B03
+     C                     ELSE
+     C                     MOVEL'全部'  #B03
+     C                     END
+     C                     END
+     C                     END
+|    C*表頭列印
+|    C                     EXSR RTN900
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....GET DETAIL
+     C*==============================================================*
+02===C           RTN200    BEGSR
+|    C**
+|    C*產品名稱
+|    C           WF1002    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+| 01-C                     END
+|    C***計算特別折扣
+|    C           WF1004    SUB  WF1005    WF4567
+|    C                     SUB  WF1006    WF4567
+|    C                     SUB  WF1007    WF4567
+|    C*計算總成本
+|    C           WF1008    ADD  WF1009    WF8910
+|    C                     ADD  WF1010    WF8910
+|    C*毛利
+|    C           WF1007    SUB  WF8910    WFGP
+|    C*毛利率
+| 02-C           WF1007    IFNE 0
+|   C           WFGP      DIV  WF1007    TFGPRT  44H
+|   C           TFGPRT    MULT 100       WFGPRT
+| 02*C                     ELSE
+|   C                     Z-ADD0         WFGPRT
+| 02-C                     END
+     C*計算總額
+     C                     ADD  WF1003    TF1003
+     C                     ADD  WF1004    TF1004
+     C                     ADD  WF1005    TF1005
+     C                     ADD  WF4567    TF4567
+     C                     ADD  WF1006    TF1006
+     C                     ADD  WF1007    TF1007
+     C                     ADD  WF1008    TF1008
+     C                     ADD  WF1009    TF1009
+     C                     ADD  WF1010    TF1010
+     C                     ADD  WF8910    TF8910
+     C                     ADD  WFGP      TFGP
+|    C*
+|    C*翻頁控制
+| 03-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN900
+| 03-C                     END
+|    C*明細列印
+|    C                     WRITEPD1
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....TOTAL
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+| 02-C           TF1007    IFNE 0
+|   C           TFGP      DIV  TF1007    TFGPRT  44H
+|   C           TFGPRT    MULT 100       XFGPRT
+| 02*C                     ELSE
+|   C                     Z-ADD0         XFGPRT
+| 02-C                     END
+|    C                     WRITEPE2
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*每一驗收單第一次表頭列印，不印續頁行
+| 01-C           *IN10     IFEQ '1'
+|   C                     WRITEPE1
+| 01-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....LR
+      *==============================================================*
+03===C           RTNLR     BEGSR
+     C                     EXSR RTN100
+     C                     WRITEPE3
+     C                     WRITEPE2
+|    C*
+03===C                     ENDSR
+

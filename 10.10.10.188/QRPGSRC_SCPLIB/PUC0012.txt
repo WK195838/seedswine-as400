@@ -1,0 +1,172 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM-ID   : PUC0012                                    *
+     H*    PROGRAM NAME :全產品年度基本報價複製                    *
+     H*    AUTHOR       : A1491 EASON                                *
+     H*    CREATE DATE  : 97/09/24                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :採購管理                                  *
+     H****************************************************************
+     FPOCCLF01IF  E           K        DISK
+     FPOCCLF05IF  E           K        DISK
+     F            CC0                               KRENAMECCX
+     FPOCALF03UF  E           K        DISK                      A
+     FPOCBPF  UF  E           K        DISK                      A
+     E*---------------------------------------------------------------
+     I*DATA AREA
+     IPTDA01      DS
+     I                                        1   1 DFMT
+     I                                        2   2 DTYPE
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      203 2080DDATE
+     I                                      125 1270$CPY
+M001AI                                      201 2080$EG8
+     I                                      217 218 $PRTCD
+     I                                      219 219 $PENV
+     I                                      500 500 $DATA
+     I                                      501 5040DA021
+     I                                      505 5080DA022
+     I*
+     I*           DS
+     I                                        1  11 SCC10
+     I*                                       1   2 CC01
+     I*                                       3   60@C
+     I*                                       7   8 @A
+     I*                                       9  110@B
+     I*                                       9  11 @X
+     I            DS
+     I                                        1   80SCA07
+     I                                        1   40@D
+     I                                        5   60@DM
+     I                                        7   80@DD
+     I            DS
+     I                                        1   80SCA08
+     I                                        1   40@E
+     I                                        5   60@EM
+     I                                        7   80@ED
+     I*
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYCC     KLIST
+     C                     KFLD           SCC04   9
+     C                     KFLD           SCC07   80
+     C           KEYCA     KLIST
+     C                     KFLD           CA01
+     C                     KFLD           CA02
+     C                     KFLD           CA03
+     C*                    KFLD           CA04
+     C                     KFLD           CA05
+     C                     KFLD           CA06
+     C                     KFLD           CA07
+     C           KEYCB     KLIST
+     C                     KFLD           CB01
+     C                     KFLD           CB02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C                     EXSR R0100                      第一筆資料
+     C                     EXSR R0200                      最新資料
+     C*往下判讀下一筆資料
+     C           KEYCC     SETGTCC0
+     C                     READ CC0                      46
+  01-C           *IN46     DOWEQ'0'
+    C                     MOVELCC04      WCC04
+    C                     EXSR R0200
+    C                     READ CC0                      46
+  01-C                     ENDDO
+     C*
+     C           EASON     TAG
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R0100  ..建立第一筆資料
+     C*==============================================================*
+01===C           R0100     BEGSR
+|    C*
+|    C                     MOVEL*BLANK    WCC04   9
+|    C                     MOVEL*BLANK    SCC10
+|    C*                    MOVEL'Q1'      @A
+|    C*                    Z-ADD0         @B
+|    C*                    Z-ADDDA022     @C
+|    C                     Z-ADDDA022     @D
+|    C                     Z-ADD01        @DM
+|    C                     Z-ADD01        @DD
+|    C                     Z-ADDDA022     @E
+|    C                     Z-ADD12        @EM
+|    C                     Z-ADD31        @ED
+|    C*
+|    C           *LOVAL    SETLLCC0
+|    C                     READ CC0                      46
+| 01-C           *IN46     IFEQ '0'
+|   C                     MOVELCC04      WCC04
+|   C                     MOVEL'Y'       $DATA
+| 01*C                     ELSE
+|   C                     MOVEL'N'       $DATA
+|   C                     GOTO EASON
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R0200 ...找到最新一筆資料
+     C*==============================================================*
+02===C           R0200     BEGSR
+|    C*
+|    C           WCC04     SETGTCCX
+|    C           WCC04     REDPECCX                      41
+| 01-C           *IN41     IFEQ '0'
+|    *預留找下一筆的KEY值
+|   C                     MOVELCC04      SCC04
+|   C                     Z-ADDCC07      SCC07
+|    *建立POCAPF
+|   C                     MOVELCC01      CA01
+|   C                     MOVELCC02      CA02
+|   C                     MOVELCC03      CA03
+|   C*                    MOVELSCC10     CA04
+|   C                     Z-ADDDA022     CA05
+|   C                     MOVEL'Q1'      CA06
+|   C                     Z-ADDSCA07     CA07
+|   C           KEYCA     CHAINCA0                  40
+     C           *IN40     IFEQ '1'
+|   C                     CALL 'GET002'
+|   C                     PARM CC01      T002I1  2
+|   C                     PARM DA022     T002I2  40
+|   C                     PARM 'Q1'      T002I3  2
+|   C           SCC10     PARM           T002O1 11
+     C*                    ADD  1         @B
+     C                     MOVELSCC10     CA04
+     C                     ENDIF
+|   C                     Z-ADDSCA08     CA08
+|   C                     MOVEL*BLANK    CA09
+|   C                     MOVEL*BLANK    CA10
+|    *
+|   C                     Z-ADD$EG8      CAVV
+|   C                     MOVEL'PUC001'  CAWW
+|   C                     Z-ADD$EG8      CAXX
+|   C                     TIME           CAYY
+|   C                     MOVEL$USER     CAZZ
+|    *
+|   C   40                WRITECA0
+|   C  N40                UPDATCA0
+|    *
+|   C                     MOVELSCC10     CB01
+|   C                     MOVELCC04      CB02
+|   C           KEYCB     CHAINCB0                  40
+|   C                     Z-ADDCC09      CB03
+|   C                     Z-ADD$EG8      CBVV
+|   C                     MOVEL'PUC001'  CBWW
+|   C                     Z-ADD$EG8      CBXX
+|   C                     TIME           CBYY
+|   C                     MOVEL$USER     CBZZ
+|    *
+|   C   40                WRITECB0
+|   C  N40                UPDATCB0
+|    *
+| 01-C                     ENDIF
+|     *
+02===C                     ENDSR
+

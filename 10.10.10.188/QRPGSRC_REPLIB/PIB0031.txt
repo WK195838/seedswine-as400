@@ -1,0 +1,168 @@
+      ****************************************************************
+      *                                                              *
+      * PROGRAM NAME : PIB003                                        *
+      * AUTHER       : CHARLES                                       *
+      * CREATE DATE  : 83/03/05                                      *
+      * UPDATE DATE  : 12/08/92                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :盤點系統                                     *
+      * REMARK       :專櫃銷售年終成本庫存調整                     *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.16 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FIMI2PF  UF  E           K        DISK                      A
+     FIMI1PF  UF  E           K        DISK
+     FMTMHPF  IF  E           K        DISK
+     FPA#KPF  UF  E           K        DISK                      A
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+ @   I*                                     140 140 $RMK02
+ @   I*                                     141 141 $RMK03
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+M001AI                                      201 2080DATE
+     I                                      598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I*                                     506 506 $PURID
+     I*                                     507 508 $TRNID
+     I*                                     509 513 $APAUT
+     I                                      513 513 $WRHTY
+     I*
+      *物流點
+     I                                      601 605 DSC04S
+     I                                      606 610 DSC04E
+      *YYMM
+     I                                      630 6330DMMYY
+     I                                      630 6310MM
+     I                                      632 6330YY
+B2MODI                                      640 6470YMD
+B2MODI                                      640 6450YYMM
+B2MODI                                      646 6470DD
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYIX     KLIST
+     C                     KFLD           YYMM
+     C                     KFLD           IX01
+     C           KEYIY     KLIST
+     C                     KFLD           IY15
+     C                     KFLD           IY01
+     C                     KFLD           IY02
+     C                     KFLD           IY03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN010
+      *
+B2000C                     Z-ADDYYMM      IY15
+     C*SOSCPF----------------------------------------------------------
+     C                     READ SC0                      45
+  01-C           *IN45     DOWEQ'0'
+    C           SC02      CHAIN#K0                  41    *單據對照
+  02-C           *IN41     IFEQ '1'                        *NOT FOUNT
+    C           SC02      SETLLSD0
+    C           SC02      READESD0                      46
+  03-C           *IN46     DOWEQ'0'
+    C                     EXSR RTN100
+    C                     EXSR RTN110
+    C           SC02      READESD0                      46
+  03-C                     END
+    C*
+    C                     MOVELSC02      #K01
+B2000C                     Z-ADDSC39      #K02
+B2000C                     Z-ADDDATE      #KXX
+B2000C                     TIME           #KYY
+    C                     MOVEL$USER     #KZZ
+    C                     WRITE#K0
+  02-C                     END
+    C*
+    C                     READ SC0                      45
+  01-C                     END
+      *
+     C                     SETON                     LR
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+|    C*                    PARM $EGMDY    S001I2  60
+B2MODC*M001D     DATE      PARM           S001O1  80
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....IMIXPF
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     MOVELSD03      IX01
+B2000C           KEYIX     CHAINIX0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C           SD04      MULT SD22      FOB    152
+|   C           SD04      MULT SD23      FHI    152
+|   C           SD04      MULT SD24      DUTY   152
+|   C                     SUB  FOB       IX08
+|   C                     SUB  FHI       IX09
+|   C                     SUB  DUTY      IX10
+|   C                     SUB  SD04      IX07
+B2000C                     Z-ADDDATE      IXXX
+B2000C                     TIME           IXYY
+|   C                     MOVE $USER     IXZZ
+|   C                     UPDATIX0
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+      *          RTN110....IMIYPF
+      *===============================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C                     MOVEL'K'       IY01
+|    C                     MOVELSC04      IY02
+|    C                     MOVELSD03      IY03
+|    C           KEYIY     CHAINIY0                  40
+B2000C                     Z-ADDDATE      IYXX
+B2000C                     TIME           IYYY
+|    C                     MOVE $USER     IYZZ
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANK    IY04
+|   C                     MOVEL*BLANK    IY05
+|   C           IY03      CHAINMA0                  41
+| 02-C           *IN41     IFEQ '0'
+|   C                     MOVELMA09      IY04
+|   C                     MOVELMA08      IY05
+| 02-C                     END
+|   C                     Z-SUBSD04      IY06
+|   C                     Z-SUBSD04      IY07
+|   C                     Z-ADD0         IY08
+|   C                     Z-ADD0         IY09
+|   C                     Z-SUBSD04      IY10
+|   C                     WRITEIY0
+      *
+| 01*C                     ELSE
+|   C                     SUB  SD04      IY06
+|   C                     SUB  SD04      IY07
+|   C                     SUB  SD04      IY10
+|   C                     UPDATIY0
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+

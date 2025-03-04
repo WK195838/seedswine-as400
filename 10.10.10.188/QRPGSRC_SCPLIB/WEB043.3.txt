@@ -1,0 +1,229 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : WEB043                                     *
+     A*    AUTHOR       : ROBIN LIU                                  *
+     A*    CREATE DATE  : 2010/01/28                                 *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存SQL RPG                         *
+     A*    SUBSYSTEM    :前台管理系統                              *
+     A*    REMARK       :庫存查詢BY分店                          *
+     A*===============================================================
+     FSCWB05PFUF  E           K        DISK
+     FSCWB05WFUF  E           K        DISK                      A
+     F            WB05                              KRENAMETWB05
+ 00A+FC#EBLF02IF  E           K        DISK
+ 00A+I*==============================================================*
+ 00A+IPARM5       DS
+ 00A+I                                        1   80PARMA
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PARM1   2        公司代號
+     C                     PARM           PARM2   2        通路代號
+     C                     PARM           PARM3   6        月結年月
+     C                     PARM           PARM4   5        分店代號
+     C                     PARM           PARM5   8        系統日期
+     C                     PARM           PARM6  24        鍵值
+     C                     PARM           ERRRD   3        ERR RCD NO.
+     C                     PARM           RTNCD   2        RETURN CODE
+     C                     PARM           RTNDSC 60        RETURN DESC.
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYWB     KLIST
+     C                     KFLD           WB0501
+     C                     KFLD           WB0503
+     C                     KFLD           WB0502
+     C                     KFLD           WB0505
+ 00A+C           KEYEB     KLIST
+ 00A+C                     KFLD           PARM1
+ 00A+C                     KFLD           PARM2
+ 00A+C                     KFLD           WB0503
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C* RUN SQL STATEMENTS
+     C                     EXSR RTNSQL
+ 00A+C*讀取貨架資料
+ 00A+C                     EXSR RTNDTA
+     C*過濾重複的資料
+     C                     EXSR RTNFLR
+     C*刪除重複的資料
+     C                     EXSR RTNDEL
+     C*
+     C                     MOVEL'000'     ERRRD
+     C                     MOVEL'00'      RTNCD
+     C                     MOVEL*BLANKS   RTNDSC
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*                    SQL STATEMENTS
+     C*==============================================================*
+     C           RTNSQL    BEGSR
+     C/EXEC SQL
+     C+ DELETE FROM SCFLIB/SCWB05PF WHERE WB0501 = :PARM6
+     C/END-EXEC
+     C*
+     C/EXEC SQL
+     C+ INSERT INTO SCFLIB/SCWB05PF
+ 00A-C*+ SELECT :PARM6,'4',TB05,NC05,EB03,NC19,
+ 00A+C+ SELECT :PARM6,'4',TB05,NC05,' ',NC19,
+     C+ TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18
+ 00A-C*+ FROM   C#EBPF, C#EGPF, INTBPF, MANCPF
+ 00A-C*+ WHERE EB01 = EG01 AND EB02 = EG02 AND EB04 = EG03
+ 00A-C*+ AND   EB01 = TB01 AND EB02 = TB03 AND EB04 = TB05
+ 00A-C*+ AND   TB01 = NC01 AND TB05 = NC02
+ 00A+C+ FROM   MANHPF, C#EGPF, INTBPF, MANCPF
+ 00A+C+ WHERE NH01 = TB01 AND NH02 = TB03 AND NH03 = TB04
+ 00A+C+ AND   EG01 = NC01 AND EG03 = NC02 AND NH04 = TB05
+ 00A+C+ AND   TB01 = EG01 AND TB03 = EG02 AND TB05 = EG03
+ 00A-C*+ AND   EB01 = :PARM1 AND EB02 = :PARM2
+ 00A+C+ AND   NC01 = :PARM1
+     C+ AND   TB02 = :#PARM3 AND TB04 = :PARM4
+ 00A-C*+ AND  (( :#PARM5  >= EB05 AND  :#PARM5  <= EB06)
+ 00A-C*+ OR ( :#PARM5  >= EB05 AND EB06 = 0))
+     C+ AND  ((  :#PARM5  >= EG04 AND  :#PARM5  <= EG05)
+     C+ OR ( :#PARM5  >= EG04 AND EG05 = 0))
+     C/END-EXEC
+     C*
+ 00A-C*/EXEC SQL
+ 00A-C*+ INSERT INTO SCFLIB/SCWB05PF
+ 00A-C*+ SELECT :PARM6,'3',TB05,NC05,EB03,NC19,
+ 00A-C*+ TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18
+ 00A-C*+ FROM   C#EBPF, C#EGPF, INTBPF, MANCPF
+ 00A-C*+ WHERE EB01 = EG01 AND EB02 = EG02 AND EB04 = EG03
+ 00A-C*+ AND   EB01 = TB01 AND EB02 = TB03 AND EB04 = TB05
+ 00A-C*+ AND   TB01 = NC01 AND TB05 = NC02
+ 00A-C*+ AND   EB01 = :PARM1 AND EB02 = :PARM2
+ 00A-C*+ AND   TB02 = :#PARM3 AND TB04 = :PARM4
+ 00A-C*+ AND  NOT (( :#PARM5  >= EB05 AND  :#PARM5  <= EB06)
+ 00A-C*+ OR ( :#PARM5  >= EB05 AND EB06 = 0))
+ 00A-C*+ AND  ((  :#PARM5  >= EG04 AND  :#PARM5  <= EG05)
+ 00A-C*+ OR ( :#PARM5  >= EG04 AND EG05 = 0))
+ 00A-C*+ AND (TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18)
+ 00A-C*+ > 0
+ 00A-C*/END-EXEC
+     C*
+     C/EXEC SQL
+     C+ INSERT INTO SCFLIB/SCWB05PF
+ 00A-C*+ SELECT :PARM6,'2',TB05,NC05,EB03,NC19,
+ 00A+C+ SELECT :PARM6,'4',TB05,NC05,' ',NC19,
+     C+ TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18
+ 00A-C*+ FROM   C#EBPF, C#EGPF, INTBPF, MANCPF
+ 00A-C*+ WHERE EB01 = EG01 AND EB02 = EG02 AND EB04 = EG03
+ 00A-C*+ AND   EB01 = TB01 AND EB02 = TB03 AND EB04 = TB05
+ 00A-C*+ AND   TB01 = NC01 AND TB05 = NC02
+ 00A+C+ FROM   MANHPF, C#EGPF, INTBPF, MANCPF
+ 00A+C+ WHERE NH01 = TB01 AND NH02 = TB03 AND NH03 = TB04
+ 00A+C+ AND   EG01 = NC01 AND EG03 = NC02 AND NH04 = TB05
+ 00A+C+ AND   TB01 = EG01 AND TB03 = EG02 AND TB05 = EG03
+ 00A-C*+ AND   EB01 = :PARM1 AND EB02 = :PARM2
+ 00A+C+ AND   NC01 = :PARM1
+     C+ AND   TB02 = :#PARM3 AND TB04 = :PARM4
+ 00A-C*+ AND   (( :#PARM5  >= EB05 AND  :#PARM5  <= EB06)
+ 00A-C*+ OR ( :#PARM5  >= EB05 AND EB06 = 0))
+     C+ AND  NOT ((  :#PARM5  >= EG04 AND  :#PARM5  <= EG05)
+     C+ OR ( :#PARM5  >= EG04 AND EG05 = 0))
+     C+ AND (TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18)
+     C+ > 0
+     C/END-EXEC
+     C*
+ 00A-C*/EXEC SQL
+ 00A-C*+ INSERT INTO SCFLIB/SCWB05PF
+ 00A-C*+ SELECT :PARM6,'1',TB05,NC05,EB03,NC19,
+ 00A-C*+ TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18
+ 00A-C*+ FROM   C#EBPF, C#EGPF, INTBPF, MANCPF
+ 00A-C*+ WHERE EB01 = EG01 AND EB02 = EG02 AND EB04 = EG03
+ 00A-C*+ AND   EB01 = TB01 AND EB02 = TB03 AND EB04 = TB05
+ 00A-C*+ AND   TB01 = NC01 AND TB05 = NC02
+ 00A-C*+ AND   EB01 = :PARM1 AND EB02 = :PARM2
+ 00A-C*+ AND   TB02 = :#PARM3 AND TB04 = :PARM4
+ 00A-C*+ AND  NOT (( :#PARM5  >= EB05 AND  :#PARM5  <= EB06)
+ 00A-C*+ OR ( :#PARM5  >= EB05 AND EB06 = 0))
+ 00A-C*+ AND  NOT ((  :#PARM5  >= EG04 AND  :#PARM5  <= EG05)
+ 00A-C*+ OR ( :#PARM5  >= EG04 AND EG05 = 0))
+ 00A-C*+ AND (TB06+TB08-TB09+TB10-TB11+TB12-TB13+TB14-TB15+TB16+TB17-TB18)
+ 00A-C*+ > 0
+ 00A-C*/END-EXEC
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*過濾重複的資料
+     C*==============================================================*
+     C           RTNFLR    BEGSR
+     C*
+     C           PARM6     SETLLWB05
+     C           PARM6     READEWB05                N    44
+     C           *IN44     DOWEQ'0'
+     C*
+     C*產品代號不相同時
+     C           WB0503    IFNE TB0503
+     C                     MOVELWB0503    TB0503
+     C*產品代號相同時，過濾掉此筆資料
+     C                     ELSE
+     C           KEYWB     CHAINTWB05                45
+     C   45                WRITETWB05
+     C                     ENDIF
+     C*
+     C           PARM6     READEWB05                N    44
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*刪除重複的資料
+     C*==============================================================*
+     C           RTNDEL    BEGSR
+     C*
+     C           *LOVAL    SETLLTWB05
+     C                     READ TWB05                    44
+     C           *IN44     DOWEQ'0'
+     C*
+ 00A+C           *LOVAL    SETGTWB05
+     C           KEYWB     CHAINWB05                 45
+     C  N45                DELETWB05
+     C*
+     C                     READ TWB05                    44
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*==============================================================*
+ 00A+C*抓貨架資料
+ 00A+C*==============================================================*
+ 00A+C           RTNDTA    BEGSR
+ 00A+C*
+ 00A+C           *LOVAL    SETLLWB05
+ 00A+C                     READ WB05                     44
+ 00A+C           *IN44     DOWEQ'0'
+ 00A+C*
+ 00A+C           KEYEB     SETGTEB0
+ 00A+C           KEYEB     REDPEEB0                      45
+ 00A+C           *IN45     IFEQ '0'
+ 00A+C           PARMA     IFGE EB05
+ 00A+C           PARMA     ANDLEEB06
+ 00A+C           PARMA     ORGE EB05
+ 00A+C           EB06      ANDEQ0
+ 00A+C                     MOVELEB03      WB0505
+ 00A+C                     ENDIF
+ 00A+C                     ELSE
+ 00A+C                     MOVEL*BLANK    WB0505
+ 00A+C                     ENDIF
+ 00A+C                     UPDATWB05
+ 00A+C*
+ 00A+C                     READ WB05                     44
+ 00A+C                     ENDDO
+ 00A+C*
+ 00A+C                     ENDSR
+ 00A+C*==============================================================*
+     C*                    *INZSR-- INITIAL VALUES
+     C*==============================================================*
+     C           *INZSR    BEGSR
+     C*
+     C                     MOVELPARM3     #PARM3  60       月結年月
+     C                     MOVELPARM5     #PARM5  80       系統日期
+     C*
+     C                     MOVEL*BLANK    TB0503  9        產品代號
+     C*
+     C                     ENDSR
+

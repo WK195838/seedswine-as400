@@ -1,0 +1,311 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARA014                                        *
+      * AUTHER       : D910074 TINA                                  *
+      * CREATE DATE  : 82/03/03                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款系統                                 *
+      *  REMARK      :沖帳批次作業　　　                           *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.17 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FARACPF  UF  E           K        DISK                      A
+     FARADPF  UF  E           K        DISK                      A
+     FMTMDPF  UF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOSIPF  UF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+B2CHKFARA014P O   E             39     PRINTER
+B2INF *CVR3009 sev.30 PRINTER file ARA014P must be converted, because
+B2INF *   field AC04 is shared by name with other database fields which
+B2INF *   require to be expanded. Please convert ARA014P, enlarging AC04
+B2INF *   prior to compilation, or manually insert in this source the
+B2INF *   proper RENAME and MOVE statements to avoid name-sharing.
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+M001AI                                      201 2080DATE
+     I                                      601 602 DAC01
+      *COMPL收款公司第一碼
+     I                                      601 601 COMPL
+     I                                      603 604 DAD10S
+     I                                      605 606 DAD10E
+     I                                      607 611 DAC02
+     I                                      612 6200DAC08
+     I                                      621 634 DAC12
+     I                                      637 6420DAC04
+B2MODI                                      643 6500WAC04
+B2MODI                                      653 656 FAC03
+B2MODI                                      657 658 FAC05
+B2MODI                                      659 672 FAC06
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYAC     KLIST
+     C                     KFLD           DAC01
+     C                     KFLD           DAC02
+     C                     KFLD           FAC03
+     C                     KFLD           WAC04
+     C                     KFLD           FAC05
+     C                     KFLD           FAC06
+     C           KEYME     KLIST
+     C                     KFLD           DAC02
+     C                     KFLD           FAC03
+     C           KEYAA     KLIST
+     C                     KFLD           COMPL
+     C           KEYAD     KLIST
+     C                     KFLD           DAC01
+     C                     KFLD           DAC02
+     C                     KFLD           FAC03
+     C                     KFLD           WAC04
+     C                     KFLD           FAC05
+     C                     KFLD           FAC06
+     C                     KFLD           SI02
+     C                     KFLD           FAD10
+     C                     KFLD           WAC04
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     .INIT SCREEN
+     C                     EXSR RTN110
+     C                     EXSR RTN130
+     C                     EXSR RTN160
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+B2???C*                    PARM $EGMDY    S001I2  80
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC*M001D     DATE      PARM           S001O1  80
+|    C                     SETON                     10
+|    C                     Z-ADD0         TOT1
+M001AC                     Z-ADD0         W6      60
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN110....WRITE ARACPF
+      *===============================================================*
+02===C           RTN110    BEGSR
+|    C*ARACPF新增一筆收款
+B2000C           KEYAC     CHAINAC0                  41
+|    C                     MOVELDAC01     AC01
+|    C                     MOVELDAC02     AC02
+|    C                     MOVELFAC03     AC03
+B2000C                     MOVELWAC04     AC04
+|    C                     MOVELFAC05     AC05
+|    C                     MOVELFAC06     AC06
+|    C                     Z-ADD0         AC08
+|    C                     Z-ADD0         AC10
+M001MC**                   MOVELDAC12     AC12
+M001MC                     MOVELDAC12     AC12
+|    C*
+|    C                     Z-ADD0         AC07
+|    C                     Z-ADD0         AC11
+|    C                     MOVEL*BLANK    AC13
+|    C                     MOVEL*BLANKS   AC14
+|    C*
+B2000C                     Z-ADDDATE      ACXX
+B2000C                     TIME           ACYY
+|    C                     MOVE $USER     ACZZ
+|    C*業務員
+|    C           KEYME     CHAINME0                  43
+| 01-C           *IN43     IFEQ '0'
+|   C                     MOVELME15      AC09
+| 01*C                     ELSE
+|   C                     MOVE *BLANKS   AC09
+| 01-C                     END
+|    C*
+|    C                     WRITEAC0
+|    C*
+|    C                     Z-ADDDAC08     HAC10   90
+|    C*收款種類
+|    C                     MOVEL'COLLECT' #A01
+|    C                     MOVELAC05      #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    D#A03
+| 02*C                     ELSE
+|   C                     MOVEL#A03      D#A03
+| 02-C                     END
+|    C*
+|    C*                    WRITEPH1
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+      *          RTN130....UPDATE SOSIPF
+      *===============================================================*
+03===C           RTN130    BEGSR
+|    C*
+|    C           *LOVAL    SETLLSI0
+|    C                     READ SI0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C*
+|   C                     MOVELSI01      FAD10   2
+|   C*算出沖銷金額
+| 02-C           SI30      IFGT HAC10
+|   C                     Z-ADDHAC10     HAD08
+| 02*C                     ELSE
+|   C                     Z-ADDSI30      HAD08   90
+| 02-C                     END
+|   C*算出發票檔之未沖金額及已沖金額
+|   C                     ADD  HAD08     SI26
+|   C                     SUB  HAD08     SI30
+|   C                     UPDATSI0
+|   C*收款總額－沖銷金額
+|   C                     SUB  HAD08     HAC10
+|   C*沖銷總金額TOT1
+|   C                     ADD  HAD08     TOT1
+|   C                     EXSR RTN140                     *UPDATE ARAD
+|   C*CHECK收款金額是否已沖銷完畢
+| 03-C           HAC10     IFEQ 0
+|   C                     SETON                     40
+| 03*C                     ELSE
+|   C                     READ SI0                      40
+| 03-C                     END
+|   C*
+| 01-C                     END
+|    C                     EXSR RTN150                     *UPDATE ARAC
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+      *          RTN140....WRITE  ARADPF
+      *===============================================================*
+04===C           RTN140    BEGSR
+|    C*CHECK ARADPF是否有同KEY之沖帳明細
+B2000C           KEYAD     CHAINAD0                  40
+B2000C                     Z-ADDDATE      ADXX
+B2000C                     TIME           ADYY
+|    C                     MOVE $USER     ADZZ
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  HAD08     AD08
+|   C                     UPDATAD0
+| 01*C                     ELSE
+|   C*新增一筆沖帳明細
+|   C                     MOVE DAC01     AD01
+|   C                     MOVE DAC02     AD02
+|   C                     MOVE FAC03     AD03
+B2000C                     Z-ADDWAC04     AD04
+B2000C                     Z-ADDWAC04     AD12
+|   C                     MOVE FAC05     AD05
+|   C                     MOVE FAC06     AD06
+|   C                     MOVE SI02      AD07
+|   C                     Z-ADDHAD08     AD08
+|   C                     MOVE *BLANKS   AD09
+|   C                     MOVELSI01      AD10
+B2000C                     Z-ADDSI21      AD11
+|   C                     WRITEAD0
+|   C*
+| 01-C                     END
+|    C*
+|    C*
+04===C                     ENDSR
+      *===============================================================*
+      *          RTN150....WRITE  ARACPF
+      *===============================================================*
+05===C           RTN150    BEGSR
+|    C*** ARACPF
+B2000C           KEYAC     CHAINAC0                  41
+|    C*未分配金額為０
+|    C                     Z-ADD0         AC10
+|    C                     Z-ADDTOT1      AC08
+|    C*
+B2000C                     Z-ADDDATE      ACXX
+B2000C                     TIME           ACYY
+|    C                     MOVE $USER     ACZZ
+|    C                     UPDATAC0
+M001AC                     Z-ADDAC04      LAC04
+|    C   39                EXSR RTN900
+|    C                     WRITEPH1
+B2000C           KEYAC     SETLLAD0
+B2000C           KEYAC     READEAD0                      43
+| 01-C           *IN43     DOWEQ'0'
+      *日期轉換
+M001AC                     Z-ADDAD04      W6      60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2000C                     PARM W6        S001I2  60
+B2TRCC           WAD04     PARM           S001O1  60
+      *
+M001AC                     Z-ADDAD11      W6      60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2000C                     PARM W6        S001I2  60
+B2TRCC           WAD11     PARM           S001O1  60
+      *
+M001AC                     Z-ADDAD12      W6      60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2000C                     PARM W6        S001I2  60
+B2TRCC           WAD12     PARM           S001O1  60
+|   C*
+|   C   39                EXSR RTN900
+|   C                     WRITEPD1
+B2000C           KEYAC     READEAD0                      43
+| 01-C                     END
+|    C*
+|    C*PRINT REPORT
+|    C                     WRITEPD2
+|    C                     WRITEPD3
+|    C                     WRITEPE2
+05===C                     ENDSR
+      *===============================================================*
+      *          RTN160....UPDATE MTMDPF
+      *===============================================================*
+06===C           RTN160    BEGSR
+|    C*修改使用額度，應收帳款
+|    C           DAC02     CHAINMD0                  44
+| 01-C           *IN44     IFEQ '0'
+|   C                     SUB  TOT1      MD29
+|   C                     SUB  TOT1      MD31
+|   C                     UPDATMD0
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+      *===============================================================*
+      *          RTNOUTLDA ... OUTLDA
+      *===============================================================*
+07===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+07===C           ENDLDA    ENDSR
+      *==============================================================*
+      *          RTN900....跳頁
+      *==============================================================*
+08===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C*收款種類
+|    C                     MOVEL'COLLECT' #A01
+|    C                     MOVELAC05      #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 01-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    D#A03
+| 01*C                     ELSE
+|   C                     MOVEL#A03      D#A03
+| 01-C                     END
+|    C*
+M001AC                     Z-ADDAC04      LAC04
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+08===C                     ENDSR
+

@@ -1,0 +1,172 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0452                                       *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 82/04/28                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款子系統                               *
+      * REMARK       :銷貨收入明細表                               *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.12.10 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSILF09IP  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FSOSPLF01IF  E           K        DISK
+     FREWF70  O   E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 602 DSI01
+     I                                      603 6080DSI35S
+     I                                      609 6140DSI35E
+M001MI                                      615 6220WSI35S
+M001MI                                      623 6300WSI35E
+M001MI                                      631 631 DSI10
+M001MI                                      632 632 DSEL
+M001MI                                      633 633 COMPS
+M001MI                                      634 634 COMPE
+     I            DS
+     I                                        1   2 SI01
+     I                                        1   1 SI01A
+     I                                        2   2 SI01B
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSJ     KLIST
+     C                     KFLD           SJ01
+     C                     KFLD           SJ02
+     C           SDKEY     KLIST
+     C                     KFLD           SI10
+     C                     KFLD           SJ03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN200
+     CLR                   SETON                     LR
+     C*==============================================================*
+     C*          RTN200....GET DETAIL
+     C*==============================================================*
+01===C           RTN200    BEGSR
+|    C                     Z-ADD0         WF7008
+|    C                     Z-ADD0         WF7009
+|    C                     Z-ADD0         WF7010
+|    C                     Z-ADD0         WF7011
+|    C                     Z-ADD0         WF7012
+|    C                     Z-ADD0         WF7013
+|    C                     Z-ADD0         WF7014
+|    C                     Z-ADD0         WF7015
+|    C                     Z-ADD0         WF7016
+|    C                     Z-ADD0         WF7017
+|    C                     Z-ADD0         WF7019
+|    C*GET專櫃號碼
+| 01-C           DSI10     IFEQ '2'
+|   C           DSEL      ANDEQ'B'
+|   C           SI10      CHAINSP0                  43
+| 02-C           *IN43     IFEQ '0'
+|   C           SP01      CHAINSC0                  44
+| 03-C           *IN44     IFEQ '0'
+|   C                     MOVELSC14      WF7002
+| 03-C                     END
+| 02-C                     END
+| 01*C                     ELSE
+|   C                     MOVELSI12      WF7002
+| 01-C                     END
+|    C*
+|    C                     MOVELSI01A     WF7001
+|    C                     MOVELSI01B     WF7018
+B2000C                     MOVELSI35      WF7003
+|    C                     MOVELSI10      WF7004
+|    C                     MOVELSI02      WF7005
+|    C                     MOVELSI12      WF7006
+|    C                     MOVELSI13      WF7007
+|    C                     Z-ADDSI24      WF7019           *營業稅
+|    C                     Z-ADDSI23      WF7011           *淨售
+|    C                     Z-ADD0         WORK1   90
+|    C                     Z-ADD0         WORK2   90
+|    C*
+|    C                     MOVE SI01      SJ01
+|    C                     MOVE SI02      SJ02
+|    C           KEYSJ     SETLLSJ0
+|    C           KEYSJ     READESJ0                      41
+|    C*
+| 04-C           *IN41     DOWEQ'0'
+|   C*事前折扣
+|   C           SDKEY     CHAINSD0                  40
+|   C*
+|   C                     SETOF                     20
+|   C           SJ05      SUB  SD06      WFLD1  130
+|   C           SJ04      SUB  SJ13      WFLD2  130
+|   C           WFLD1     MULT WFLD2     CHKFLD 130
+| 05-C           CHKFLD    IFEQ SJ07
+|   C                     SETON                     20
+| 05-C                     END
+|   C*計算合計
+|   C                     ADD  SJ06      WF7008
+|   C*舊算法
+| 06-C           *IN20     IFEQ '0'
+|   C           SJ13      MULT SJ05      WORK1            *搭贈
+|   C                     ADD  WORK1     WF7010
+| 06*C                     ELSE
+|   C                     Z-ADD0         WORK1            *搭贈
+| 06-C                     END
+|   C*
+|   C                     EXSR RTN210                     *PROC COST
+|   C*
+|   C           KEYSJ     READESJ0                      41
+| 04-C                     END
+     C*計算折扣＝（銷售－搭贈）－淨售－營業稅
+|   C           WF7008    SUB  WF7010    WORK3   90
+|   C                     SUB  WF7011    WORK3
+|   C           WORK3     SUB  WF7019    WF7009
+|    C*計算總計
+|    C*
+|    C           WF7011    SUB  WF7015    WF7016
+|    C*
+| 07-C           WF7008    IFNE 0
+|   C           WF7016    DIV  WF7011    WRATE   54H
+|   C           WRATE     MULT 100       WF7017
+| 07*C                     ELSE
+|   C                     Z-ADD0         WF7017
+| 07-C                     END
+|    C*
+|    C                     WRITEWF700
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN210....PROC COST
+      *==============================================================*
+02===C           RTN210    BEGSR
+|    C*
+|    C           SDKEY     CHAINSD0                  42
+|    C*
+| 01-C           *IN42     IFEQ '0'
+|   C           SD10      ADD  SD11      WORK4   82
+|   C                     ADD  SD12      WORK4            單位成本
+|   C           SD10      MULT SJ04      WSD10   82
+|   C           SD11      MULT SJ04      WSD11   82
+|   C           SD12      MULT SJ04      WSD12   82
+|   C           WORK4     MULT SJ04      WCOST  102
+| 01*C                     ELSE
+|   C                     Z-ADD0         WSD10
+|   C                     Z-ADD0         WSD11
+|   C                     Z-ADD0         WSD12
+|   C                     Z-ADD0         WCOST
+| 01-C                     END
+|    C*
+|    C                     ADD  WSD10     WF7012
+|    C                     ADD  WSD11     WF7013
+|    C                     ADD  WSD12     WF7014
+|    C                     ADD  WCOST     WF7015
+|    C*
+02===C                     ENDSR
+

@@ -1,0 +1,278 @@
+      ****************************************************************
+      * PROGRAM ID : P31                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :日期格式轉換（中西）                           *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3101I    I   *DEC    8 0  輸入年月日     *
+      *             02   P3102I    I   *CHAR   1    原始日期格式   *
+      *                                              '1'=00YYMMDD    *
+      *                                              '2'=YYYYMMDD    *
+      *                                              '3'=00MMDDYY    *
+      *                                              '4'=MMDDYYYY    *
+      *                                              '5'=00DDMMYY    *
+      *                                              '6'=DDMMYYYY    *
+      *             03   P3103I    I   *CHAR   1    原始曆別       *
+      *                                             '1':西曆       *
+      *                                             '2':國曆       *
+      *             04   P3104I    I   *CHAR   1    轉換後日期格式 *
+      *             05   P3105I    I   *CHAR   1    轉換後曆別     *
+      *             06   P3111O    O   *DEC    8 0  轉換後日期     *
+      *                                             Y=OK , N =ERROR  *
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3101     N   *DEC    4 0 原始西元年      *
+      *             02   P3102     N   *DEC    2 0 原始月份        *
+      *             03   P3103     N   *DEC    2 0 原始日期        *
+      *             04   P3104     N   *DEC    8 0 轉換後日期      *
+      *             05   P3105     N   *CHAR   1   日期格式        *
+      *             06   P3106     N   *CHAR   1   曆別            *
+      *
+      ****************************************************************
+     E* WFV   :日期格式VALUE
+     E                    WFV     6   6  1
+     I            DS
+     I                                        1   80WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     I                                        7   80WD4
+     I            DS
+     I                                        1   80WYMD
+     I                                        1   20WY1
+     I                                        3   40WY2
+     I                                        5   60WY3
+     I                                        7   80WY4
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3101I  80
+     C                     PARM           P3102I  1
+     C                     PARM           P3103I  1
+     C                     PARM           P3104I  1
+     C                     PARM           P3105I  1
+     C                     PARM           P3111O  80
+     C*最高機密
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+     C*
+     C                     EXSR P31CHK                     *CHK中西曆
+     C   99                GOTO QUIT
+     C                     EXSR P31YMD
+     C*
+     C                     Z-ADDWYYYY     P3101   40
+     C                     Z-ADDWMM       P3102   20
+     C                     Z-ADDWDD       P3103   20
+     C*
+     C                     EXSR P31CVD                     *CVD DATE
+     C*
+     C           QUIT      TAG
+     C                     MOVE P3104     P3111O
+     C                     SETON                     LR
+      *--------------------------------------------------------------*
+      *                 P31CHK....CHECK中西曆及輸入格式
+      *--------------------------------------------------------------*
+01===C           P31CHK    BEGSR
+|    C*
+|    C                     MOVE P3103I    P3106   1
+|    C                     MOVE P3102I    P3105   1
+|    C                     EXSR P31SUB
+|    C   99                GOTO ERROR
+|    C*
+|    C                     MOVE P3105I    P3106
+|    C                     MOVE P3104I    P3105
+|    C                     EXSR P31SUB
+|    C   99                GOTO ERROR
+|    C*
+|    C           ERROR     TAG
+| 01-C           *IN99     IFEQ '1'
+|   C                     Z-ADD0         P3104
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P31SUB....CHECK中西曆及輸入格式
+      *--------------------------------------------------------------*
+02===C           P31SUB    BEGSR
+|     *
+|     *CHECK轉換後曆別:"1","2"不可為其它,
+|     *且國曆之FORMAT只可為2:YYYYMMDD
+|     *
+| 01-C           P3106     IFNE '1'
+|   C           P3105     ANDNE'2'
+|   C                     SETON                     99
+| 01-C                     END
+|    C   99                GOTO P31END
+|    C*
+| 02-C           P3106     IFEQ '1'                        *西曆
+|   C                     Z-ADD1         I       10
+|   C           P3105     LOKUPWFV,I                    40
+| 03-C           *IN40     IFEQ '0'
+|   C                     SETON                     99
+| 03-C                     END
+| 02*C                     ELSE
+|   C*
+| 04-C           P3105     IFNE '2'                        *中曆
+|   C                     SETON                     99    *YYYYMMDD
+| 04-C                     END
+| 02-C                     END
+|    C   99                GOTO P31END
+|    C*
+02===C           P31END    ENDSR
+      *--------------------------------------------------------------*
+      *                 P31YMD....取出原始年．月．日．
+      *--------------------------------------------------------------*
+03===C           P31YMD    BEGSR
+|    C*
+|    C                     Z-ADDP3101I    WDATE
+|    C*
+| 01-C           P3103I    IFEQ '1'                        *西曆
+|   C*
+| 02-C           P3102I    IFEQ '1'                        *00YYMMDD
+|   C                     Z-ADDWD2       WYY     20
+|   C                     Z-ADDWD3       WMM     20
+|   C                     Z-ADDWD4       WDD     20
+|   C                     EXSR P31PYY
+| 02-C                     END
+|   C*
+| 03-C           P3102I    IFEQ '2'                        *YYYYMMDD
+|   C                     MOVELWD1       WYYYY   40
+|   C                     MOVE WD2       WYYYY
+|   C                     Z-ADDWD3       WMM
+|   C                     Z-ADDWD4       WDD
+| 03-C                     END
+|   C*
+| 04-C           P3102I    IFEQ '3'                        *00MMDDYY
+|   C                     Z-ADDWD4       WYY
+|   C                     Z-ADDWD2       WMM
+|   C                     Z-ADDWD3       WDD
+|   C                     EXSR P31PYY
+| 04-C                     END
+|   C*
+| 05-C           P3102I    IFEQ '4'                        *MMDDYYYY
+|   C                     MOVELWD3       WYYYY
+|   C                     MOVE WD4       WYYYY
+|   C                     Z-ADDWD1       WMM
+|   C                     Z-ADDWD2       WDD
+| 05-C                     END
+|   C*
+| 06-C           P3102I    IFEQ '5'                        *00DDMMYY
+|   C                     Z-ADDWD4       WYY
+|   C                     Z-ADDWD3       WMM
+|   C                     Z-ADDWD2       WDD
+|   C                     EXSR P31PYY
+| 06-C                     END
+|   C*
+| 07-C           P3102I    IFEQ '6'                        *DDMMYYYY
+|   C                     MOVELWD3       WYYYY
+|   C                     MOVE WD4       WYYYY
+|   C                     Z-ADDWD2       WMM
+|   C                     Z-ADDWD1       WDD
+| 07-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 08-C           P3103I    IFEQ '2'                        *中曆
+|   C           P3102I    ANDEQ'2'                        *YYYYMMDD
+|   C                     MOVELWD1       WYYYY
+|   C                     MOVE WD2       WYYYY
+|   C                     Z-ADDWD3       WMM
+|   C                     Z-ADDWD4       WDD
+|   C                     EXSR P31PYY
+| 08-C                     END
+|    C*
+03===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P31PYY....產生西元年份
+      *--------------------------------------------------------------*
+04===C           P31PYY    BEGSR
+|     *
+|     *適用年份為西元1980～2079年:
+|     *
+      * 1.西曆
+|     * 2000～2029 "輸入年度+2000年
+|     * 1930～1999 "輸入年度+1900年
+|     *
+| 01-C           P3103I    IFEQ '1'                        *西曆
+| 02-C           WYY       IFLT 80
+|   C           WYY       ADD  2000      WYYYY
+| 02*C                     ELSE
+|   C           WYY       ADD  1900      WYYYY
+| 02-C                     END
+|   C*
+|   C* 2.國曆
+|   C*
+| 01*C                     ELSE
+|   C                     ADD  1911      WYYYY
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P31CVD....轉換日期
+      *--------------------------------------------------------------*
+05===C           P31CVD    BEGSR
+|    C*
+| 01-C           P3105I    IFEQ '1'                        *西曆
+|   C*
+| 02-C           P3104I    IFEQ '1'                        *00YYMMDD
+|   C                     Z-ADD0         WY1
+|   C                     Z-ADDP3101     WY2
+|   C                     Z-ADDP3102     WY3
+|   C                     Z-ADDP3103     WY4
+| 02-C                     END
+|   C*
+| 03-C           P3104I    IFEQ '2'                        *YYYYMMDD
+|   C                     MOVELP3101     WY1
+|   C                     MOVE P3101     WY2
+|   C                     Z-ADDP3102     WY3
+|   C                     Z-ADDP3103     WY4
+| 03-C                     END
+|   C*
+| 04-C           P3104I    IFEQ '3'                        *00MMDDYY
+|   C                     Z-ADD0         WY1
+|   C                     Z-ADDP3102     WY2
+|   C                     Z-ADDP3103     WY3
+|   C                     Z-ADDP3101     WY4
+| 04-C                     END
+|   C*
+| 05-C           P3104I    IFEQ '4'                        *MMDDYYYY
+|   C                     Z-ADDP3102     WY1
+|   C                     Z-ADDP3103     WY2
+|   C                     MOVELP3101     WY3
+|   C                     MOVE P3101     WY4
+| 05-C                     END
+|   C*
+| 06-C           P3104I    IFEQ '5'                        *00DDMMYY
+|   C                     Z-ADD0         WY1
+|   C                     Z-ADDP3103     WY2
+|   C                     Z-ADDP3102     WY3
+|   C                     Z-ADDP3101     WY4
+| 06-C                     END
+|   C*
+| 07-C           P3104I    IFEQ '6'                        *DDMMYYYY
+|   C                     Z-ADDP3103     WY1
+|   C                     Z-ADDP3102     WY2
+|   C                     MOVELP3101     WY3
+|   C                     MOVE P3101     WY4
+| 07-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 08-C           P3105I    IFEQ '2'                        *中曆
+|   C           P3104I    ANDEQ'2'                        *YYYYMMDD
+|   C                     SUB  1911      P3101
+|   C                     MOVELP3101     WY1
+|   C                     MOVE P3101     WY2
+|   C                     Z-ADDP3102     WY3
+|   C                     Z-ADDP3103     WY4
+| 08-C                     END
+|    C*
+|    C                     Z-ADDWYMD      P3104   80
+05===C                     ENDSR
+      *--------------------------------------------------------------*
+** <<日期格式>>VALUE
+123456
+

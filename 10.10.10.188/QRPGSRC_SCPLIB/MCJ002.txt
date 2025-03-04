@@ -1,0 +1,392 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : MCJ001                                        *
+      * AUTHER       : A1010  JOHN CHIOU                             *
+      * CREATE DATE  : 2010/10/29                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :進貨傳票產生                                 *
+      * MODIFICATION :                                               *
+      * 00A需求單號: 1040369                                       *
+      * 00A 2015/04/20 DEREK修正BUG :無資料寫入GLAHWF,           *
+      * 00A                            不應編列傳票號碼            *
+      * 00B需求單號: 1110041                                       *
+      * 00B 2022/01/21 YVONNE :銷售傳票自12/26/21起，AS400→   *
+      *                         10進銷存系統→21產生傳票作業系統所
+      *                        拋轉公司修改為『SC』              *
+      ****************************************************************
+     FMANBPF  IF  E           K        DISK
+     FINTXPF  UF  E           K        DISK
+     FGLAHWF  UF  E           K        DISK                      A
+     FGLAHWFL1UF  E           K        DISK
+     F            WAH0                              KRENAMEWAHL1
+     I*==============================================================
+     I           UDS
+     I                                      101 110 $USER
+     I                                      201 2080$A8YMD
+     I                                      209 2160$C8YMD
+     I*FOR PRINTER
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*傳票日期
+     I            DS
+     I                                        1   80VDATE
+     I                                        1   60VYYMM
+     I                                        7   80VDD
+     I            DS
+     I                                        1   8 ACCT
+     I                                        1   6 ACCT1
+     I                                        7   8 ACCT2
+     I            DS
+     I                                        1   5 WTX12
+     I                                        3   4 WTX121
+     I            DS
+     I                                        1   60WTX02
+     I                                        3   60WTX021
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C*          *LIKE     DEFN TB18      XTB18
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+     C                     PARM           INYYMM  60
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYNB     KLIST
+     C                     KFLD           WTX07   5
+     C           KEYTX     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           INYYMM
+     C                     KFLD           TXCD    2
+     C           KEYWAH    KLIST
+     C                     KFLD           XAH01   2        公司別
+     C                     KFLD           XAH20   1        資料別
+     C                     KFLD           XAH19   1        借貸別
+     C                     KFLD           XAH04   8        會計科目
+     C                     KFLD           XAH05  20        成本中心
+     C                     KFLD           XAH05A  2        欄位代碼
+     C                     KFLD           XAH06  20        對象別
+     C                     KFLD           XAH06A  2        欄位代碼
+     C                     KFLD           XAH07  20        相關號碼1
+     C                     KFLD           XAH07A  2        欄位代碼
+     C                     KFLD           XAH08  20        相關號碼2
+     C                     KFLD           XAH08A  2        欄位代碼
+     C                     KFLD           XAH09   80       日期
+     C                     KFLD           XAH09A  2        欄位代碼
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN100                     PREPARE WAH  10~18
+ 00A+C*有資料才取傳票號碼
+ 00A+C           RECORD    IFEQ 'Y'
+     C                     EXSR RTN200                     PREPARE AH
+ 00A+C                     ENDIF
+ 00A+C*
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN100....PREPARE  AMT
+      *===============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|00A+C                     MOVEL'N'       RECORD  1        設定無資料
+|    C                     Z-ADDINYYMM    VYYMM
+|    C                     Z-ADD25        VDD
+|    C*
+|    C                     MOVEL'C1'      TXCD
+|    C*
+|    C           KEYTX     SETLLTX0
+|    C           KEYTX     READETX0                      40
+| 01-C           *IN40     DOWEQ'0'
+| 02-C           TX19      IFNE 0
+|   C                     EXSR RTN101                     存貨
+|   C                     EXSR RTN102                     進項稅額
+|   C                     EXSR RTN103                     應付帳款
+|   C                     Z-ADD$A8YMD    TX23
+|   C                     Z-ADDINYYMM    TX24
+|   C                     UPDATTX0
+|00A+C                     MOVEL'Y'       RECORD           有資料
+| 02-C                     ENDIF
+|   C*
+|    C           KEYTX     READETX0                      40
+| 01-C                     ENDDO
+|    C*
+|    C                     MOVEL'C2'      TXCD
+|    C*
+|    C           KEYTX     SETLLTX0
+|    C           KEYTX     READETX0                      40
+| 01-C           *IN40     DOWEQ'0'
+| 02-C           TX19      IFNE 0
+|   C                     EXSR RTN101                     存貨
+|   C                     EXSR RTN102                     進項稅額
+|   C                     EXSR RTN103                     應付帳款
+|   C                     Z-ADD$A8YMD    TX23
+|   C                     Z-ADDINYYMM    TX24
+|   C                     UPDATTX0
+|00A+C                     MOVEL'Y'       RECORD           有資料
+| 02-C                     ENDIF
+|   C*
+|    C           KEYTX     READETX0                      40
+| 01-C                     ENDDO
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN101....PREPARE AH   存貨
+      *===============================================================*
+02===C           RTN101    BEGSR
+|    C                     MOVE '1'       XAH19            借貸別
+|    C                     MOVE '1'       XAH20            群組別
+|    C                     Z-ADDTX19      WAMT1  112       借方金額
+|    C                     Z-ADD0         WAMT2  112       貸方金額
+|    C*
+|00B+C                     MOVEL'SC'      XAH01            公司別
+|    C*00B-                MOVEL'SD'      XAH01            公司別
+|    C                     MOVEL*BLANK    XAH04            會計科目
+|    C                     MOVEL'1141'    XAH04            會計科目
+|    C                     MOVEL*BLANK    XAH05            成本中心
+|    C                     MOVEL*BLANK    XAH05A           欄位代碼
+|    C                     MOVEL*BLANK    XAH06            對象別
+|    C                     MOVEL*BLANK    XAH06A           欄位代碼
+|    C                     MOVEL*BLANK    XAH07            相關號碼1
+|    C                     MOVEL*BLANK    XAH07A           欄位代碼
+|    C                     MOVEL*BLANK    XAH08            相關號碼2
+|    C                     MOVEL*BLANK    XAH08A           欄位代碼
+|    C                     Z-ADD0         XAH09            日期
+|    C                     MOVEL*BLANK    XAH09A           欄位代碼
+|    C*
+|    C           KEYWAH    CHAINWAH0                 41
+| 01-C           *IN41     IFEQ '1'
+|   C*                    CLEARWAH0
+|00B+C                     MOVEL'SC'      WAH01            公司別
+|   C*00B-                MOVEL'SD'      WAH01            公司別
+|   C                     MOVEL*BLANK    WAH02            傳票號碼
+|   C                     Z-ADD0         WAH03            傳票項次
+|   C                     MOVEL*BLANK    WAH04            會計科目
+|   C                     MOVEL'1141'    WAH04            會計科目
+|   C                     MOVEL*BLANK    WAH05            成本中心
+|   C                     MOVEL*BLANK    WAH05A           欄位代碼
+|   C                     MOVEL*BLANK    WAH06            對象別
+|   C                     MOVEL*BLANK    WAH06A           欄位代碼
+|   C                     MOVEL*BLANK    WAH07            相關號碼1
+|   C                     MOVEL*BLANK    WAH07A           欄位代碼
+|   C                     MOVEL*BLANK    WAH08            相關號碼2
+|   C                     MOVEL*BLANK    WAH08A           欄位代碼
+|   C                     Z-ADD0         WAH09            日期
+|   C                     MOVEL*BLANK    WAH09A           欄位代碼
+|   C                     Z-ADDVDATE     WAH10            傳票日期
+|   C                     Z-ADDWAMT1     WAH12            借方金額
+|   C                     Z-ADDWAMT2     WAH13            貸方金額
+|   C                     Z-ADD0         WAH14            數量
+|   C                     MOVEL*BLANK    WAH14A           欄位代碼
+|   C                     MOVEL*BLANK    WAH15            其它
+|   C                     MOVEL*BLANK    WAH15A           欄位代碼
+|   C                     MOVEL*BLANK    WAH16            摘要
+|   C                     MOVEL'RV'      WAH17            傳票來源
+|   C                     MOVEL*BLANK    WAH18            過帳註記
+|   C                     MOVELXAH19     WAH19            核准註記
+|   C                     MOVELXAH20     WAH20            作廢註記
+|   C                     Z-ADD0         WAH21            迴轉日期
+|   C                     MOVEL*BLANK    WAH22            資金代碼
+|   C                     Z-ADD0         WAH23            資金金額
+|   C                     MOVEL*BLANK    WAH24            沖帳傳票號
+|   C                     Z-ADD$A8YMD    WAH25            製票日期
+|   C                     MOVEL$USER     WAH26            製票人　
+|   C                     TIME           WAH97            異動時間
+|   C                     Z-ADD$A8YMD    WAH98            異動日期
+|   C                     MOVEL$USER     WAH99            異動者
+|   C                     WRITEWAH0
+| 01*C                     ELSE
+|   C                     ADD  WAMT1     WAH12            借方金額
+|   C                     ADD  WAMT2     WAH13            貸方金額
+|   C                     UPDATWAH0
+| 01-C                     ENDIF
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN102....PREPARE AH   進項稅額
+      *===============================================================*
+03===C           RTN102    BEGSR
+|    C                     MOVE '1'       XAH19            借貸別
+|    C                     MOVE '1'       XAH20            群組別
+|    C                     Z-ADDTX19A     WAMT1            借方金額
+|    C                     Z-ADD0         WAMT2            貸方金額
+|    C*
+|00B+C                     MOVEL'SC'      XAH01            公司別
+|    C*00B-                MOVEL'SD'      XAH01            公司別
+|    C                     MOVEL*BLANK    XAH04            會計科目
+|    C                     MOVEL'115501'  XAH04            會計科目
+|    C                     MOVEL*BLANK    XAH05            成本中心
+|    C                     MOVEL*BLANK    XAH05A           欄位代碼
+|    C                     MOVEL*BLANK    XAH06            對象別
+|    C                     MOVEL*BLANK    XAH06A           欄位代碼
+|    C                     MOVEL*BLANK    XAH07            相關號碼1
+|    C                     MOVEL*BLANK    XAH07A           欄位代碼
+|    C                     MOVEL*BLANK    XAH08            相關號碼2
+|    C                     MOVEL*BLANK    XAH08A           欄位代碼
+|    C                     Z-ADD0         XAH09            日期
+|    C                     MOVEL*BLANK    XAH09A           欄位代碼
+|    C*
+|    C           KEYWAH    CHAINWAH0                 41
+| 01-C           *IN41     IFEQ '1'
+|   C*                    CLEARWAH0
+|00B+C                     MOVEL'SC'      WAH01            公司別
+|   C*00B-                MOVEL'SD'      WAH01            公司別
+|   C                     MOVEL*BLANK    WAH02            傳票號碼
+|   C                     Z-ADD1         WAH03            傳票項次
+|   C                     MOVEL*BLANK    WAH04            會計科目
+|   C                     MOVEL'115501'  WAH04            會計科目
+|   C                     MOVEL*BLANK    WAH05            成本中心
+|   C                     MOVEL*BLANK    WAH05A           欄位代碼
+|   C                     MOVEL*BLANK    WAH06            對象別
+|   C                     MOVEL*BLANK    WAH06A           欄位代碼
+|   C                     MOVEL*BLANK    WAH07            相關號碼1
+|   C                     MOVEL*BLANK    WAH07A           欄位代碼
+|   C                     MOVEL*BLANK    WAH08            相關號碼2
+|   C                     MOVEL*BLANK    WAH08A           欄位代碼
+|   C                     Z-ADD0         WAH09            日期
+|   C                     MOVEL*BLANK    WAH09A           欄位代碼
+|   C                     Z-ADDVDATE     WAH10            傳票日期
+|   C                     Z-ADDWAMT1     WAH12            借方金額
+|   C                     Z-ADDWAMT2     WAH13            貸方金額
+|   C                     Z-ADD0         WAH14            數量
+|   C                     MOVEL*BLANK    WAH14A           欄位代碼
+|   C                     MOVEL*BLANK    WAH15            其它
+|   C                     MOVEL*BLANK    WAH15A           欄位代碼
+|   C                     MOVEL*BLANK    WAH16            摘要
+|   C                     MOVEL'RV'      WAH17            傳票來源
+|   C                     MOVEL*BLANK    WAH18            過帳註記
+|   C                     MOVELXAH19     WAH19            核准註記
+|   C                     MOVELXAH20     WAH20            作廢註記
+|   C                     Z-ADD0         WAH21            迴轉日期
+|   C                     MOVEL*BLANK    WAH22            資金代碼
+|   C                     Z-ADD0         WAH23            資金金額
+|   C                     MOVEL*BLANK    WAH24            沖帳傳票號
+|   C                     Z-ADD$A8YMD    WAH25            製票日期
+|   C                     MOVEL$USER     WAH26            製票人　
+|   C                     TIME           WAH97            異動時間
+|   C                     Z-ADD$A8YMD    WAH98            異動日期
+|   C                     MOVEL$USER     WAH99            異動者
+|   C                     WRITEWAH0
+| 01*C                     ELSE
+|   C                     ADD  WAMT1     WAH12            借方金額
+|   C                     ADD  WAMT2     WAH13            貸方金額
+|   C                     UPDATWAH0
+| 01-C                     ENDIF
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+     C*          RTN103....PREPARE AH   應付帳款
+      *===============================================================*
+04===C           RTN103    BEGSR
+|    C           TX19      ADD  TX19A     WAMT   112
+|    C                     MOVE '2'       XAH19            借貸別
+|    C                     MOVE '1'       XAH20            群組別
+|    C                     Z-ADD0         WAMT1            借方金額
+|    C                     Z-ADDWAMT      WAMT2            貸方金額
+|    C* 摘要
+|    C                     MOVEL*BLANK    YAH16  50
+|    C                     MOVELTX07      WTX07
+|    C           KEYNB     CHAINNB0                  45
+| 01-C           *IN45     IFEQ '0'
+|   C                     MOVELNB03      YAH16
+| 01-C                     ENDIF
+|    C*
+|00B+C                     MOVEL'SC'      XAH01            公司別
+|    C*00B-                MOVEL'SD'      XAH01            公司別
+|    C                     MOVEL*BLANK    XAH04            會計科目
+|    C                     MOVEL'212211'  XAH04            會計科目
+|    C                     MOVEL*BLANK    XAH05            成本中心
+|    C                     MOVEL*BLANK    XAH05A           欄位代碼
+|    C                     MOVELTX07      XAH06            對象別
+|    C                     MOVEL'04'      XAH06A           欄位代碼
+|    C                     MOVEL*BLANK    XAH07            相關號碼1
+|    C                     MOVEL*BLANK    XAH07A           欄位代碼
+|    C                     MOVEL*BLANK    XAH08            相關號碼2
+|    C                     MOVEL*BLANK    XAH08A           欄位代碼
+|    C                     Z-ADD0         XAH09            日期
+|    C                     MOVEL*BLANK    XAH09A           欄位代碼
+|    C*
+|    C           KEYWAH    CHAINWAH0                 41
+| 02-C           *IN41     IFEQ '1'
+|   C*                    CLEARWAH0
+|00B+C                     MOVEL'SC'      WAH01            公司別
+|   C*00B-                MOVEL'SD'      WAH01            公司別
+|   C                     MOVEL*BLANK    WAH02            傳票號碼
+|   C                     Z-ADD1         WAH03            傳票項次
+|   C                     MOVEL*BLANK    WAH04            會計科目
+|   C                     MOVEL'212211'  WAH04            會計科目
+|   C                     MOVEL*BLANK    WAH05            成本中心
+|   C                     MOVEL*BLANK    WAH05A           欄位代碼
+|   C                     MOVELTX07      WAH06            對象別
+|   C                     MOVEL'04'      WAH06A           欄位代碼
+|   C                     MOVEL*BLANK    WAH07            相關號碼1
+|   C                     MOVEL*BLANK    WAH07A           欄位代碼
+|   C                     MOVEL*BLANK    WAH08            相關號碼2
+|   C                     MOVEL*BLANK    WAH08A           欄位代碼
+|   C                     Z-ADD0         WAH09            日期
+|   C                     MOVEL*BLANK    WAH09A           欄位代碼
+|   C                     Z-ADDVDATE     WAH10            傳票日期
+|   C                     Z-ADDWAMT1     WAH12            借方金額
+|   C                     Z-ADDWAMT2     WAH13            貸方金額
+|   C                     Z-ADD0         WAH14            數量
+|   C                     MOVEL*BLANK    WAH14A           欄位代碼
+|   C                     MOVEL*BLANK    WAH15            其它
+|   C                     MOVEL*BLANK    WAH15A           欄位代碼
+|   C                     MOVELYAH16     WAH16            摘要
+|   C                     MOVEL'RV'      WAH17            傳票來源
+|   C                     MOVEL*BLANK    WAH18            過帳註記
+|   C                     MOVELXAH19     WAH19            核准註記
+|   C                     MOVELXAH20     WAH20            作廢註記
+|   C                     Z-ADD0         WAH21            迴轉日期
+|   C                     MOVEL*BLANK    WAH22            資金代碼
+|   C                     Z-ADD0         WAH23            資金金額
+|   C                     MOVEL*BLANK    WAH24            沖帳傳票號
+|   C                     Z-ADD$A8YMD    WAH25            製票日期
+|   C                     MOVEL$USER     WAH26            製票人　
+|   C                     TIME           WAH97            異動時間
+|   C                     Z-ADD$A8YMD    WAH98            異動日期
+|   C                     MOVEL$USER     WAH99            異動者
+|   C                     WRITEWAH0
+| 02*C                     ELSE
+|   C                     ADD  WAMT1     WAH12            借方金額
+|   C                     ADD  WAMT2     WAH13            貸方金額
+|   C                     UPDATWAH0
+| 02-C                     ENDIF
+|    C*
+04===C                     ENDSR
+      *===============================================================*
+     C*          RTN200....PREPARE WAH
+      *===============================================================*
+05===C           RTN200    BEGSR
+|    C*傳票號碼
+|    C                     MOVEL*BLANKS   XAH02   9
+|    C                     CALL 'GLS002'
+|00B+C                     PARM 'SC'      P002I1  2
+|    C*00B-                PARM 'SD'      P002I1  2
+|    C                     PARM VDATE     P002I2  80
+|    C                     PARM 'F'       P002I3  1
+|    C           XAH02     PARM           P002O1  9
+|    C*
+|    C           *LOVAL    SETLLWAHL1
+|    C                     READ WAHL1                    42
+| 01-C           *IN42     DOWEQ'0'
+|   C                     ADD  1         SEQNO   30
+|   C                     MOVELXAH02     WAH02
+|   C                     Z-ADDSEQNO     WAH03
+|   C                     MOVEL*BLANK    WAH19
+|   C                     MOVEL*BLANK    WAH20
+|   C                     UPDATWAHL1
+|   C*
+|   C                     READ WAHL1                    42
+|   C*
+| 01-C                     ENDDO
+|    C*
+05===C                     ENDSR
+      *===============================================================*
+

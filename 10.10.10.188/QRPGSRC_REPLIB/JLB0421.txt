@@ -1,0 +1,234 @@
+     H****************************************************************
+     H*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+     H*                                                              *
+     H*    PROGRAM ID   : JLB042                                     *
+     H*    PROGRAM NAME :完稅傳票批次                              *
+     H*    AUTHOR       : AN MING HSIA                               *
+     H*    CREATE DATE  : 06/05/93                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       : 進銷存收TO總帳                         *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.18 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     F****************************************************************
+     FJLB042D CF  E                    WORKSTN      KINFDS DSPFDS
+     I*CURSOR POSTITON
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I*LOCAL DATA AREA
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      111 1160$CHYMD
+     I                                      119 1240$ADMDY
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      152 161 $USERN
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*確認日期
+M001MI                                      601 6080F01
+M001MI                                      609 6160F02
+M001MI                                      617 6220D05
+M001MI                                      623 6280D06
+      *公司別
+M001MI                                      629 629 D01
+M001MI                                      630 630 D02
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *NAMVAR   DEFN *LDA      LDA
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN14     PARM *IN14     IN14    1
+     C           *IN10     PARM *IN10     IN10    1
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C   10                EXSR R0200                      *INIT MSG.
+     C  N10                EXSR R0100                      *INIT VALUE
+     C*
+     C                     MOVEL*BLANK    @PRT    1        *PRINT
+  01-C           *IN03     DOUEQ'1'
+    C           @PRT      OREQ 'Y'
+    C                     EXSR R1000                      *SCRN
+  01-C                     END
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+     C*==============================================================*
+     C*          R0100 ....SCREEN INIT VALUE SET
+     C*==============================================================*
+01===CSR         R0100     BEGSR
+|    C                     SETON                     10
+|    C* SCREEN INIT VALUE SET *
+|    C                     MOVE *BLANKS   D01
+|    C                     MOVE *BLANKS   D02
+|    C                     Z-ADD*ZEROS    D05
+|    C                     Z-ADD*ZEROS    D06
+M001AC                     Z-ADD0         W6      60
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R0200 ....INITIAL VALUE
+     C*==============================================================*
+02===CSR         R0200     BEGSR
+|    C*
+|    C                     SETON                       99  報表格式MESSAGE
+|    C*
+| 01-C           $EVR      IFEQ 1                          ON-LINE
+|   C                     MOVEL'UPT2142' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+| 01-C                     END
+|    C*
+| 02-C           $EVR      IFEQ 2                          BATCH
+|   C                     MOVEL'UPT2111' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+     C*===============================================================*
+     C*          R1000  ...SCREEN MAIN PROCESS
+     C*===============================================================*
+03===C           R1000     BEGSR
+|    C*
+|    C                     EXFMTDSPD1
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+| 01-C           *IN03     IFEQ '1'
+|   C                     GOTO E1000
+| 01-C                     END
+|    C*
+| 02-C           *IN04     IFEQ '1'                        *WINDOW
+|   C**********************
+|   C*  F4 PROMPT PROCESS *
+|   C**********************
+|   C                     EXSR RTNF4
+|   C                     GOTO E1000
+| 02-C                     END
+|    C*
+|    C                     EXSR R1B00                      .CHECK      ?
+|    C*
+| 03-C           *IN99     IFEQ *ZERO
+|   C           *IN14     ANDEQ'1'
+|   C                     SETON                     28    .執行中
+|   C                     WRITEDSPD1
+|   C                     SETOF                     28
+|   C*
+|   C                     OUT  *NAMVAR
+|   C                     MOVEL'Y'       @PRT
+| 03-C                     END
+|    C*
+03===C           E1000     ENDSR
+     C*===============================================================*
+     C*          R1B00  ...CHECK DATA FROM SCREEN KEY-IN
+     C*===============================================================*
+04===C           R1B00     BEGSR
+|    C*
+|    C*公司別
+| 01-C           D01       IFEQ *BLANKS
+|   C                     MOVEL*LOVAL    D01
+| 01-C                     END
+|    C*
+| 02-C           D02       IFEQ *BLANKS
+|   C                     MOVEL*HIVAL    D02
+| 02-C                     END
+|    C*
+| 03-C           D01       IFGT D02
+|   C                     MOVEL'UPT0042' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     616299
+| 03-C                     END
+|    C   99                GOTO E1B00
+|    C*
+|    C*確認日期
+|    C*
+| 04-C           D05       IFEQ *ZEROS
+|   C                     MOVEL'UPT0012' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6599
+| 04*C                     ELSE
+|   C*
+|   C                     CALL 'P09'
+|   C                     PARM D05       P0901I  60
+|   C                     PARM           P0911O  1
+| 05-C           P0911O    IFEQ 'N'
+|   C                     MOVEL'UPT0040' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6599
+| 05-C                     END
+| 04-C                     END
+|    C   99                GOTO E1B00
+|    C*
+| 06-C           D06       IFEQ *ZEROS
+|   C                     MOVEL'UPT0012' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6699
+| 06*C                     ELSE
+|   C*
+|   C                     CALL 'P09'
+|   C                     PARM D06       P0901I  60
+|   C                     PARM           P0911O  1
+| 07-C           P0911O    IFEQ 'N'
+|   C                     MOVEL'UPT0040' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6699
+| 07-C                     END
+| 06-C                     END
+|    C   99                GOTO E1B00
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     X1      3
+|    C                     PARM D05       X2      60
+|    C           W6        PARM           X3      60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    F01
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     X1      3
+|    C                     PARM D06       X2      60
+|    C           W6        PARM           X3      60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    F02
+|    C*
+| 08-C           F02       IFLT F01
+|   C                     MOVEL'UPT0042' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     656699
+| 08-C                     END
+|    C   99                GOTO E1B00
+|    C*
+04===CSR         E1B00     ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+05===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+|    C*
+| 01-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE39
+|   C           D#COL     ANDLE40
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 01-C                     END
+|    C*
+05===C           ENDF4     ENDSR
+M001AC/COPY HBP2CVTR
+

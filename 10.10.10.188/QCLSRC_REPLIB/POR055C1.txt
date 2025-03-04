@@ -1,0 +1,86 @@
+     /***************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266   */
+     /*                                                             */
+     /*    AUTHOR       : AN MING HSIA                              */
+     /*    CREATE DATE  : 05/12/93                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : POR0551                                   */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :採購子系統                               */
+     /*    REMARK       :供應商到貨完稅狀況表                     */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DPD07S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DPD07E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&YPD04S) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YPD04E) TYPE(*CHAR) LEN(4)
+/*M001M*/    DCL        VAR(&X6S   ) TYPE(*CHAR) LEN(6)
+/*M001M*/    DCL        VAR(&X6E   ) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DPE04S) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DPE04E) TYPE(*CHAR) LEN(9)
+
+             CPYF       FROMFILE(REFLIB/REWF73) TOFILE(QTEMP/REWF73) +
+                          CRTFILE(*YES)
+
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF73))
+             OVRDBF     FILE(REWF73) TOFILE(QTEMP/REWF73) SHARE(*YES)
+
+             CHGVAR     VAR(&DPD07S) VALUE(%SST(*LDA 601 5))
+             CHGVAR     VAR(&DPD07E) VALUE(%SST(*LDA 606 5))
+             CHGVAR     VAR(&YPD04S) VALUE(%SST(*LDA 619 4))
+             CHGVAR     VAR(&YPD04E) VALUE(%SST(*LDA 623 4))
+/*M001A*/    CHGVAR     VAR(&X6S   ) VALUE(%SST(*LDA 651 6))
+/*M001A*/    CHGVAR     VAR(&X6E   ) VALUE(%SST(*LDA 661 6))
+             CHGVAR     VAR(&DPE04S) VALUE(%SST(*LDA 627 9))
+             CHGVAR     VAR(&DPE04E) VALUE(%SST(*LDA 636 9))
+
+             OVRPRTF    FILE(POR055P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('到貨狀況')
+             OVRDBF     FILE(IMINPF) SHARE(*YES)
+             OVRDBF     FILE(POPDPF) SHARE(*YES)
+             OVRDBF     FILE(POPFPF) SHARE(*YES)
+
+             OPNQRYF    FILE((IMINPF)) QRYSLT(' IN04 *EQ %RANGE("' +
+                          *CAT &DPE04S *CAT '" "' *CAT &DPE04E *CAT +
+              /*M001M*/   '")  &  (IN02 *LT ' *CAT &X6S    *CAT ') & +
+                          (IN03A *EQ "T") ') KEYFLD(*FILE) +
+                          MAPFLD((IN03A '%SST(IN03 1 1)' *CHAR 1))
+
+             OPNQRYF    FILE((POPDPF)) QRYSLT(' PD07 *EQ %RANGE("' +
+                          *CAT &DPD07S *CAT '" "' *CAT &DPD07E *CAT +
+              /*M001M*/   '")  & PD04B *EQ %RANGE("' *CAT &X6S    +
+                          *CAT '" "' *CAT &X6E    *CAT '") ') +
+                          KEYFLD(*FILE) MAPFLD((PD04A PD04 *CHAR 8) +
+                          (PD04B '%SST(PD04A 1 6)' *CHAR 6))
+
+             OPNQRYF    FILE((POPFPF)) QRYSLT('PF04B *EQ %RANGE("' +
+              /*M001M*/   *CAT &X6S    *CAT '" "' *CAT &X6E    *CAT +
+                          '") ') MAPFLD((PF04A PF04 *CHAR 8) (PF04B +
+                          '%SST(PF04A 1 6)' *CHAR 6))
+
+             CALL       POR0551
+             CALL       POR0552
+
+             CLOF       OPNID(IMINPF)
+             CLOF       OPNID(POPDPF)
+             CLOF       OPNID(POPFPF)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6601I) VALUE('POR055P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

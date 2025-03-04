@@ -1,0 +1,240 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR0422                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/02/11                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+      * REMARK       :產品客戶報價表                               *
+      *==============================================================*
+      * MODI CODE | AUTHOR |  DATE  | DESCRIPTION
+      *--------------------------------------------------------------
+      *  M001     |MICHELLE|02.01.07| OVERFLOW CONTROL
+      *--------------------------------------------------------------
+      *  M002     |MICHELLE|01.12.31|以生效日當成牌價判斷日
+      *--------------------------------------------------------------
+      ****************************************************************
+     FSOSAPF  UP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#CPF  IF  E           K        DISK
+     FSOR042P O   E             39     PRINTER
+     ISA0
+     I                                              SA01  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 609 DMA01S
+     I                                      610 618 DMA01E
+     I                                      621 621 DMD07S
+     I                                      622 622 DMD07E
+     I                                      623 624 DMD08S
+     I                                      625 626 DMD08E
+     I                                      627 628 DME07S
+     I                                      629 630 DME07E
+     I                                      633 6380CDATE
+     I                                      640 6450DATE
+     I            DS
+     I                                        1   9 SA01
+     I                                        1   4 SA01L
+     I                                        5   9 SA01R
+     I                                        3   4 SA01M
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYMA     KLIST
+     C                     KFLD           SA01
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEY#C     KLIST
+     C                     KFLD           SA02
+     C                     KFLD           SA03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN100
+     C*
+     C   L1 10             EXSR RTN910
+     C                     EXSR RTN200                     *FILE TO SCR
+     C   39                EXSR RTN900
+     C*
+     CLRN10                EXSR RTNLR
+     CLR 10                EXSR RTNEND
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....MOVE DATA TO SCREEN
+     C*==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C* GET通路說明
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVEL'DISTRUBT'#A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVELSA02      #A02
+|    C           KEY#A     CHAIN#A0                  40
+|    C   40                MOVE *BLANKS   PSA02
+|    C  N40                MOVEL#A03      PSA02
+|    C* GET型態說明
+|    C           KEY#C     CHAIN#C0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   PSA03
+| 01*C                     ELSE
+|   C                     MOVEL#C03      PSA03
+|   C                     CALL 'P65'
+|   C                     PARM PSA03     P6501I 80
+|   C                     PARM 16        P6502I  30
+|   C           PSA03     PARM           P6511O 80
+|   C                     PARM           P6512O 80
+| 01-C                     END
+|    C* GET 牌價
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+M001DC*                    PARM $EGMDY    S001I2  80
+M001AC                     PARM $EGMDY    S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+M001DC*                    PARM           S001O1  80
+M001AC                     PARM           S001O1  60
+|    C*
+|    C                     Z-ADD0         PRICE
+M001AC                     MOVE S001O1    HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    YMD8S   80
+M001DC*          S001O1    IFLT MA39
+M002AC           YMD8S     IFLE SA05
+M002AC                     Z-ADDSA05      WYMD8   80
+M002AC                     ELSE
+M002AC                     Z-ADDYMD8S     WYMD8
+M002AC                     END
+      *
+M001AC*M002M     YMD8S     IFLT MA39
+M002MC           WYMD8     IFLT MA39
+|   C                     MOVE MA41      PRICE
+| 02*C                     ELSE
+|   C                     MOVE MA46      PRICE
+| 02-C                     END
+|    C*
+| 03-C           SA04      IFEQ 'N'
+|   C           SA06      MULT 100       SA06N
+|   C           PRICE     MULT SA06      SA06NW 134
+|   C           PRICE     SUB  SA06NW    SA06N$    H
+| 03*C                     ELSE
+| 04-C           SA04      IFEQ 'S'
+|   C           SA06      MULT 100       SA06S
+|   C           PRICE     MULT SA06      SA06SW 134
+|   C           PRICE     SUB  SA06NW    SA06S$    H
+| 04*C                     ELSE
+|   C                     Z-ADD0         SA06S
+|   C                     Z-ADD0         SA06N
+|   C                     Z-ADD0         SA06S$
+|   C                     Z-ADD0         SA06N$
+| 04-C                     END
+| 03-C                     END
+|    C*
+|    C*
+|    C*
+|    C* GET轉換日期
+M001AC                     Z-ADDSA05      DSA05   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SA05      S001I2  80
+M001AC                     PARM DSA05     S001I2  60
+M001DC*          SA05P     PARM           S001O1  80
+M001AC           SA05P     PARM           S001O1  60
+|    C* GET轉換日期
+M001AC                     Z-ADDSA13      DSA13   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SA13      S001I2  80
+M001AC                     PARM DSA13     S001I2  60
+M001DC*          SA13P     PARM           S001O1  80
+M001AC           SA13P     PARM           S001O1  60
+|    C*
+|    C                     WRITEPD1
+|    C                     MOVEL'P'       SA14
+|    C                     UPDATSA0
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     EXSR RTN100
+     C                     WRITEPH2
+M003DC*                    SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN910....  PRINT HEAD
+      *==============================================================*
+04===C           RTN910    BEGSR
+|    C*
+| 01-C           SA01R     IFEQ *BLANK
+     C                     Z-ADD0         MA41
+     C                     Z-ADD0         MA46
+     C                     Z-ADD0         PRICE
+     C                     Z-ADD0         SA06N$
+     C                     Z-ADD0         SA06S$
+|   C                     MOVEL'BRAND   '#A01
+|   C                     MOVELSA01M     #A02
+|   C           KEY#A     CHAIN#A0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   MA03
+| 02*C                     ELSE
+|   C                     MOVEL#A03      MA03
+| 02-C                     END
+| 01*C                     ELSE
+|   C           KEYMA     CHAINMA0                  40
+     C           *IN40     IFEQ '1'
+     C                     Z-ADD0         MA41
+     C                     Z-ADD0         MA46
+     C                     Z-ADD0         PRICE
+     C                     Z-ADD0         SA06N$
+     C                     Z-ADD0         SA06S$
+|   C                     MOVE *BLANK    MA03
+| 01-C                     END
+| 01-C                     END
+|    C*
+     C                     WRITEPH2
+|    C*M001M               SETOF                     3938
+M001MC                     SETOF                     38
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+05===C           RTNLR     BEGSR
+|    C*
+|    C                     WRITEPH1
+|    C                     WRITEPE9
+|    C                     WRITEPE2
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNEND....(DATA)
+      *==============================================================*
+05===C           RTNEND    BEGSR
+|    C*
+|    C                     WRITEPE2
+|    C*
+05===C                     ENDSR
+     C/COPY HBP2CVTR
+

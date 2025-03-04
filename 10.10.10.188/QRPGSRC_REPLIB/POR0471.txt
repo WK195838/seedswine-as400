@@ -1,0 +1,174 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : POR0471                                       *
+      * AUTHER       : A1118 PHILIP TSAI                             *
+      * CREATE DATE  : 81/01/17                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :採購資料子系統                               *
+      * REMARK       :國外採購到貨明細表                           *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.12.16 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FPOPDPF  IP  E           K        DISK
+     FPOPEPF  IF  E           K        DISK
+     FPOPCPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMBLF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+B2CHKFPOR047P O   E             39     PRINTER
+B2INF *CVR3009 sev.30 PRINTER file POR047P must be converted, because
+B2INF *   field PD04 is shared by name with other database fields which
+B2INF *   require to be expanded. Please convert POR047P, enlarging PD04
+B2INF *   prior to compilation, or manually insert in this source the
+B2INF *   proper RENAME and MOVE statements to avoid name-sharing.
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 602 DPD01S
+     I                                      603 604 DPD01E
+     I                                      605 616 DPD02S
+     I                                      617 628 DPD02E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYPC     KLIST
+     C                     KFLD           PE03
+     C                     KFLD           PE04
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     SETON                     10
+     C*表頭列印
+     C                     EXSR RTN100
+     C*明細列印
+     C                     EXSR RTN200
+     C*
+     CLRN10                WRITEPH1
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*程式第一次表頭列印，不印合計行
+| 01-C           FSTHDG    IFEQ 0
+|   C                     Z-ADD1         FSTHDG  10
+| 01*C                     ELSE
+|   C                     WRITEPE2
+| 01-C                     END
+|    C*
+M001AC                     Z-ADDPD04      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM PD04      S001I2  80
+M001MC                     PARM W6        S001I2  60
+B2MODC*M001M     PD04      PARM           S001O1  80
+M001MC           LPD04     PARM           S001O1  60
+|    C**
+|    C*供應商名稱
+|    C           PD07      CHAINMB0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MB02
+| 02-C                     END
+|    C*幣別
+|    C                     MOVE *BLANK    #A01
+|    C                     MOVE *BLANK    #A02
+|    C                     MOVE 'CURRENCY'#A01
+|    C                     MOVELPD08      #A02
+|    C           KEY#A     CHAINPA#APF               40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #A03
+| 03-C                     END
+|    C*運費
+|    C           PD11      MULT PD09      DFRI      H
+|    C*
+|    C                     Z-ADD1         PPGE
+|    C                     SETOF                     10
+|    C                     EXSR RTN900
+|    C                     SETON                     10
+|    C*清除合計欄位
+|    C                     Z-ADD0         PE07T
+|    C                     Z-ADD0         PE08T
+|    C                     Z-ADD0         PE09T
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....GET DETAIL
+     C*==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C           PD02      SETLLPE0
+|    C           PD02      READEPE0                      41
+|    C*
+| 01-C           *IN41     DOWEQ'0'
+|   C           KEYPC     CHAINPC0                  40
+|   C*
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    PC09
+| 02-C                     END
+|   C*翻頁控制
+| 03-C           *IN39     IFEQ '1'
+|   C                     ADD  1         PPGE
+|   C                     EXSR RTN900
+| 03-C                     END
+|   C*
+|   C*庫存單位
+|   C           PC03      CHAINMA0                  42
+|   C*
+|   C   42                MOVE *BLANK    MA13
+|   C*
+|   C*採購數量
+|   C           PC10      MULT PE06      AMT1
+|   C*
+|   C*單位 FOB
+| 04-C           AMT1      IFNE 0
+|   C           PE07      DIV  AMT1      UPE07     H
+|   C*單位 FHI
+|   C           PE08      ADD  PE09      PE089   80
+|   C           PE089     DIV  AMT1      UPE089    H
+| 04*C                     ELSE
+|   C                     Z-ADD0         UPE089
+|   C                     Z-ADD0         UPE07
+| 04-C                     END
+|   C*明細列印
+|   C                     WRITEPD1
+|   C*計算合計
+|   C                     ADD  PE07      PE07T
+|   C                     ADD  PE08      PE08T
+|   C                     ADD  PE09      PE09T
+|   C           PD02      READEPE0                      41
+| 01-C                     END
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*每一驗收單第一次表頭列印，不印續頁行
+| 01-C           *IN10     IFEQ '1'
+|   C                     WRITEPE1
+| 01-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+04===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+04===C                     ENDSR
+

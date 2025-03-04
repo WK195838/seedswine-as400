@@ -1,0 +1,192 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     H*                                                              *
+     H*    PROGRAM-ID   : KIS0172                                    *
+     H*    PROGRAM NAME :物流點庫存報表　                          *
+     H*    AUTHOR       : A1491 EASON                                *
+     H*    CREATE DATE  : 2009/06/17                                 *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :                                            *
+     H****************************************************************
+     FIMIAPF  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FW1AALF01IF  E           K        DISK
+     FMTMHPF  IF  E           K        DISK
+     F            MA0                               KRENAMEMH0
+     FREW503  UF  E           K        DISK                      A
+     E*---------------------------------------------------------------
+     E*---------------------------------------------------------------
+     I*
+     I*DATA AREA
+     IPTDA01      DS
+     I                                        1   1 DFMT
+     I                                        2   2 DTYPE
+     I*
+     I           UDS
+     I                                      211 2160DDATE
+     I                                      125 1270$CPY
+     I                                      201 2080$EG8
+     I                                      217 218 $PRTCD
+     I                                      219 219 $PENV
+     I                                      500 500 $DATA
+     I*
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *NAMVAR   DEFN           PTDA01
+      *
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYAA     KLIST
+     C                     KFLD           WF01
+     C                     KFLD           $EG8
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C  N10                EXSR RTN010
+     C                     EXSR RTN100
+     C*==============================================================*
+     C*          RTN010... INITIAL PROCESS
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     IN   PTDA01
+|    C*
+|    C                     SETON                     10
+|    C                     SETON                     39
+|    C*                    MOVEL'Y'       $DATA
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100... WRITE REW503
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|     *
+|    C                     CLEARWF0
+|     *
+|    C           IA03      CHAINWF0                  40
+| 01-C           *IN40     IFEQ '1'
+|    *茂世單位成本計算方式
+|    *{(FOB+FHI)/(保稅量+完稅量)}+DUTY/完稅量)
+|   C           IA03      CHAINMA0                  41
+     C           *IN41     IFEQ '1'
+     C                     GOTO ETN100
+     C                     ENDIF
+| 02-C           MA07      IFEQ 'R'
+|   C                     MOVELMA01      WF01
+|   C                     MOVELMA03      WF02
+|    *
+|   C           KEYAA     SETGTAA0
+|   C           WF01      REDPEAA0                      46
+| 03-C           *IN46     IFEQ '0'
+|   C                     Z-ADDAA04      WF03A
+| 03*C                     ELSE
+|   C                     Z-ADD0         WF03A
+| 03-C                     ENDIF
+|    *
+|   C                     Z-ADD0         X1     122       FOB+FHI
+|   C                     Z-ADD0         X2      70       庫存量
+|   C                     Z-ADD0         X3      92       暫存
+|    *
+|   C           MA26      ADD  MA27      X1        H
+|   C           MA29      ADD  MA30      X2
+| 04-C           X2        IFNE 0
+|   C           X1        DIV  X2        WF03      H
+| 05-C           MA30      IFNE 0
+|   C           MA28      DIV  MA30      X3        H
+| 05*C                     ELSE
+|   C                     Z-ADD0         X3
+| 05-C                     ENDIF
+|   C                     ADD  X3        WF03
+|    *
+| 04*C                     ELSE
+|   C                     Z-ADD0         WF03
+| 06-C           MA30      IFNE 0
+|   C           MA28      DIV  MA30      X3        H
+| 06*C                     ELSE
+|   C                     Z-ADD0         X3
+| 06-C                     ENDIF
+|   C                     ADD  X3        WF03
+| 04-C                     ENDIF
+|    *
+|   C*                    EXSR RTN200
+|    *
+| 02*C                     ELSE
+|   C           IA03      CHAINMH0                  41
+|   C                     MOVELMA01      WF01
+|   C                     MOVELMA03      WF02
+|   C                     Z-ADDMA34      WF03
+|    *
+|   C           KEYAA     SETGTAA0
+|   C           WF01      REDPEAA0                      46
+| 07-C           *IN46     IFEQ '0'
+|   C                     Z-ADDAA04      WF03A
+| 07*C                     ELSE
+|   C                     Z-ADD0         WF03A
+| 07-C                     ENDIF
+| 02-C                     ENDIF
+|    *
+|   C                     EXSR RTN200
+|   C                     WRITEWF0
+| 01*C                     ELSE
+|    *
+|   C                     EXSR RTN200
+|    *
+|   C                     UPDATWF0
+| 01-C                     ENDIF
+      *
+|     *
+02===C           ETN100    ENDSR
+     C*==============================================================*
+     C*          RTN200... WRITE REW503
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|     *
+| 01-C                     SELEC
+|   C           IA02      WHEQ 'B0000'
+|   C                     ADD  IA06      B0000
+|   C           IA02      WHEQ 'B0003'
+|   C                     ADD  IA06      B0003
+|   C           IA02      WHEQ 'B0006'
+|   C                     ADD  IA06      B0006
+|   C           IA02      WHEQ 'B0007'
+|   C                     ADD  IA06      B0007
+|   C           IA02      WHEQ 'B0011'
+|   C                     ADD  IA06      B0011
+|   C           IA02      WHEQ 'B0013'
+|   C                     ADD  IA06      B0013
+|   C           IA02      WHEQ 'B0014'
+|   C                     ADD  IA06      B0014
+|   C           IA02      WHEQ 'B0015'
+|   C                     ADD  IA06      B0015
+|   C           IA02      WHEQ 'B0017'
+|   C                     ADD  IA06      B0017
+|   C           IA02      WHEQ 'B0018'
+|   C                     ADD  IA06      B0018
+|   C           IA02      WHEQ 'B0019'
+|   C                     ADD  IA06      B0019
+|   C           IA02      WHEQ 'B0022'
+|   C                     ADD  IA06      B0022
+|   C           IA02      WHEQ 'B0026'
+|   C                     ADD  IA06      B0026
+|   C           IA02      WHEQ 'B0030'
+|   C                     ADD  IA06      B0030
+|   C           IA02      WHEQ 'B0031'
+|   C                     ADD  IA06      B0031
+|   C           IA02      WHEQ 'B0032'
+|   C                     ADD  IA06      B0032
+|   C           IA02      WHEQ 'B0033'
+|   C                     ADD  IA06      B0033
+|   C           IA02      WHEQ 'B0099'
+|   C                     ADD  IA06      B0099
+|   C           IA02      WHEQ 'B1001'
+|   C                     ADD  IA06      B1001
+|   C           IA02      WHEQ 'W0005'
+|   C                     ADD  IA06      W0005
+|   C           IA02      WHEQ 'W9999'
+|   C                     ADD  IA06      W9999
+| 01-C                     ENDSL
+|     *
+03===C                     ENDSR
+

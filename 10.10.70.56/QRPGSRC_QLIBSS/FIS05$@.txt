@@ -1,0 +1,214 @@
+     H****************************************************************
+     H*    PROGRAM NAME : FIS05$                                     *
+     H*    AUTHOR       : A1043 JACKIE                               *
+     H*    CREATE DATE  : 78/11/01                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :財務系統                                  *
+     H*    SUBSYSTEM    :人事薪資系統                              *
+     H*    PROCEDURE    :                                            *
+     H*    PURPOSE      :部門代號建檔                              *
+     H*    INDICATORS   :                                            *
+     H*         50-53   : SUBFILE                                    *
+     H*                   50 --- SFLDSP                              *
+     H*                   51 --- SFLDSPCTL                           *
+     H*                   52 --- SFLCLR                              *
+     H*                   53 --- SFLEND ('+')                        *
+     H*         96-98   : MESSAGE                                    *
+     H*                   96 --- NO DATA                             *
+     H*                   97 --- LAST PAGE                           *
+     H*                   98 --- FIRST PAGE                          *
+     H*    REMAEKS      : 1. ROLL UP / ROLL DOWN CTL BY PGM          *
+     H*                   2. SFLSIZE = SFLPAGE, SFLEND CTL BY PGM    *
+     H*                   3. WHEN FIRST PAGE / LAST PAGE , CAN'T ROLL*
+     H*                   4. WHEN FIRST PAGE , PRESS ROLL DOWN       *
+     H*                      --- EXECUTE READ NEXT , DON'T SETOF 98  *
+     H****************************************************************
+     FNMPF    IF  E           K        DISK
+     FCMPF    IF  E           K        DISK
+     FFIS05D$ CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I            DS
+     I                                        1  15 WNM02T
+     I                                        1   1 WNM21T
+     I                                        2   6 WNM22T
+     I            DS
+     I                                        1  15 WNM02B
+     I                                        1   1 WNM21B
+     I                                        2   6 WNM22B
+     I            DS
+     I                                        1  15 NM02
+     I                                        1   1 DNM021
+     I                                        2   6 DNM022
+     I            DS
+     I                                        1  42 NM03
+     I                                        1  14 DNM03
+     I           UDS
+     I                                      111 1160DDATE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           S05I1   1
+     C                     PARM           S05I2   5
+     C           *IN03     PARM *IN03     S05O1   1
+     C*==============================================================*
+     C*                    KEY LIST FOR NMPF
+     C*==============================================================*
+     C           KEYNMT    KLIST                           *NMPF TOP
+     C                     KFLD           WNM01T  2
+     C                     KFLD           WNM02T 15
+     C*
+     C           KEYNMB    KLIST                           *NMPF BOTTOM
+     C                     KFLD           WNM01B  2
+     C                     KFLD           WNM02B 15
+     C*==============================================================*
+     C*          MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C           KEYNMB    SETLLNMPF                       *1 SETLL
+     C                     EXSR RTN100                     *1 READ NEXT
+     C*
+     C           *IN12     DOWEQ'0'
+     C           *IN03     IFEQ '0'
+     C*
+     C           *IN25     IFEQ '1'                        *ROLLUP
+     C           *IN97     ANDEQ'0'                        *LAST PAGE
+     C           KEYNMB    SETGTNMPF                       *AFTER 1 SETLL
+     C                     EXSR RTN100                     *READ NEXT
+     C                     END
+     C*
+     C           *IN26     IFEQ '1'                        *ROLLDOWN
+     C           *IN98     ANDEQ'0'                        *FIRST PAGE
+     C           KEYNMT    SETLLNMPF
+     C                     EXSR RTN200                     *READ PREV
+     C                     END
+     C*
+     C                     EXSR RTN300                     *EXFMT
+     C*
+     C                     ELSE
+     C                     SETON                     12
+     C                     END
+     C*
+     C                     END
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL
+     C*==============================================================*
+     CSR         RTN010    BEGSR
+     C*INITIAL VALUES
+     C                     Z-ADD*ZEROS    RRN
+     C*SET KEYNM TOP VALUES
+     C                     MOVE '01'      WNM01T
+     C                     MOVE *BLANK    WNM21T
+     C                     MOVE *BLANK    WNM22T
+     C*SET KEYNM BOTTOM VALUES
+     C                     MOVE '01'      WNM01B
+     C                     MOVE S05I1     WNM21B
+     C                     MOVE S05I2     WNM22B
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....READ NEXT
+     C*==============================================================*
+     CSR         RTN100    BEGSR
+     C                     Z-ADD*ZEROS    RRN
+     C   25                SETOF                     9896
+     C*
+     C           WNM01T    READENMPF                     44*READ EQ DIV
+     C                     EXSR RTN810                     *GET KEY TOP
+     C*
+     C           RRN       DOWLT28                         *SFL FULL
+     C*
+     C           *IN44     IFEQ '0'                        *EOF
+     C           DNM021    ANDEQS05I1                      *COMP CO.
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C                     MOVE DNM021    WNM21B           *KEY BOTTOM
+     C                     MOVE DNM022    WNM22B
+     C                     ELSE
+     C                     SETON                     5397  *LAST PAGE
+     C                     GOTO END100
+     C                     END
+     C*
+     C           WNM01T    READENMPF                     44*READ EQ DIV
+     C*
+     C                     END
+     C           END100    ENDSR
+     C*==============================================================*
+     C*          RTN200....READ PREVIOUS
+     C*==============================================================*
+     CSR         RTN200    BEGSR
+     C                     Z-ADD29        RRN
+     C                     SETOF                     979798
+     C*
+     C                     READPNMPF                     44*READ EQ DIV
+     C                     EXSR RTN820                     *GET KEY BOTTOM
+     C*
+     C           RRN       DOWGT1                          *SFL FULL
+     C*
+     C           *IN44     IFEQ '1'                        *READP EOF
+     C           WNM21T    ORNE DNM021
+     C                     SETON                     98    *FIRST PAGE
+     C                     MOVE S05I1     WNM21B
+     C                     MOVE *BLANKS   WNM22B
+     C           KEYNMB    SETLLNMPF
+     C                     EXSR RTN100                     *READ NEXT
+     C                     GOTO END200
+     C                     END
+     C*
+     C                     SETOF                     53    *DSP '+'
+     C                     SUB  1         RRN
+     C                     MOVE DNM021    WNM21T           *KEY TOP
+     C                     MOVE DNM022    WNM22T
+     C*
+     C                     WRITESFLSR
+     C*
+     C                     READPNMPF                     44*READ EQ DIV
+     C*
+     C                     END
+     C           END200    ENDSR
+     C*==============================================================*
+     C*          RTN300....EXFMT SFL
+     C*==============================================================*
+     CSR         RTN300    BEGSR
+     C           RRN       IFGT *ZEROS
+     C                     SETON                     50    *SFLDSP
+     C                     ELSE
+     C           S05I2     IFEQ WNM22B
+     C                     SETON                     96
+     C                     END
+     C* N97                SETON                     96    *NO DATA
+     C                     END
+     C*
+     C                     SETON                     51    *SFLDSPCTL
+     C           S05I1     CHAINCMPF                 40
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR
+     C*
+     C                     SETOF                     5051
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN810....READ NEXT CLEAR & INIT
+     C*==============================================================*
+     CSR         RTN810    BEGSR
+     C*SFL CLEAR
+     C                     SETON                     52
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C*
+     C                     MOVE DNM021    WNM21T           *KEY TOP
+     C                     MOVE DNM022    WNM22T
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN820....READ PREV CLEAR & INIT
+     C*==============================================================*
+     CSR         RTN820    BEGSR
+     C*SFL CLEAR
+     C                     SETON                     52
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C*
+     C                     MOVE DNM021    WNM21B           *KEY BOTTOM
+     C                     MOVE DNM022    WNM22B
+     C                     ENDSR
+

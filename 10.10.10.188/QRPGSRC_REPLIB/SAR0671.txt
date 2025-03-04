@@ -1,0 +1,264 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266
+      *
+      * PROGRAM NAME : SAR0671
+      * AUTHER       : AN MING HSIA
+      * CREATE DATE  : 09/06/93
+      * UPDATE DATE  :
+      * SYSTEM       :人頭馬匯東
+      * SUBSYSTEM    :訂單系統
+      * REMARK       :試飲分析彙總表
+     A*==============================================================*
+     A* CODE | AUTHOR |  DATE  | DESCRIPTION
+     A*--------------------------------------------------------------
+     A* M001 |MICHELLE|03.02.10| ADD COLUMN: COSTCODE
+     A*--------------------------------------------------------------
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FSOSNPF  IF  E           K        DISK
+     FSOSOPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+M001AFPA#PPF  IF  E           K        DISK
+M001DF*MTMEPF  IF  E           K        DISK
+     FREWF84  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 6060DSC07S
+     I                                      607 6120DSC07E
+     I                                      620 620 DSEL
+     I                                      681 682 DSC01S
+     I                                      683 684 DSC01E
+     I                                      701 7060DSC39S
+     I                                      707 7120DSC39E
+     I                                      713 7180DATES
+     I                                      719 7240DATEE
+     I                                      731 739 DSD03S
+     I                                      741 749 DSD03E
+     I                                      750 750 IN20
+     I            DS
+     I                                        1   9 WF8406
+     I                                        3   4 W8401
+     I                                        1   6 W8403
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF8410    WORK10
+     C           *LIKE     DEFN WF8411    WORK11
+     C           *LIKE     DEFN WF8412    WORK12
+     C           *LIKE     DEFN WF8413    WORK13
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF8401
+     C                     KFLD           WF8403
+     C                     KFLD           WF8404
+     C                     KFLD           WF8406
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*銷售
+     C                     READ SC0                      45
+  01-C           *IN45     DOWEQ'0'
+    C                     MOVE SC10      WF8404
+M001AC           SC10      CHAIN#P0                  48
+|    C           *IN48     IFEQ '0'
+|    C                     MOVEL#P02      WF8414
+|    C                     ELSE
+|    C                     MOVEL*BLANKS   WF8414
+M001AC                     END
+  02-C*M001D     SC10      IFEQ '05'
+  03-C*M001D     SC04      IFEQ 'Y0005'
+    C*M001D               MOVE '98'      WF8404
+  03-C*M001D               END
+  04-C*M001D     SC04      IFEQ 'Y0006'
+    C*M001D               MOVE '99'      WF8404
+  04-C*M001D               END
+  02-C*M001D               END
+    C           SC02      SETLLSD0
+    C           SC02      READESD0                      46
+  05-C           *IN46     DOWEQ'0'
+    C*
+  06-C           SD03      IFGE DSD03S
+    C           SD03      ANDLEDSD03E
+    C*
+    C                     EXSR RTN100
+  06-C                     END
+    C*
+    C           SC02      READESD0                      46
+  05-C                     END
+    C*
+    C                     READ SC0                      45
+  01-C                     END
+     C*
+     C*退回
+     C                     READ SN0                      45
+  01-C           *IN45     DOWEQ'0'
+    C*M001M               MOVE '50'      WF8404
+M001AC                     MOVELSN16      WF8404
+|    C           SN16      CHAIN#P0                  48
+|    C           *IN48     IFEQ '0'
+|    C                     MOVEL#P02      WF8414
+|    C                     ELSE
+|    C                     MOVEL*BLANKS   WF8414
+M001AC                     END
+    C           SN02      SETLLSO0
+    C           SN02      READESO0                      46
+  05-C           *IN46     DOWEQ'0'
+    C*
+  06-C           SO03      IFGE DSD03S
+    C           SO03      ANDLEDSD03E
+    C*
+    C                     EXSR RTN200
+  06-C                     END
+    C*
+    C           SN02      READESO0                      46
+  05-C                     END
+    C*
+    C                     READ SN0                      45
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....WRITE OR UPDATE REWF84
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C                     MOVE SD03      WF8406
+|    C                     MOVE W8403     WF8403
+|    C                     MOVE W8401     WF8401
+|    C*品牌不是RM則產品前六碼帶入品牌
+| 07-C           WF8401    IFNE 'RM'
+|   C                     MOVE *BLANK    WF8403
+|   C                     MOVELW8401     WF8403
+| 07-C                     END
+|    C*
+|    C           SD10      ADD  SD11      WORK10
+|    C                     ADD  SD12      WORK10
+|    C           SD04      MULT WORK10    WORK10
+|    C           SD04      MULT SD22      WORK11
+|    C           SD04      MULT SD23      WORK12
+|    C           SD04      MULT SD24      WORK13
+|    C*
+|    C           KEYWF     CHAINWF840                40
+| 08-C           *IN40     IFEQ '0'
+|   C                     ADD  SD04      WF8408
+|   C                     ADD  WORK10    WF8410
+|   C                     ADD  WORK11    WF8411
+|   C                     ADD  WORK12    WF8412
+|   C                     ADD  WORK13    WF8413
+|   C*
+|   C                     UPDATWF840
+| 08*C                     ELSE
+|   C                     Z-ADDSD04      WF8408
+|   C                     Z-ADDWORK10    WF8410
+|   C                     Z-ADDWORK11    WF8411
+|   C                     Z-ADDWORK12    WF8412
+|   C                     Z-ADDWORK13    WF8413
+|   C*品牌說明
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'BRAND   '#A01
+|   C                     MOVELWF8401    #A02
+|   C           KEY#A     CHAIN#A0                  47
+| 09-C           *IN47     IFEQ '0'
+|   C                     MOVEL#A03      WF8402
+| 09-C                     END
+|   C*原因說明
+| 10-C*M001D     WF8404    IFEQ '98'
+|   C*M001D     WF8404    OREQ '99'
+|   C*M001D     SC04      CHAINME0                  47
+|   C*M001D N47                MOVELME04      WF8405
+| 10*C*M001D               ELSE
+M001AC                     MOVEL*BLANK    WF8405
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'STOCK   '#A01
+|   C                     MOVELWF8404    #A02
+|   C           KEY#A     CHAIN#A0                  47
+| 11-C           *IN47     IFEQ '0'
+|   C                     MOVEL#A03      WF8405
+| 11-C                     END
+| 10-C*M001D               END
+|   C*
+|   C                     WRITEWF840
+| 08-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE OR UPDATE REWF84
+      *==============================================================*
+01===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE SO03      WF8406
+|    C                     MOVE W8403     WF8403
+|    C                     MOVE W8401     WF8401
+|    C*品牌不是RM則產品前六碼帶入品牌
+| 07-C           WF8401    IFNE 'RM'
+|   C                     MOVE *BLANK    WF8403
+|   C                     MOVELW8401     WF8403
+| 07-C                     END
+|    C*
+|    C           -1        MULT SO13      WORK11
+|    C           -1        MULT SO14      WORK12
+|    C           -1        MULT SO15      WORK13
+     C           -1        MULT SO05      SO05
+|    C*
+|    C           KEYWF     CHAINWF840                40
+| 08-C           *IN40     IFEQ '0'
+|   C                     ADD  SO05      WF8408
+|   C                     ADD  WORK11    WF8411
+|   C                     ADD  WORK12    WF8412
+|   C                     ADD  WORK13    WF8413
+|   C*
+|   C                     UPDATWF840
+| 08*C                     ELSE
+|   C                     Z-ADDSO05      WF8408
+|   C                     Z-ADDWORK11    WF8411
+|   C                     Z-ADDWORK12    WF8412
+|   C                     Z-ADDWORK13    WF8413
+|   C*品牌說明
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'BRAND   '#A01
+|   C                     MOVELWF8401    #A02
+|   C           KEY#A     CHAIN#A0                  47
+| 09-C           *IN47     IFEQ '0'
+|   C                     MOVEL#A03      WF8402
+| 09-C                     END
+|   C*原因說明
+     C                     MOVE *BLANK    WF8405
+| 10-C*M001D     WF8404    IFEQ '98'
+|   C*M001D     WF8404    OREQ '99'
+     C*M001D     WF8404    OREQ '50'
+     C*M001D     WF8404    IFEQ '50'
+     C*M001D               MOVEL'收回'  WF8405
+     C*M001D               ELSE
+|   C*M001D     SC04      CHAINME0                  47
+|   C*M001D N47                MOVELME04      WF8405
+     C*M001D               END
+| 10*C*M001D               ELSE
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'STOCK   '#A01
+|   C                     MOVELWF8404    #A02
+|   C           KEY#A     CHAIN#A0                  47
+| 11-C           *IN47     IFEQ '0'
+|   C                     MOVEL#A03      WF8405
+| 11-C                     END
+| 10-C*M001D               END
+|   C*
+|   C                     WRITEWF840
+| 08-C                     END
+|    C*
+01===C                     ENDSR
+

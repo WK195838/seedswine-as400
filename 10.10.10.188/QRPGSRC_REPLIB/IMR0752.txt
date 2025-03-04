@@ -1,0 +1,179 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : IMR0752                                       *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 07/23/93                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :收貨未確認明細表                             *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.04  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FREWF79  IP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#2PF  IF  E           K        DISK
+     FIMR075P O   E             39     PRINTER
+     E*
+     IWF790
+     I                                              WF7901L2
+     I                                              WF7903L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 605 DSN04S
+     I                                      606 610 DSN04E
+     I                                      611 6160DSN05S
+     I                                      617 6220DSN05E
+M001MI*                                     623 6280YSN05S
+M001MI*                                     629 6340YSN05E
+M001MI                                      623 6300YSN05S
+M001MI                                      631 6380YSN05E
+     I*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEY#2     KLIST
+     C                     KFLD           #201
+     C                     KFLD           #202
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+     C                     ELSE
+     C   39                EXSR RTN900
+     C           *INL2     IFEQ '1'
+     C                     WRITEPE1
+     C                     EXSR RTN010
+     C                     END
+  01-C                     END
+     C*
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                SETOF                     30
+     CL2 10                EXSR RTN200
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*收貨物流點
+|    C                     MOVEL'STORAGE '#A01
+|    C                     MOVELWF7901    #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    WF791A
+| 02*C                     ELSE
+|   C                     MOVEL#A03      WF791A
+| 02-C                     END
+|    C                     WRITEPH1
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*出貨物流點
+|    C                     MOVEL'STORAGE '#A01
+|    C                     MOVELWF7905    #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 01-C           *IN41     IFEQ '1'
+|   C           WF7905    CHAINME0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    WF795A
+| 02*C                     ELSE
+|   C                     MOVELME03      WF795A
+| 02-C                     END
+|   C*
+| 01*C                     ELSE
+|   C                     MOVEL#A03      WF795A
+| 01-C                     END
+|    C*
+|    C*產品簡稱
+|    C           WF7906    CHAINMA0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   MA03
+| 03-C                     END
+|    C*
+|    C*單別說明
+|    C                     MOVELWF7904    #201
+|    C                     MOVELWF7904    #202
+|    C           KEY#2     CHAIN#20                  40
+| 04-C           *IN40     IFEQ '0'
+|   C                     MOVEL#203      #203A
+| 04*C                     ELSE
+|   C                     MOVEL*BLANKS   #203A
+| 04-C                     END
+|    C*打單日期
+M001AC                     Z-ADDWF7902    W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM WF7902    S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           Y7902     PARM           S001O1  60
+|    C*
+|    C                     ADD  WF7907    T07907
+|    C                     ADD  WF7908    T07908
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     SETOF                     21
+|    C                     SETON                     30
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C                     SETOF                     30
+|    C                     SETON                     21
+|    C                     ADD  T07907    T17907  50
+|    C                     ADD  T07908    T17908  50
+|    C                     Z-ADD0         T07907
+|    C                     Z-ADD0         T07908
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETOF                     30
+|    C                     SETOF                     21
+      *
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+04===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+|    C                     WRITEPH1
+|    C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+04===C                     ENDSR
+

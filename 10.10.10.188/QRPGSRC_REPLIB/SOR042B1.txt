@@ -1,0 +1,190 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR042B1                                     *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/02/11                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+      * REMARK       :產品客戶報價表                               *
+      ****************************************************************
+     FSOSBPF  IP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+B2CHKFSOR042BPO   E             39     PRINTER
+B2INF *CVR3010 sev.30 PRINTER file SOR042BP must be converted, because
+B2INF *   file SB05 (and more) are shared by name with other database
+B2INF *   fields which require to be expanded. Please convert SOR042BP,
+B2INF *   enlarging all involved fields prior to compilation, or manually
+B2INF *   insert in this source the proper RENAME and MOVE statements to
+B2INF *   avoid name sharing
+     ISB0
+     I                                              SB02  L1
+     I                                              SB01  L2
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*
+     I                                      607 607 DSB01S
+     I                                      641 641 DSB01E
+     I*
+     I                                      608 609 DMD08S
+     I                                      642 643 DMD08E
+     I*
+     I                                      607 609 DMD78S
+     I                                      641 643 DMD78E
+     I*
+     I                                      621 629 DSB02S
+     I                                      631 639 DSB02E
+     I                                      644 645 DME07S
+     I                                      646 647 DME07E
+     I                                      601 6060DDATE
+     I                                      611 6160YDATE
+     I                                      650 653 DMC03S
+     I                                      654 657 DMC03E
+     I                                      658 663 DME15S
+     I                                      664 669 DME15E
+     I            DS
+     I                                        1   9 SB02
+     I                                        3   4 SB02A
+     I            DS
+     I                                        1   3 MD78
+     I                                        1   1 MD07
+     I                                        2   3 MD08
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYME     KLIST
+     C                     KFLD           SB01
+     C                     KFLD           ME02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN100
+     C*
+     C   39                EXSR RTN900
+     C           SB01      CHAINME0                  40
+     C           ME15      IFGE DME15S
+     C           ME15      ANDLEDME15E
+     C           ME15      CHAINMC0                  41
+     C           MC03      IFGE DMC03S
+     C           MC03      ANDLEDMC03E
+     C                     EXSR RTN200                     *FILE TO SCR
+     C                     END
+     C                     END
+     C*
+     CL1 10                SETON                     21
+     CL2 10                SETON                     20
+     CLR                   EXSR RTN999
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     102021
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....MOVE DATA TO SCREEN
+     C*==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     SETOF                     45
+|    C*檢查型態是否在範圍內
+|    C           SB01      CHAINMD0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C           MD78      ORLT DMD78S
+|   C           MD78      ORGT DMD78E
+|   C                     SETON                     45
+| 01-C                     END
+|    C*檢查地區是否在範圍內
+|    C                     MOVE *BLANK    ME02
+|    C           KEYME     CHAINME0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C           DME07S    ORGT ME07
+|   C           DME07E    ORLT ME07
+|   C                     SETON                     45
+| 02-C                     END
+|    C*
+|    C*IN45判斷型態，地區是否在範圍內
+| 03-C           *IN45     IFEQ '0'
+|   C* GET產品名稱
+|   C                     MOVE *BLANK    DMA03
+|   C           SB02      CHAINMA0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C                     MOVELMA03      DMA03
+| 04*C                     ELSE
+|   C                     MOVEL'BRAND'   #A01
+|   C                     MOVELSB02A     #A02
+|   C           KEY#A     CHAIN#A0                  41
+| 05-C           *IN41     IFEQ '0'
+|   C                     MOVEL#A03      DMA03
+| 05-C                     END
+| 04-C                     END
+|   C* GET 客戶簡稱
+|   C           SB01      CHAINME0                  40
+|   C   40                MOVE *BLANK    ME04
+|   C*折扣別，折扣率
+|   C                     Z-ADD0         DSB06
+| 06-C           SB04      IFEQ 'N'
+|   C                     MOVE '普通'  DSB04
+|   C           SB06      MULT 100       DSB06
+| 06*C                     ELSE
+| 07-C           SB04      IFEQ 'S'
+|   C                     MOVE '特別'  DSB04
+|   C           SB06      MULT 100       DSB06
+| 07*C                     ELSE
+|   C                     MOVE '搭贈'  DSB04
+| 07-C                     END
+| 06-C                     END
+|   C* GET轉換日期
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM SB05      S001I2  80
+B2MODC           SB05      PARM           S001O1  80
+|   C* GET轉換日期
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM SB13      S001I2  80
+B2MODC           SB13      PARM           S001O1  80
+|   C*
+|   C                     WRITEPD1
+|   C                     SETOF                     2021
+| 03-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     2021
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+05===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN100
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+05===C                     ENDSR
+

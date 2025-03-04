@@ -1,0 +1,168 @@
+     FSOSIPF  IP  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FARR065P O   E             39     PRINTER
+     ISI0
+     I                                              SI01  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+      *公司
+     I                                      601 602 DSI01S
+     I                                      603 604 DSI01E
+      *產品
+     I                                      605 613 DSJ03S
+     I                                      614 622 DSJ03E
+      *年月
+     I                                      631 6360YMDS
+     I                                      637 6420YMDE
+     I                                      643 6480DSI35S
+     I                                      649 6540DSI35E
+      *毛利比率
+     I                                      655 6560DRATE
+     I                                      657 657 DTYPE
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSJ     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C*
+     C           KEYSD     KLIST
+     C                     KFLD           SI10
+     C                     KFLD           SJ03
+     C*
+      *==============================================================*
+      *                    DEFINE KEY
+      *==============================================================*
+     C           *LIKE     DEFN SI02      WSI02
+B2MODC           *LIKE     DEFN SI35      WSI35 - 2
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *SET INIT
+  01*C                     ELSE
+  02-C           *INL1     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 11                EXSR RTNL1
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*公司名稱
+|    C*
+|    C           SI01      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    #B03
+|    C                     WRITEPH1
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C**
+|    C*確認日期
+|    C**
+M001AC                     Z-ADDSI35      XSI35   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI35      S001I2  80
+M001AC                     PARM XSI35     S001I2  60
+|    C           PSI35     PARM           S001O1  60
+     C                     SETOF                     21
+|    C**
+|    C           KEYSJ     SETLLSJ0
+|    C           KEYSJ     READESJ0                      45
+| 01-C           *IN45     DOWEQ'0'
+|    C*
+| 02-C           SJ03      IFGE DSJ03S
+|   C           SJ03      ANDLEDSJ03E
+|   C           SJ03      CHAINMA0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C           MA07      ANDEQDTYPE
+      *
+|   C           KEYSD     CHAINSD0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C           SD15      ANDNE0
+|   C           SD04      ANDNE0
+      *計算毛利比率PRATE
+     C           SD10      MULT SD04      PSD10
+     C*ERIC      SJ06      SUB  SJ07      PSJ06
+     C           SJ06      SUB  SJ071     PSJ06
+|   C           PSJ06     SUB  PSD10     WORK   134
+|   C                     DIV  SD15      WORK
+     C                     DIV  SD04      WORK      H
+|   C           WORK      MULT 100       PRATE
+      *是否應補差額
+| 05-C           PRATE     IFLT DRATE
+|   C           DRATE     SUB  PRATE     WORK
+|   C                     MULT SD15      WORK
+|   C                     MULT SD04      WORK
+|   C           WORK      DIV  100       PAMT      H
+      *
+|   C   39                EXSR RTN900
+|   C                     WRITEPD1
+|   C                     SETON                     21
+      *IN11 SUBTOT
+|   C                     SETON                     11
+|   C                     ADD  PAMT      TAMT
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+|   C           KEYSJ     READESJ0                      45
+| 01-C                     END
+      *
+02===C                     ENDSR
+      *==============================================================*
+      *          RTNL1.....公司別不同換頁
+      *==============================================================*
+03===C           RTNL1     BEGSR
+|    C*
+|    C*控制第一次列印
+|    C                     WRITEPD2
+|    C*變數清為零
+|    C                     Z-ADD0         TAMT
+|    C                     SETOF                     11
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C*控制第一次列印
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     3921
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....OVERFLOW
+      *==============================================================*
+06===C           RTNLR     BEGSR
+|    C*
+     C           *IN10     IFEQ '0'
+|    C                     EXSR RTN010
+|    C                     WRITEPE3
+|    C                     END
+|    C                     WRITEPE2
+|    C*
+06===C                     ENDSR
+

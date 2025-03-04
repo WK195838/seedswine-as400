@@ -1,0 +1,114 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1087  JOYCE                              */
+     /*    CREATE DATE  : 81/01/27                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : POR050C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :採購系統                                 */
+     /*    REMARK       :驗收單明細表                             */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DPI01)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DDOC)   TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DPH06S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DPH06E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DPI05S) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&DPI05E) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&DATA)   TYPE(*CHAR) LEN(1)
+
+             CHGVAR     VAR(&DPI01)  VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DDOC)   VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&DPH06S)  VALUE(%SST(*LDA 618 5))
+             CHGVAR     VAR(&DPH06E)  VALUE(%SST(*LDA 623 5))
+
+ /*M001M     CHGVAR     VAR(&DPI05S) VALUE(%SST(*LDA 609 +
+                          2) || %SST(*LDA 605 4))     +
+             CHGVAR     VAR(&DPI05E) VALUE(%SST(*LDA 615 +
+                          2) || %SST(*LDA 611 4))            */
+
+ /*M001A */  CHGVAR     VAR(&DPI05S) VALUE(%SST(*LDA 631 8))
+ /*M001A */  CHGVAR     VAR(&DPI05E) VALUE(%SST(*LDA 641 8))
+
+             CHGVAR     VAR(&DATA)   VALUE(%SST(*LDA 617 1))
+
+             IF         COND(&DDOC *EQ 'I1') THEN(DO)
+             OVRDBF     FILE(REWF01) TOFILE(POPEPF) SHARE(*YES)
+             OPNQRYF    FILE((POPEPF) (POPDPF)) FORMAT(REWF01) +
+                          QRYSLT('PE01 *EQ "' *CAT &DPI01 *CAT '" & +
+                          PD07 *EQ %RANGE("' *CAT &DPH06S *CAT '" +
+                          "' *CAT &DPH06E *CAT '") & PE05 *EQ +
+                          %RANGE(' *CAT &DPI05S *CAT ' ' *CAT +
+                          &DPI05E *CAT ')') KEYFLD((PI01) (PI05) +
+                          (PI02) (PI03) (PI04)) JFLD((PE02 PD02 +
+                          *EQ) (PE01 PD01)) MAPFLD((PI01 PE01 *CHAR +
+                          2) (PI02 PE02 *CHAR 12) (PI03 PE03 *CHAR +
+                          12) (PI04 PE04 *CHAR 9) (PI05 PE05 *ZONED +
+                          8 0) (PI06 PE06 *DEC 5 0) (PI07 PE07 *DEC +
+                          8 0) (PI08 PE08 *DEC 6 0) (PI09 PE09 *DEC +
+                          6 0) (PI10 'PI07+PI08+PI09' *DEC 8 0) +
+                          (PH06 PD07 *CHAR 5))
+                        ENDDO
+             ELSE
+             IF         COND(&DDOC *EQ 'I3') THEN(DO)
+             OVRDBF     FILE(REWF01) TOFILE(POPIPF) SHARE(*YES)
+             OPNQRYF    FILE((POPIPF) (POPHPF)) FORMAT(REWF01) +
+                          QRYSLT(' PI01 *EQ "' *CAT &DPI01 *CAT '" +
+                          & PH06 *EQ %RANGE("' *CAT &DPH06S *CAT '" +
+                          "' *CAT &DPH06E *CAT '") & PI05 *EQ +
+                          %RANGE(' *CAT &DPI05S *CAT ' ' *CAT +
+                          &DPI05E *CAT ')') KEYFLD((PI01) (PI05) +
+                          (PI02) (PI03) (PI04)) JFLD((PI02 PH02)) +
+                          MAPFLD((PI08 0 *DEC 6 0) (PI09 0 *DEC 6 0) +
+                          (PI10 'PI07+PI08+PI09' *DEC 8 0))
+                        ENDDO
+
+             IF         COND(&DATA *EQ 'A') THEN(DO)
+             OVRPRTF    FILE(POR050AP) PAGESIZE(*N 176) CPI(13.3) +
+                          USRDTA('驗收明細')
+             CALL       POR0501
+                        ENDDO
+             ELSE
+             IF         COND(&DATA *EQ 'B') THEN(DO)
+             OVRPRTF    FILE(POR050BP) PAGESIZE(*N 176) CPI(13.3) +
+                          USRDTA('驗收明細')
+             CALL       POR0502
+             DLTOVR     FILE(POR050BP)
+                        ENDDO
+
+             IF         COND(&DDOC *EQ 'I1') THEN(DO)
+             CLOF       OPNID(POPEPF)
+                        ENDDO
+             ELSE
+             IF         COND(&DDOC *EQ 'I3') THEN(DO)
+             CLOF       OPNID(POPIPF)
+                        ENDDO
+             DLTOVR     FILE(REWF01)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             IF         COND(&DATA *EQ 'A') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('POR050AP')
+                        ENDDO
+             ELSE
+             IF         COND(&DATA *EQ 'B') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('POR050BP')
+                        ENDDO
+
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

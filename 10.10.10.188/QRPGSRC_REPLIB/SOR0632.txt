@@ -1,0 +1,186 @@
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /*                                                          */
+     /*=============================================================*/
+     FREWF39  IP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#2PF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FSOR063P O   E             39     PRINTER
+     E*
+     IWF390
+     I                                              WF3902L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *物流點
+     I                                      601 605 DSE07
+      *SELECT起迄日期
+     I                                      628 6330DSE24S
+     I                                      634 6390DSE24E
+     I                                      661 6660DSE06S
+     I                                      667 6720DSE06E
+     I                                      675 683 DSE04S
+     I                                      684 692 DSE04E
+     I                                      750 750 IN20
+     I                                      751 751 COMPS
+     I                                      752 752 COMPE
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEY#2     KLIST
+     C                     KFLD           #201
+     C                     KFLD           #202
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+| 02-C           IN20      IFEQ '0'
+|   C                     SETOF                     20
+| 02*C                     ELSE
+|   C                     SETON                     20
+| 02-C                     END
+      *
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELDSE07     #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 03-C           COMPS     IFEQ '1'
+|   C                     MOVEL'台北'  COMPA
+     C                     MOVEL'1'       COMP
+| 03*C                     ELSE
+| 04-C           COMPS     IFEQ '2'
+|   C                     MOVEL'台中'  COMPA
+     C                     MOVEL'2'       COMP
+| 04*C                     ELSE
+| 05-C           COMPS     IFEQ '3'
+|   C                     MOVEL'高雄'  COMPA
+     C                     MOVEL'3'       COMP
+| 05*C                     ELSE
+     C                     MOVEL' '       COMP
+|   C                     MOVEL'全部'  COMPA
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+      *
+|    C                     WRITEPH1
+      *
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     MOVEL*BLANKS   #203
+|    C                     MOVELWF3903    #201
+|    C                     MOVELWF3903    #202
+|    C           KEY#2     CHAIN#20                  40
+|    C*產品
+|    C           WF3902    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   MA03
+| 01-C                     END
+      *
+|    C           WF3904    ADD  WF3905    PTOT
+|    C                     ADD  WF3906    PTOT
+|    C                     ADD  WF3907    PTOT
+      *
+|    C   39                EXSR RTN900
+| 02-C           WF3908    IFEQ '*'
+|   C                     MOVEL'當月未'MARK
+|   C*                    MOVE '確認'  MARK
+|   C                     ADD  WF3904    T23904
+|   C                     ADD  WF3905    T23905
+|   C                     ADD  WF3906    T23906
+|   C                     ADD  WF3907    T23907
+|   C                     ADD  PTOT      T2TOT
+| 02*C                     ELSE
+| 03-C           WF3908    IFEQ '#'
+|   C                     MOVEL'前月未'MARK
+|   C*                    MOVE '確認'  MARK
+|   C                     ADD  WF3904    T23904
+|   C                     ADD  WF3905    T23905
+|   C                     ADD  WF3906    T23906
+|   C                     ADD  WF3907    T23907
+|   C                     ADD  PTOT      T2TOT
+| 03*C                     ELSE
+|   C                     MOVEL*BLANKS   MARK
+|   C                     ADD  WF3904    T13904
+|   C                     ADD  WF3905    T13905
+|   C                     ADD  WF3906    T13906
+|   C                     ADD  WF3907    T13907
+|   C                     ADD  PTOT      T1TOT
+| 03-C                     END
+| 02-C                     END
+|    C                     WRITEPD1
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+| 01-C           T1TOT     IFNE 0
+|   C   39                EXSR RTN900
+|   C                     WRITEPT1
+|   C                     Z-ADD0         T13904
+|   C                     Z-ADD0         T13905
+|   C                     Z-ADD0         T13906
+|   C                     Z-ADD0         T13907
+|   C                     Z-ADD0         T1TOT
+| 01-C                     END
+|    C*
+| 02-C           T2TOT     IFNE 0
+|   C   39                EXSR RTN900
+|   C                     WRITEPT2
+|   C                     Z-ADD0         T23904
+|   C                     Z-ADD0         T23905
+|   C                     Z-ADD0         T23906
+|   C                     Z-ADD0         T23907
+|   C                     Z-ADD0         T2TOT
+| 02-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+      *
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR  ...LR
+      *==============================================================*
+09===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+09===C                     ENDSR
+

@@ -1,0 +1,350 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250
+     A*--------------------------------------------------------------
+     A*    PROGRAM ID   : ARA0102
+     A*    AUTHOR       : A1118  PHILIP
+     A*    DATE WRITTEN : 81/04/29
+     A*    UPDATE DATE  :
+     A*    SYSTEM       :人頭馬匯東
+     A*    SUBSYSTEM    :應收帳款子系統
+     A*    REMARK       :統一發票申報表列印
+     A*===============================================================
+     A* MODI CODE |  AUTHOR  |  DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+      *  M001     | MICHELLE |02.01.04|讀取發票檔得非營業人稅額
+     A*================================================================
+     A****************************************************************
+     FSOSILF97IF  E           K        DISK
+     FSOSSPF  UF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FARAIPF  IF  E           K        DISK
+     FARAJPF  IF  E           K        DISK
+     FARA010BPO   E             39     PRINTER
+     I*
+     I            DS
+     I                                        1  10 SI02S
+     I                                        9  100SEQ1
+     I            DS
+     I                                        1  10 SI02E
+     I                                        9  100SEQ2
+     I            DS
+B2MODI                                        1   60AJ02
+B2MODI                                        5   60AJ02M
+     I            DS
+     I                                        1   8 AJ03
+     I                                        1   2 AJ031
+     I                                        3   8 AJ032
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 602 DSI01
+     I*                                     603 604 DSI01E
+     I                                      613 6160DSI21S
+     I                                      617 6200DSI21E
+B2MODI                                      621 6260WSI21S
+B2MODI                                      627 6320WSI21E
+B2MODI                                      680 680 ERRCD
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN AJ02M     MONCHK
+B2000C           *LIKE     DEFN AJ02      AJ02S
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYAI     KLIST
+     C                     KFLD           AJ01
+     C                     KFLD           AJ02
+     C           KEYAJ1    KLIST
+     C                     KFLD           AJ01
+     C                     KFLD           AJ02S
+     C           KEYAJ     KLIST
+     C                     KFLD           AJ01
+     C                     KFLD           AJ02
+     C                     KFLD           AJ03
+     C                     KFLD           AJ13
+     C           KEYME     KLIST
+     C                     KFLD           SI08
+     C                     KFLD           SI09
+     C           KEYSIS    KLIST
+     C                     KFLD           SI02S
+     C           KEYSIE    KLIST
+     C                     KFLD           SI02E
+     C           KEYSS     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     MOVE DSI01     AJ01
+B2000C                     Z-ADDWSI21S    AJ02S
+B2000C           KEYAJ1    SETLLAJ0
+B2000C           KEYAJ1    READEAJ0                      41
+     C*每月 BEGIN
+     C**         DSI01     READEAJ0                      41
+     C*每月 END
+     C*檢查申報年月是否大於螢幕值
+B2000C           *IN41     IFEQ '0'
+    C           AJ02      ANDGTWSI21E
+    C                     SETON                     41
+  01*C                     ELSE
+    C*每月 BEGIN
+    C**                   MOVE *BLANK    MONCHK
+    C*每月 END
+    C*本期合計只列印於第一頁SETON 30
+    C                     SETON                     30
+  01-C                     END
+     C*PAGE
+     C                     Z-ADD0         PAGEM
+     C*******
+  02-C           *IN41     DOWEQ'0'
+    C*每月 BEGIN
+  03-C*          AJ02M     IFNE MONCHK
+    C*                    Z-ADD1         PAGEM
+    C*                    Z-ADDAJ02M     MONCHK
+  03*C*                    ELSE
+    C*每月 END
+    C                     ADD  1         PAGEM
+    C*每月 BEGIN
+  03-C*                    END
+    C*每月 END
+    C*新增資料
+    C                     EXSR RTN100                     *DATA->FILE
+    C                     EXSR RTN200                     *DATA->FILE
+    C                     EXSR RTN300                     *DATA->FILE
+B2000C           KEYAJ1    READEAJ0                      41
+    C*每月 BEGIN
+    C**         DSI01     READEAJ0                      41
+    C*每月 END
+    C*
+B2000C           AJ02      IFGT WSI21E
+    C                     SETON                     41
+  04-C                     END
+    C*
+  02-C                     END
+     C   41                SETON                     LR
+     C*
+     CLR                   RETRN
+      *=========================================================*
+      *          RTN100....WRITE HEADER                         *
+      *=========================================================*
+01===C           RTN100    BEGSR
+|    C*明細表年月
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    MOVELAJ02      AJ02Y   20
+B2NEWC                     MOVELAJ02      HB2@Y4  40
+B2CHKC*M001M               SUB  11        AJ02Y
+M001MC           HB2@Y4    SUB  1911      AJ02Y   20
+|    C**GET統一編號，營業人名稱，稅籍
+|    C           AJ01      CHAIN#B0                  40
+| 05-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #B12
+|   C                     MOVE *BLANK    #B02
+|   C                     MOVE *BLANK    #B13
+| 05-C                     END
+|    C                     WRITEPH1
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN200....GET DATA                             *
+      *=========================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE AJ01      SI01
+|    C                     MOVELAJ03      SI02S
+|    C                     MOVELAJ03      SI02E
+|    C                     Z-ADD1         I       20
+|    C                     Z-ADDAJ13      SEQ1    20
+|    C           AJ13      ADD  25        SEQ2    20
+|    C**
+| 01-C           I         DOWLE25
+|   C**左列資料
+|   C                     MOVE *BLANK    MD171
+|   C           KEYSIS    CHAINSI0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE '空白'  MD171
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     Z-ADD0         SI231
+|   C                     Z-ADD0         SI241
+| 02*C                     ELSE
+      *
+     C           KEYSS     CHAINSS0                  41
+     C           *IN41     IFEQ '0'
+|   C                     MOVE 'V'       SS20
+     C                     UPDATSS0
+     C                     END
+      *
+| 03-C           SI19      IFEQ 'V'
+| 03-C           *IN41     OREQ '0'
+|   C                     MOVE '作廢'  MD171
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     Z-ADD0         SI231
+|   C                     Z-ADD0         SI241
+| 03*C                     ELSE
+|   C*買受人統一編號
+| 04-C           SI17      IFEQ 3
+|   C           SI12      CHAINMD0                  40
+|   C   40                MOVE *BLANK    MD171
+|   C  N40                MOVE MD17      MD171
+| 04-C                     END
+|   C*營業稅
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C                     MOVE 'V'       SI2211
+|   C           SI22      WHEQ 'Z'
+|   C                     MOVE 'V'       SI2221
+|   C           SI22      WHEQ 'B'
+|   C                     MOVE 'V'       SI2231
+|   C                     OTHER
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     ENDSL
+|   C                     Z-ADDSI23      SI231
+M001DC*                    Z-ADDSI25      SI231
+M001AC           SI17      IFEQ 2
+M001AC           SI22      ANDEQ'D'
+M001AC                     Z-ADDSI25      SI231
+M001AC                     Z-ADD0         SI241
+M001AC                     ELSE
+|   C                     Z-ADDSI24      SI241
+M001AC                     END
+| 03-C                     END
+| 02-C                     END
+|   C**右列資料
+|   C                     MOVE *BLANK    MD172
+|   C           KEYSIE    CHAINSI0                  40
+| 05-C           *IN40     IFEQ '1'
+|   C                     MOVE '空白'  MD172
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     Z-ADD0         SI232
+|   C                     Z-ADD0         SI242
+| 05*C                     ELSE
+      *
+     C           KEYSS     CHAINSS0                  41
+     C           *IN41     IFEQ '0'
+|   C                     MOVE 'V'       SS20
+     C                     UPDATSS0
+     C                     END
+      *
+| 06-C           SI19      IFEQ 'V'
+     C           *IN41     OREQ '0'
+|   C                     MOVE '作廢'  MD172
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     Z-ADD0         SI232
+|   C                     Z-ADD0         SI242
+| 06*C                     ELSE
+|   C*買受人統一編號
+| 07-C           SI17      IFEQ 3
+|   C           SI12      CHAINMD0                  40
+|   C   40                MOVE *BLANK    MD172
+|   C  N40                MOVE MD17      MD172
+| 07-C                     END
+|   C*營業稅
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C                     MOVE 'V'       SI2212
+|   C           SI22      WHEQ 'Z'
+|   C                     MOVE 'V'       SI2222
+|   C           SI22      WHEQ 'B'
+|   C                     MOVE 'V'       SI2232
+|   C                     OTHER
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     ENDSL
+|   C                     Z-ADDSI23      SI232
+M001DC*                    Z-ADDSI25      SI232
+M001AC           SI17      IFEQ 2
+M001AC           SI22      ANDEQ'D'
+M001AC                     Z-ADDSI25      SI232
+M001AC                     Z-ADD0         SI242
+M001AC                     ELSE
+|   C                     Z-ADDSI24      SI242
+M001AC                     END
+| 06-C                     END
+| 05-C                     END
+|   C*WRITE DETAIL FILE
+|   C                     WRITEPD1
+|   C*
+|   C                     ADD  1         SEQ1
+|   C                     ADD  1         SEQ2
+|   C                     ADD  1         I
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN300....WRITE FOOT                           *
+      *=========================================================*
+03===C           RTN300    BEGSR
+|    C*本表合計資料
+|    C*計算空白張數
+|    C                     Z-ADD0         BKTMP   40
+|    C                     ADD  AJ04      BKTMP
+|    C                     ADD  AJ05      BKTMP
+|    C                     ADD  AJ06      BKTMP
+|    C                     ADD  AJ07      BKTMP
+|    C           50        SUB  BKTMP     AJBK
+M001AC                     Z-ADD0         AJ1014
+M001AC           AJ10      SUB  AJ14      AJ1014
+|    C*本月合計資料
+B2000C           KEYAI     CHAINAI0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         AI03
+|   C                     Z-ADD0         AI04
+|   C                     Z-ADD0         AI05
+|   C                     Z-ADD0         AI06
+|   C                     Z-ADD0         AIBKT
+|   C                     Z-ADD0         AI07
+|   C                     Z-ADD0         AI08
+|   C                     Z-ADD0         AI09
+|   C                     Z-ADD0         AI09C
+|   C*M001D               Z-ADD0         AI09TX
+|   C                     Z-ADD0         AI10
+|   C                     Z-ADD0         AI11
+M001AC                     Z-ADD0         AI13
+| 01*C                     ELSE
+|   C*計算空白張數
+|   C                     Z-ADD0         BKTMP   40
+|   C                     ADD  AI03      BKTMP
+|   C                     ADD  AI04      BKTMP
+|   C                     ADD  AI05      BKTMP
+|   C                     ADD  AI06      BKTMP
+|   C           50        MULT AI12      TOT     40
+|   C           TOT       SUB  BKTMP     AIBKT
+|   C*應稅非營業人銷售額
+|   C*M001D     AI09      MULT 100       AI9TMP 110
+|   C*M001D     AI9TMP    DIV  105       AI09C     H
+M001AC           AI09      SUB  AI13      AI09C
+|   C*應稅非營業人稅額
+|   C*M001D     AI09C     MULT 0.05      AI09TX    H
+| 01-C                     END
+|    C*
+|    C*WRITE DETAIL FILE
+|    C                     WRITEPE1
+|    C                     SETOF                     30
+|    C*
+03===C                     ENDSR
+

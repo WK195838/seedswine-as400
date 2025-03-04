@@ -1,0 +1,182 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR0432                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/04/21                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+     A*    REMARK       :客戶報價單                                *
+      ****************************************************************
+     FREWF04  IP  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FSOR043P O   E             39     PRINTER
+     IWF040
+     I                                              WF0403L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 601 DMD07S
+     I                                      602 602 DMD07E
+     I                                      603 604 DMD08S
+     I                                      605 606 DMD08E
+     I                                      607 611 DMD01S
+     I                                      612 616 DMD01E
+     I                                      617 6220DATE
+     I                                      680 680 DSEL
+     I                                      681 681 DSEL1
+     I                                      682 6862DSEL2
+     IDA04        DS
+     I                                        1  80 PRMK1
+     I                                       81 160 PRMK2
+     I                                      161 240 PRMK3
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           WF0403
+     C           KEYMC     KLIST
+     C                     KFLD           ME15
+     C           KEYMA     KLIST
+     C                     KFLD           WF0404
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *INIT ENVIRM
+     C  N10                EXSR RTN100                     *GET HEADING
+     C*
+     C   39N38             EXSR RTN900
+     C   39 38             EXSR RTN910
+     C                     EXSR RTN200                     *FILE TO SCR
+     C*
+     CL1 10                SETON                     3938
+     CLR                   EXSR RTN999
+     C*==============================================================*
+     C*          RTN010....INIT ENVIRMENT
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*備註
+|    C           *NAMVAR   DEFN           DA04
+|    C                     IN   *NAMVAR
+|    C*
+|    C                     Z-ADD0         PPAGE
+| 01-C           DSEL      IFEQ 'Y'
+|   C                     SETON                     19
+| 01*C                     ELSE
+|   C                     SETOF                     19
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C* GET客戶名稱／員工代號
+|    C           KEYME     CHAINME0                  40
+|    C   40                MOVE *BLANKS   ME03
+|    C   40                MOVE *BLANKS   ME15
+|    C* GET業務員
+|    C           KEYMC     CHAINMC0                  40
+|    C   40                MOVE *BLANKS   MC02
+|    C* GET有效日期
+|    C                     Z-ADDDATE      PDATE
+|    C* GET頁次
+|    C                     ADD  1         PPAGE
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....MOVE DATA TO SCREEN
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C* GET 產品名稱／單位／包裝規格
+|    C           KEYMA     CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   MA04
+|   C                     MOVE *BLANKS   MA05
+|   C                     MOVE *BLANKS   MA03
+|   C                     MOVE *BLANKS   MA13
+|   C                     MOVE *BLANKS   MA17
+| 01*C                     ELSE
+|   C* GET 牌價
+|   C                     CALL 'RES001'
+|   C                     PARM 'MDY'     S001I1  3
+|   C                     PARM $EGMDY    S001I2  60
+M001DC*                    PARM           S001O1  80
+M001AC                     PARM           S001O1  60
+|   C*
+M001AC                     MOVE S001O1    HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    YMD8S   80
+M001DC*          S001O1    IFLT MA39
+M001AC           YMD8S     IFLT MA39
+|   C                     Z-ADDMA41      PMA416
+| 02*C                     ELSE
+|   C                     Z-ADDMA46      PMA416
+| 02-C                     END
+|   C*計算進價
+| 02-C           DSEL1     IFEQ 'A'
+|   C                     Z-ADDWF0406    PWF416
+| 02*C                     ELSE
+|   C           DSEL2     DIV  100       DSEL3   54
+     C           1         SUB  DSEL3     DSEL3
+     C           PMA416    MULT DSEL3     PWF416    H
+| 02-C                     END
+|   C*
+| 03-C           MA05      IFEQ *BLANKS
+|   C                     SETOF                     20
+| 03*C                     ELSE
+|   C                     SETON                     20
+| 03-C                     END
+|   C*
+|   C                     WRITEPD1
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     EXSR RTN100                     *GET HEADING
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN910....換下頁
+      *==============================================================*
+05===C           RTN910    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     Z-ADD0         PPAGE
+|    C                     EXSR RTN100                     *GET HEADING
+|    C                     SETOF                     38
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+06===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     Z-ADD0         PPAGE
+|   C                     EXSR RTN100
+| 01*C                     ELSE
+|   C*                    WRITEPE1
+| 01-C                     END
+|    C*                    WRITEPE2
+|    C*
+06===C                     ENDSR
+     C/COPY HBP2CVTR
+

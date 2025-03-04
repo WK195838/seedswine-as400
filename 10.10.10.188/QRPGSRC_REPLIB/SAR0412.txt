@@ -1,0 +1,335 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SAR0412                                       *
+      * AUTHER       :                                               *
+      * CREATE DATE  : 81/05/07                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款作業                                 *
+      * REMARK       :客戶退貨明細表－產品收回                     *
+      ****************************************************************
+     FSOSNPF  IP  E           K        DISK
+     FSOSOPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSAR041BPO   E             39     PRINTER
+     ISN0
+     I                                              SN07  L3
+     I                                              SN03  L2
+     I                                              SN11  L2
+     I                                              SN02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      139 139 $RMK01
+     I                                      598 5990$PRTID
+     I                                      601 604 DSG12S
+     I                                      605 608 DSG12E
+     I                                      611 616 DSG11S
+     I                                      617 622 DSG11E
+     I                                      631 635 DSG04S
+     I                                      636 640 DSG04E
+     I                                      641 6460DSG06S
+     I                                      647 6520DSG06E
+     I                                      673 6780DSG26S
+     I                                      679 6840DSG26E
+     I                                      685 6900DATES
+     I                                      691 6960DATEE
+     I                                      661 661 DSG03
+     I                                      662 662 IN20
+     I                                      663 663 DATA1
+     I*增加辦事處的挑選
+     I                                      671 671 COMPS
+     I                                      672 672 COMPE
+     I*增加產品挑選
+     I                                      701 709 DSH03S
+     I                                      711 719 DSH03E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           MEKEY     KLIST
+     C                     KFLD           SN03
+     C                     KFLD           SN11
+      *==============================================================*
+      *                    DEFINE KEY
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *INIT ENVIRM
+     C*
+     C* GET轉換日期
+M001AC                     Z-ADDSN05      PSN05   60
+     C                     CALL 'RES001'
+     C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SN05      S001I2  80
+M001AC                     PARM PSN05     S001I2  60
+     C           PSN05     PARM           S001O1  60
+     C*
+     C                     EXSR RTN100                     *CHAIN #MC
+     C                     EXSR RTN200                     *CHAIN ME0
+     C                     EXSR RTN300                     *READE SO0
+     C*
+     CL1 10                SETOF                     32
+     CL2 10                EXSR RTNL2                      *WRITE PD2
+     CL3 10                EXSR RTNL3                      *WRITE PD3
+     CLR                   EXSR RTNLR                      *END PGM
+      *==============================================================*
+      *          RTN010....SET INIT
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE COMPS     COMP
+|    C                     Z-ADD0         SO05C
+|    C                     Z-ADD0         AMT0C
+|    C                     Z-ADD0         AMT1C
+|    C                     Z-ADD0         AMT2C
+|    C                     Z-ADD0         SO05S
+|    C                     Z-ADD0         AMT0S
+|    C                     Z-ADD0         AMT1S
+|    C                     Z-ADD0         AMT2S
+|    C                     Z-ADD0         SO05R
+|    C                     Z-ADD0         AMT0R
+|    C                     Z-ADD0         AMT1R
+|    C                     Z-ADD0         AMT2R
+|    C*
+| 01-C           $RMK01    IFEQ 'Y'
+|   C                     SETON                     33
+| 01*C                     ELSE
+|   C                     SETOF                     33
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....CHAIN MTMCPF
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           SN07      CHAINMC0                  41
+|    C*
+|    C   41                MOVE *BLANK    MC02
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....CHAIN ME0
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C           MEKEY     CHAINME0                  41
+|    C*
+|    C   41                MOVE *BLANK    ME04
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....READE SOSOPF
+      *==============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C           SN02      CHAINSO0                  41
+|    C*
+| 01-C           *IN41     DOWEQ'0'
+| 02-C           SO03      IFGE DSH03S
+|   C           SO03      ANDLEDSH03E
+|   C                     EXSR RTN310                     *CHAIN MA0
+|   C*
+| 03-C           SN11      IFEQ *BLANK
+|   C                     SETON                     38
+| 03-C                     END
+|   C*
+|   C                     EXSR RTN900                     *PROC SKIP
+|   C                     WRITEPD1
+|   C                     SETON                     303132
+|   C                     SETOF                     38
+|   C*
+| 02-C                     END
+|   C           SN02      READESO0                      41
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN310....CHAIN MTMAPF
+      *==============================================================*
+05===C           RTN310    BEGSR
+|    C*
+      *未確認且為打單日期以打單數量為準
+B2CHKC           SN06      IFEQ 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2INF *CVR0001 sev.00 Field IN20 is not a date or year
+|   C           IN20      ANDEQ'0'
+|   C                     Z-ADDSO04      SO05
+| 01-C                     END
+      *
+|    C           SO05      MULT SO12      AMT0
+|    C*
+|    C           SO13      ADD  SO14      AMT2
+|    C                     ADD  SO15      AMT2
+|    C           SO16      ADD  SO17      AMT1
+|    C                     ADD  SO18      AMT1
+|    C*
+|    C                     ADD  SO05      SO05C
+|    C                     ADD  AMT0      AMT0C
+|    C                     ADD  SO05      SO05S
+|    C                     ADD  AMT0      AMT0S
+|    C                     ADD  SO05      SO05R
+|    C                     ADD  AMT0      AMT0R
+|    C                     ADD  AMT1      AMT1C
+|    C                     ADD  AMT1      AMT1S
+|    C                     ADD  AMT1      AMT1R
+|    C                     ADD  AMT2      AMT2C
+|    C                     ADD  AMT2      AMT2S
+|    C                     ADD  AMT2      AMT2R
+|    C                     ADD  SO13      SO13C
+|    C                     ADD  SO14      SO14C
+|    C                     ADD  SO15      SO15C
+|    C                     ADD  SO13      SO13S
+|    C                     ADD  SO14      SO14S
+|    C                     ADD  SO15      SO15S
+|    C                     ADD  SO13      SO13R
+|    C                     ADD  SO14      SO14R
+|    C                     ADD  SO15      SO15R
+      *
+|    C           SO03      CHAINMA0                  41
+|    C*
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+| 02-C                     END
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNL2.....WRITE PD2
+      *==============================================================*
+06===C           RTNL2     BEGSR
+|    C*
+|    C                     SETOF                     31
+|    C*
+|    C                     EXSR RTN900
+| 01-C           SO05C     IFNE 0
+|   C                     WRITEPD2
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         SO05C
+|    C                     Z-ADD0         AMT0C
+|    C                     Z-ADD0         AMT1C
+|    C                     Z-ADD0         AMT2C
+|    C                     Z-ADD0         SO13C
+|    C                     Z-ADD0         SO14C
+|    C                     Z-ADD0         SO15C
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTNL3.....WRITE PD3
+      *==============================================================*
+07===C           RTNL3     BEGSR
+|    C*
+|    C                     SETOF                     30
+|    C*
+|    C                     EXSR RTN900
+| 01-C           SO05S     IFNE 0
+|   C                     WRITEPD3
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         SO05S
+|    C                     Z-ADD0         AMT0S
+|    C                     Z-ADD0         AMT1S
+|    C                     Z-ADD0         SO13S
+|    C                     Z-ADD0         SO14S
+|    C                     Z-ADD0         SO15S
+|    C                     Z-ADD0         AMT2S
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTNLR.....ENDPGM
+      *==============================================================*
+08===C           RTNLR     BEGSR
+|    C*
+|    C*
+| 01-C           *IN10     IFEQ '0'
+| 02-C           IN20      IFEQ '0'
+|   C                     SETON                     20
+| 02*C                     ELSE
+|   C                     SETOF                     20
+| 02-C                     END
+|   C*判斷含試飲與否
+|   C                     SETON                     212223
+| 03-C           DATA1     IFEQ '1'
+|   C                     SETOF                     21
+|   C                     SETON                     2223
+| 03*C                     ELSE
+| 04-C           DATA1     IFEQ '2'
+|   C                     SETOF                     22
+|   C                     SETON                     2123
+| 04*C                     ELSE
+| 05-C           DATA1     IFEQ '3'
+|   C                     SETOF                     23
+|   C                     SETON                     2122
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|   C                     WRITEPH1
+|   C                     WRITEPE3
+| 01*C                     ELSE
+|   C   39                EXSR RTN900
+| 06-C           SO05R     IFNE 0
+|   C                     WRITEPD4
+| 06-C                     END
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+08===C                     ENDSR
+09===C*          RTNLR     BEGSR
+|    C*
+|    C*                    EXSR RTN900
+|    C*
+| 01-C*          SO05R     IFNE 0
+|   C*                    WRITEPD4
+| 01-C*                    END
+|    C*                    WRITEPE2
+|    C*
+09===C*                    ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+10===C           RTN900    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C*判斷日期為打單日期或確認日期
+|   C                     SETOF                     20
+| 02-C           IN20      IFEQ '0'
+|   C                     SETON                     20
+| 02*C                     ELSE
+|   C                     SETOF                     20
+| 02-C                     END
+|   C*判斷含試飲與否
+|   C                     SETON                     212223
+| 03-C           DATA1     IFEQ '1'
+|   C                     SETOF                     21
+|   C                     SETON                     2223
+| 03*C                     ELSE
+| 04-C           DATA1     IFEQ '2'
+|   C                     SETOF                     22
+|   C                     SETON                     2123
+| 04*C                     ELSE
+| 05-C           DATA1     IFEQ '3'
+|   C                     SETOF                     23
+|   C                     SETON                     2122
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|   C                     WRITEPH1
+|   C                     SETON                     10
+|   C                     SETOF                     39
+| 01-C                     END
+|    C*
+| 06-C           *IN39     IFEQ '1'
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+| 06-C                     END
+|    C*
+10===C                     ENDSR
+

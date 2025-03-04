@@ -1,0 +1,188 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : PUR0613                                       *
+      * AUTHER       : A1492  TERRY                                  *
+      * CREATE DATE  : 101/01/12                                     *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :                                             *
+      * SUBSYSTEM    :採購系統                                     *
+      * REMARK       :採購單彙總表                                 *
+      ****************************************************************
+     FPOCHPF  IP  E           K        DISK
+     FPOCIPF  IF  E           K        DISK
+     FPOCDPF  IF  E           K        DISK
+     FPOCCLF02IF  E           K        DISK
+     FMANBPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FSCWK252 UF  E           K        DISK                      A
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      600 600 DOWNL
+     I                                      601 602 DCH01
+     I                                      603 604 DCH02S
+     I                                      605 606 DCH02E
+     I                                      607 611 DCH07S
+     I                                      612 616 DCH07E
+     I                                      617 621 DCH06S
+     I                                      622 626 DCH06E
+     I                                      627 635 DCI03S
+     I                                      636 644 DCI03E
+     I                                      645 6500DCD03S
+     I                                      651 6560DCD03E
+     I                                      657 6620DCH08S
+     I                                      663 6680DCH08E
+     I                                      669 669 DPRTTP
+     I                                      670 6770DATE3S
+     I                                      678 6850DATE3E
+     I                                      686 6930DATE8S
+     I                                      694 7010DATE8E
+      *==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYCI1    KLIST
+     C                     KFLD           CH04
+     C                     KFLD           CH06
+     C                     KFLD           DCI03S
+     C           KEYCI2    KLIST
+     C                     KFLD           CH04
+     C                     KFLD           CH06
+     C           KEYCC1    KLIST
+     C                     KFLD           CH01
+     C                     KFLD           CH02
+     C                     KFLD           CI03
+     C                     KFLD           CC06
+     C                     KFLD           CH03
+     C           KEYCC2    KLIST
+     C                     KFLD           CH01
+     C                     KFLD           CH02
+     C                     KFLD           CI03
+     C                     KFLD           CC06
+     C           KEY252    KLIST
+     C                     KFLD           W25201
+     C                     KFLD           W25202
+     C                     KFLD           W25206
+     C                     KFLD           W25204
+     C                     KFLD           W25205
+     C                     KFLD           W25208
+     C           KEYNC     KLIST
+     C                     KFLD           CH01
+     C                     KFLD           CI03
+     C           KEYNE     KLIST
+     C                     KFLD           CH01
+     C                     KFLD           CH02
+     C                     KFLD           CH07
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN100
+     C*
+      *==============================================================*
+      *                    WRITE SCWK252
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C           CH16      CHAINPOCDPF               40
+| 01-C           *IN40     IFEQ *OFF
+|   C           CD03      ANDGEDATE3S
+|   C           CD03      ANDLEDATE3E
+|   C*
+|   C           KEYCI1    SETLLPOCIPF
+|   C           KEYCI2    READEPOCIPF                   41
+| 02-C           *IN41     DOWEQ*OFF
+|   C*
+| 03-C           CI03      IFGT DCI03E
+|   C                     LEAVE
+| 03-C                     ENDIF
+|   C*
+|   C                     EXSR RTN110
+|   C*
+|   C           KEYCI2    READEPOCIPF                   41
+| 02-C                     ENDDO
+|   C*
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *                    WRITE SCWK252
+      *==============================================================*
+02===C           RTN110    BEGSR
+|    C*
+|    C                     CLEARW252
+|    C*
+|    C                     MOVELCH01      W25201           公司代號
+|    C                     MOVELCH06      W25202           供應商代號
+|    C           W25202    CHAINMANBPF               40
+|    C  N40                MOVELNB03      W25203           供應商簡稱
+|    C                     Z-ADDCD03      W25204           訂貨日期
+|    C                     Z-ADDCH08      W25205           到貨運日
+|    C                     MOVELCI03      W25206           產品代號
+|    C           KEYNC     CHAINMANCPF               40
+|    C  N40                MOVELNC05      W25207           產品簡稱
+|    C                     MOVELCH07      W25208           分店代號
+|    C           KEYNE     CHAINMANEPF               40
+|    C  N40                MOVELNE05      W25209           分店簡稱
+|    C*
+|    C           KEY252    CHAINSCWK252              40
+|    C                     ADD  CI04      W25210           採購數量
+|    C*單價取得方式，參考PUC015
+|    C*一般及客訂單先取活動價若無再取年度價
+|    C                     MOVEL'2'       CC06
+|    C                     EXSR RTN111
+| 01-C           WCC09     IFEQ 0
+|   C                     MOVEL'1'       CC06
+|   C                     EXSR RTN111
+| 01-C                     ENDIF
+|    C                     Z-ADDWCC09     W25211           未稅進價
+|    C           W25211    MULT W25210    W25212    H      未稅金額
+|    C           W25212    MULT 1.05      W25213    H      含稅金額
+|    C                     MOVELCH04      W25214           採購單號
+|    C*
+|    C   40                WRITEW252
+|    C  N40                UPDATW252
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *                    取得最新報價單價
+      *==============================================================*
+03===C           RTN111    BEGSR
+|    C*
+|    C                     Z-ADD0         WCC09   82
+|     *
+|    C           KEYCC1    SETGTPOCCLF02
+|    C           KEYCC2    REDPEPOCCLF02                 47
+| 01-C           *IN47     IFEQ '0'
+|    *
+| 02-C           CC08      IFNE 0
+| 03-C           CH03      IFLE CC08
+|   C           CH03      ANDGECC07
+|   C                     Z-ADDCC09      WCC09
+| 03-C                     ENDIF
+| 02*C                     ELSE
+| 04-C           CH03      IFGE CC07
+|   C                     Z-ADDCC09      WCC09
+| 04-C                     ENDIF
+| 02-C                     ENDIF
+| 01-C                     ENDIF
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*                    INITIAL
+     C*==============================================================*
+04===C           *INZSR    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     IN   LDA
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+

@@ -1,0 +1,140 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM-ID   : PIA0062                                    *
+     H*    PROGRAM NAME :盤點資料產生                              *
+     H*    AUTHOR       : ROBIN                                      *
+     H*    CREATE DATE  : 100/08/02                                  *
+     H*    UPDATE DATE  :                                            *
+     H****************************************************************
+     H* INTBPF產品庫存分庫檔:
+     H*        TB01 :公司別  KEY
+     H*        TB02 :年月    KEY
+     H*        TB03 :通路代號KEY
+     H*        TB04 :分店代號KEY
+     H*        TB05 :產品代號KEY
+     H*        TB07 :帳列庫存
+     H*        TB16 :陳列期初
+     H*        TB17 :陳列異動
+     H*        TB18 :陳列借貨
+     H* MANEPF銷售通路分店資料檔:
+     H*        NE01 :公司別  KEY
+     H*        NE02 :通路代號KEY
+     H*        NE03 :分店代號KEY
+     H*        NE04 :分店全稱
+     H* MANCPF產品基本資料檔:
+     H*        NC01 :公司別  KEY
+     H*        NC02 :產品代號KEY
+     H*        NC05 :中文簡稱
+     H* INPTWF盤點資料產生工作檔
+     H*        PW01   :公司別  KEY
+     H*        PW02   :分店代號KEY
+     H*        PW02NM :分店全稱FROM NE04
+     H*        PW03   :產品代號KEY
+     H*        PW03NM :中文簡稱FROM NC05
+     H*        PW04   :盤點單號*BLANK
+     H*        PW05   :盤點量
+     H*
+     H*盤點量=帳列庫存+陳列期初+陳列異動-陳列借貨
+     H* PW05   = TB07     + TB16     + TB17     - TB18
+     H*
+     H****************************************************************
+     FINTBPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FINPTWF  UF  E           K        DISK                      A
+     E*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      201 2080A8YMD
+     I                                      203 2080A6YMD
+     I                                      500 500 $DATA
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+     I                                      501 502 DPI01
+     I                                      503 5060DPI02
+     I                                      507 5120DPIYM
+     I                                      513 5140DPIDD
+     I                                      507 5140DPIYMD
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYTB     KLIST
+     C                     KFLD           DPI01            公司別
+     C                     KFLD           DPIYM            年月
+      *
+     C           KEYNE     KLIST
+     C                     KFLD           TB01             公司別
+     C                     KFLD           TB03             通路代號
+     C                     KFLD           TB04             分店代號
+      *
+     C           KEYNC     KLIST
+     C                     KFLD           TB01             公司別
+     C                     KFLD           TB05             產品代號
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN010
+     C                     EXSR RTN100                     INTBPF
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN010....
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           *LOVAL    SETLLINPTWF
+|    C                     READ INPTWF                   41
+| 01-C           *IN41     DOWEQ*OFF
+|   C                     DELETPW0
+|   C                     READ INPTWF                   41
+| 01-C                     ENDDO
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....INTBPF -> INPTWF
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           KEYTB     SETLLINTBPF
+|    C           KEYTB     READEINTBPF                   41
+| 01-C           *IN41     DOWEQ*OFF
+|   C*
+|   C                     CLEARPW0
+|   C*
+|   C           KEYNE     CHAINMANEPF               42
+|   C   42                MOVEL*BLANK    NE04
+|   C*
+|   C           KEYNC     CHAINMANCPF               42
+|   C   42                MOVEL*BLANK    NC05
+|   C*
+|   C                     MOVELTB01      PW01             公司別
+|   C                     MOVELTB04      PW02             分店代號
+|   C                     MOVELNE04      PW02NM           分店全稱
+|   C                     MOVELTB05      PW03             產品代號
+|   C                     MOVELNC05      PW03NM           中文簡稱
+|   C                     MOVEL*BLANK    PW04             盤點單號
+|   C                     Z-ADDTB07      PW05             盤點量
+|   C                     ADD  TB16      PW05             　　　
+|   C                     ADD  TB17      PW05             　　　
+|   C                     SUB  TB18      PW05
+|   C                     Z-ADDA8YMD     PWXX             異動日期
+|   C                     TIME           PWYY             異動時間
+|   C                     MOVEL$USER     PWZZ             異動者　
+|   C*
+|   C                     MOVEL'Y'       $DATA
+|   C*
+|   C                     WRITEPW0
+|   C*
+|   C           KEYTB     READEINTBPF                   41
+| 01-C                     ENDDO
+|    C*
+02===C                     ENDSR
+

@@ -1,0 +1,200 @@
+      ****************************************************************
+      *                                                              *
+      * PROGRAM NAME : VTA0023                                       *
+      * AUTHER       : MICHELLE                                      *
+      * CREATE DATE  : 04/10/02                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :寰盛洋酒                                     *
+      * SUBSYSTEM    :媒體申報系統                                 *
+      * REMARK       :進項憑證轉檔作業－來源＝F0                   *
+      * FILE         :價差折讓檔
+     A*===============================================================
+     A* CODE | AUTHOR | DATE  | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001 |MICHELLE|04.18.03| ADD VQ96員工編號
+     A*---------------------------------------------------------------
+     A* M002 |MICHELLE|05.13.03|單別C3的折讓單，為匯齡的進貨折讓
+     A*      |        |        |寰盛的銷貨折讓，改單別CW為匯齡轉檔
+     A*      |        |        |依據，原單據為寰盛的轉檔依據。
+     A*      |        |        | IF AF03 = B0000則單別改為CK。
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FARAFPF  IP  E           K        DISK
+     FSOVQPF  UF  E           K        DISK                      A
+     FPA#8PF  UF  E           K        DISK                      A
+     FPA#BPF  IF  E           K        DISK
+M001AFS#SUPF  IF  E           K        DISK
+     FSOSILF10IF  E           K        DISK
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      201 208 DATE
+     I                                      598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I                                      513 513 $WRHTY
+      *公司別
+     I                                      601 601 DVP91
+      *YYMM
+     I                                      614 6170DVP04S
+     I                                      614 6150MMS
+     I                                      616 6170YYS
+     I                                      620 6230YYMMS
+      *
+     I                                      634 6370DVP04E
+     I                                      634 6350MME
+     I                                      636 6370YYE
+     I                                      640 6430YYMME
+     I                                      800 8070YMD8S
+     I                                      810 8170YMD8E
+     I            DS
+     I                                        1  12 WAF02
+     I                                        3   4 WC3
+     I            DS
+     I                                        1   2 KCO
+     I                                        1   1 WVP91
+     I                                        2   2 VQ92
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYVQ     KLIST
+     C                     KFLD           VQ91
+     C                     KFLD           VQ92
+     C                     KFLD           VQ04
+     C                     KFLD           VQ01
+     C                     KFLD           VQ16
+M002AC                     KFLD           VQ19
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN100
+     CLR                   RETRN
+      *
+      *==============================================================*
+      *                    RTN100
+      *==============================================================*
+     C           RTN100    BEGSR
+     C*
+M002AC                     MOVELAF02      WAF02
+     C*
+M002AC           AF03      IFEQ 'A0002'
+"    C                     MOVEL'CW'      WC3
+"    C                     ELSE
+"    C           AF03      IFEQ 'B0000'
+"    C                     MOVEL'CK'      WC3
+"    C                     END
+"    C                     END
+      *
+M002MC*          AF02      CHAIN#80                  46
+M002MC           WAF02     CHAIN#80                  46
+|2---C           *IN46     IFEQ '1'
+      *
+     C           AF09      IFNE 0
+      *
+|||  C           AF06      CHAINSI0                  51
+|||4-C           *IN51     IFEQ '0'
+||||5C           SI22      IFEQ 'D'
+     C*M002M               MOVELAF02      #801
+M002MC                     MOVELWAF02     #801
+|||| C                     Z-ADDAF05      #802
+|||| C                     MOVE DATE      #8XX
+|||| C                     TIME           #8YY
+|||| C                     MOVEL$USER     #8ZZ
+|||| C                     WRITE#80
+|||| C*
+|||| C                     MOVE 'F0'      VQ20
+|||| C*M002M               MOVELAF02      VQ19
+M002MC                     MOVELWAF02     VQ19
+||||  *SOVQPF
+|||| C                     MOVEL'23'      VQ01
+|||| C           SI17      IFEQ 2
+|||| C           AF07      ADD  AF09      W07    120
+|||| C                     Z-ADD0         W09    100
+|||| C                     ELSE
+|||| C                     Z-ADDAF07      W07
+|||| C                     Z-ADDAF09      W09
+|||| C                     END
+|||| C                     MOVELAF05      VQ04
+|||| C                     MOVE AF01      VQ92
+|||| C           DVP91     IFEQ 'W'
+|||| C                     MOVE 'WH'      VQ91
+|||| C                     MOVE '1'       VQ92
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'K'
+|||| C                     MOVE 'KN'      VQ91
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE DVP91     WVP91
+|||| C           KCO       CHAIN#B0                  47
+|||| C           *IN47     IFEQ '0'
+|||| C                     MOVEL#B17      WCO     2
+|||| C           WCO       CHAIN#B0                  48
+|||| C           *IN48     IFEQ '0'
+|||| C                     MOVEL#B12      VQ05
+|||| C                     ELSE
+|||| C                     MOVE *BLANKS   VQ05
+|||| C                     END
+|||| C                     ELSE
+|||| C                     MOVE *BLANKS   VQ05
+|||| C                     END
+|||| C           SI22      IFEQ 'D'
+|||| C                     MOVEL'1'       VQ08
+|||| C                     ELSE
+|||| C           SI22      IFEQ 'B'
+|||| C                     MOVEL'3'       VQ08
+|||| C                     ELSE
+|||| C                     MOVEL'2'       VQ08
+|||| C                     END
+|||| C                     END
+|||| C                     MOVEL'1'       VQ10
+|||| C                     MOVEL' '       VQ14
+|||| C                     MOVEL*BLANKS   VQ16
+|||| C                     MOVELAF06      VQ16
+|||| C                     Z-ADDSI21      VQ17
+|||| C           SI01      CHAIN#B0                  50
+|||| C           *IN50     IFEQ '0'
+|||| C                     MOVEL#B17      WCO     2
+|||| C           WCO       CHAIN#B0                  51
+|||| C           *IN51     IFEQ '0'
+|||| C                     MOVEL#B12      VQ15
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE DATE      VQ97
+|||| C                     TIME           VQ98
+|||| C                     MOVEL$USER     VQ99
+M001AC           AFZZ      CHAINSU0                  44
+  "  C           *IN44     IFEQ '0'
+  "  C                     MOVELSU04      VQ96
+  "  C                     ELSE
+  "  C                     MOVELAFZZ      VQ96
+M001AC                     END
+|||| C           KEYVQ     CHAINVQ0                  61
+|||| C           *IN61     IFEQ '0'
+|||| C                     ADD  W07       VQ07
+|||| C                     ADD  W09       VQ09
+|||| C                     UPDATVQ0
+|||| C                     ELSE
+|||| C                     Z-ADDW07       VQ07
+|||| C                     Z-ADDW09       VQ09
+|||| C                     WRITEVQ0
+|||| C                     END
+||||  *
+||||5C                     END
+|||4-C                     END
+|    C                     END
+|2---C                     END
+     C                     ENDSR
+      *==============================================================*
+      *
+      *================================================================
+

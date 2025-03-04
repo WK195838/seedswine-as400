@@ -1,0 +1,214 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : IMI0211                                    *
+     A*    AUTHOR       : A1092  TAYLOR                              *
+     A*    DATE WRITTEN : 81/02/17                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :庫存子系統                                *
+     A*    PROCEDURE    :產品存貨狀況－物流點數量                  *
+     A*===============================================================
+     A* MODI CODE   DATE    AUTH   DESCRIPTION
+     A*---------------------------------------------------------------
+     A*  M001A     880826 MICHELLE開放保稅倉查詢權限
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FMTMAPF  IF  E           K        DISK
+     FIMIALF01IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FIMI0211DCF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I           UDS
+     I                                      101 110 $USER
+     I                                      101 101 $USER1
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I            DS
+     I                                        1   5 IA02
+     I                                        1   1 IA02A
+     C*==============================================================*
+     C*                    PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           IA03
+     C                     PARM *IN03     I021O1  1
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYIA     KLIST
+     C                     KFLD           MA01
+     C                     KFLD           DBGN1
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                      *GET HEADING
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C           *IN12     ANDEQ'0'
+    C*
+  02-C           *IN25     CASEQ'1'       RTN100           下一頁
+    C                     CAS            RTN400            START KEY
+  02-C                     END
+    C*
+    C                     EXSR RTN500                     EXFMTSFL
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*=============================================================*
+     C*          RTN010....GET HEADING
+     C*=============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           IA03      CHAINMA0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+|   C                     Z-ADD0         MA29
+|   C                     Z-ADD0         MA30
+|   C                     Z-ADD0         MA37
+|   C                     Z-ADD0         MA38
+B2MODC                     Z-ADD0         CDATE   60
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+     C*=============================================================*
+     C*          RTN100....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+02===C           RTN100    BEGSR
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                         98*LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+|   C                     EXSR RTN810                     *ADD SFL DTA
+| 01-C                     END
+02===C                     ENDSR
+     C*=============================================================*
+     C*          RTN400....SFL MAIN RUTINE (START KEY)
+     C*=============================================================*
+03===C           RTN400    BEGSR
+|    C                     EXSR RTN405                     *INIT SFL
+|    C                     EXSR RTN810                     *ADD SFL DTA
+03===C                     ENDSR
+     C*=============================================================*
+     C*          RTN405....SFL INITIAL
+     C*=============================================================*
+04===C           RTN405    BEGSR
+|    C*
+|    C*
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         DSPRCD
+|    C                     Z-ADD10        WPRCD            *PAG RCD
+|    C                     MOVE 'N'       WBOTOM  1        *BOTTOM
+|    C*
+|    C                     SETON                     52    *SFLCLR
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C                     SETON                     51    *SFLDSPCTL
+|    C*
+|    C           KEYIA     SETLLIA0
+04===C                     ENDSR
+     C*=============================================================*
+     C*          RTN500....EXFMT DSPF
+     C*=============================================================*
+05===C           RTN500    BEGSR
+|    C*
+| 01-C           RRN       IFGT 0
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     95    *NO DTA
+| 01-C                     END
+|    C*
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     50
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+05===C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA
+     C*=============================================================*
+06===C           RTN810    BEGSR
+|    C*
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C           IA03      READEIA0                      44*NF/EOF
+|   C*
+| 02-C           *IN44     IFEQ '0'
+| 03-C           IA06      IFNE 0
+|   C           IA09      ORNE 0
+|   C           IA10      ORNE 0
+|   C*M001D     IA02A     IFEQ 'T'
+|   C*M001D     $USER1    ANDEQ'C'
+|   C*M001D     $USER     ANDNE'C810374'
+|   C*M001D               GOTO SKIP
+| 03-C*M001D               END
+|   C                     EXSR RTN811                     DTA->SFL
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+     C           SKIP      TAG
+| 03-C                     END
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVE 'Y'       WBOTOM
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN       DRRN
+06===C                     ENDSR
+     C*=============================================================*
+     C*          RTN811....MOVE DTA TO SFL
+     C*=============================================================*
+07===C           RTN811    BEGSR
+|    C* GET 物流點
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVE *BLANK    #A02
+|    C                     MOVELIA02      #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      DFLD
+| 01*C                     ELSE
+|   C           IA02      CHAINME0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVELME04      DFLD
+| 02*C                     ELSE
+|   C                     MOVE *BLANK    DFLD
+| 02-C                     END
+| 01-C                     END
+|    C* GET日期轉換
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM $EGMDY    S001I2  60
+M001DC*          CDATE     PARM           S001O1  80
+M001AC           CDATE     PARM           S001O1  60
+M001AC                     MOVE CDATE     HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    YMD8S   80
+     C*有效日前－零售價
+M001DC*          CDATE     IFLT MA39
+M001AC           YMD8S     IFLT MA39
+     C*                    Z-ADDMA40      DMA40
+     C                     Z-ADDMA41      DMA46
+     C                     END
+     C*
+     C*有效日後－零售價
+M001DC*          CDATE     IFGE MA39
+M001AC           YMD8S     IFGE MA39
+     C*                    Z-ADDMA45      DMA40
+     C                     Z-ADDMA46      DMA46
+     C                     END
+|    C*
+07===C                     ENDSR
+     C/COPY HBP2CVTR
+

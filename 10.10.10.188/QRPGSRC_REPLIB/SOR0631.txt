@@ -1,0 +1,152 @@
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.05.12  Y2K MODIFY                    */
+     /*=============================================================*/
+     FSOSEPF  IF  E           K        DISK
+     FSOSFPF  IF  E           K        DISK
+     FREWF39  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      606 614 DSF03S
+     I                                      615 623 DSF03E
+     I                                      640 6450YMDS
+     I                                      646 6510YMDE
+     I                                      750 750 IN20
+M001AI                                      851 8580Y01S
+M001AI                                      861 8680Y01E
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF3904    WORK04
+     C           *LIKE     DEFN WF3905    WORK05
+     C           *LIKE     DEFN WF3906    WORK06
+     C           *LIKE     DEFN WF3907    WORK07
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF3901
+     C                     KFLD           WF3902
+     C                     KFLD           WF3903
+     C                     KFLD           WF3908
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      * １．挑選送貨日期：
+      *
+      *　ＳＥ０６送貨日期　　ＳＥ２４確認日期
+      *   ================    ================
+      *   當月              當月     ' '
+      *   當月              未確認   '*'
+      *   當月              後月     '*'
+      *   前月              未確認   '#'
+      *   前月              後月     '#'
+      *
+      * ２．挑選確認日期：
+      *
+      *　ＳＥ２４確認日期
+      *   ================
+      *   當月 ' '
+      *
+     C                     READ SE0                      45
+  01-C           *IN45     DOWEQ'0'
+    C                     MOVELSE07      WF3901
+    C                     MOVELSE03      WF3903
+M001MC*          SE24      IFGE YMDS
+M001MC*          SE24      ANDLEYMDE
+M001MC           SE24      IFGE Y01S
+M001MC           SE24      ANDLEY01E
+    C                     MOVEL*BLANKS   WF3908
+  02*C                     ELSE
+M001MC*          SE06      IFGE YMDS
+M001MC*          SE06      ANDLEYMDE
+M001MC           SE06      IFGE Y01S
+M001MC           SE06      ANDLEY01E
+    C                     MOVEL'*'       WF3908
+  03*C                     ELSE
+    C                     MOVEL'#'       WF3908
+  03-C                     END
+  02-C                     END
+      *
+    C           SE02      SETLLSF0
+    C           SE02      READESF0                      46
+  04-C           *IN46     DOWEQ'0'
+      *
+  05-C           SF03      IFGE DSF03S
+    C           SF03      ANDLEDSF03E
+      *
+    C                     MOVELSF03      WF3902
+    C           KEYWF     CHAINWF390                40
+    C                     EXSR RTN300
+  05-C                     END
+      *
+    C           SE02      READESF0                      46
+  04-C                     END
+      *
+    C                     READ SE0                      45
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN300....WRITE OR UPDATE REWF39
+      *==============================================================*
+01===C           RTN300    BEGSR
+      *
+|    C                     Z-ADD0         WORK04
+|    C                     Z-ADD0         WORK05
+|    C                     Z-ADD0         WORK06
+|    C                     Z-ADD0         WORK07
+      *
+M001MC*          SE24      IFGE YMDS
+M001MC*          SE24      ANDLEYMDE
+M001MC           SE24      IFGE Y01S
+M001MC           SE24      ANDLEY01E
+      *未確認
+      *雖確認但在當時點未確認
+| 07-C           SE03      IFEQ 'D4'
+|   C                     Z-ADDSF19      WORK06
+| 07*C                     ELSE
+| 08-C           SE03      IFEQ 'D3'
+|   C                     Z-ADDSF19      WORK07
+| 08*C                     ELSE
+|   C                     Z-ADDSF19      WORK04
+| 08-C                     END
+| 07-C                     END
+|   C                     Z-ADDSF20      WORK05
+| 06*C                     ELSE
+      *已確認
+| 09-C           SE03      IFEQ 'D4'
+|   C                     Z-ADDSF04      WORK06
+| 09*C                     ELSE
+| 10-C           SE03      IFEQ 'D3'
+|   C                     Z-ADDSF04      WORK07
+| 10*C                     ELSE
+|   C                     Z-ADDSF04      WORK04
+| 10-C                     END
+| 09-C                     END
+|   C                     Z-ADDSF05      WORK05
+      *********
+| 06-C                     END
+      *
+| 11-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK04    WF3904
+|   C                     ADD  WORK05    WF3905
+|   C                     ADD  WORK06    WF3906
+|   C                     ADD  WORK07    WF3907
+      *
+|   C                     UPDATWF390
+| 11*C                     ELSE
+|   C                     Z-ADDWORK04    WF3904
+|   C                     Z-ADDWORK05    WF3905
+|   C                     Z-ADDWORK06    WF3906
+|   C                     Z-ADDWORK07    WF3907
+|   C                     WRITEWF390
+| 11-C                     END
+|    C*
+01===C                     ENDSR
+

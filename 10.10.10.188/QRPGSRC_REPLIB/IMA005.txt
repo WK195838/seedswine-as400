@@ -1,0 +1,2276 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : IMA005                                     *
+     A*    AUTHOR       : A1087  JOYCE                               *
+     A*    DATE WRITTEN : 81/02/28                                   *
+     A*    UPDATE DATE  : 81/04/20 PHILIP                            *
+     A*                   81/05/19 STEPHANIE
+     A*                     1.物流點第一碼須等於�洘犕�
+     A*                         變更為　第一碼不得修改
+     A*                   81/05/20 STEPHANIE
+     A*                     1.調入之成本改為由調出之成
+     A*                         本轉入並重算單位成本
+     A*                     2.調入之產品其須有成本資料
+     A*                         之檢核拿掉
+     A*                   81/05/22 STEPHANIE
+     A*                     1.單一產品之調入之成本依其
+     A*                         本身之單位成本高整
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :庫存系統                                  *
+     A*    REMARK       :調整處理 (A/U/D/I)                        *
+     A*===============================================================
+     A* CODE | AUTHOR |  DATE  | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001 |MICHELLE|98.11.16| MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A* M002 |MICHELLE|98.11.25| 123199 = 123129
+     A*---------------------------------------------------------------
+     A* M003 |MICHELLE|03.03.06|計算調出產品的可用量
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FIMIGPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+     FIMIHPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+     FIMIAPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+     FMTMAPF  UF  E           K        DISK
+     F                                              KINFSR ERRSR
+     FMTMHPF  UF  E           K        DISK
+     F            MA0                               KRENAMEMH0
+     FIMIGLF1 IF  E           K        DISK
+     F            IG0                               KRENAMEIG0L
+     FPA#FLF  IF  E           K        DISK
+     F                                              KINFDS #FRCDN
+     F            #A0                               KRENAME#F0L
+     FPA#APF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FPA#GPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FIMA005D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     F                                        RRN1  KSFILE SFLSR1
+     F                                        RRN2  KSFILE SFLSR2
+     E*: FUNCTION DATA :
+     E                    WFUN    5   5  6
+     E*: DATA TYPE :
+     E                    WTYPE   2   2 10
+     E*: A/U/D/I AUT
+     E                    WA01        5  1
+     E*調出產品ARR
+M003AE                    @AR1      999  9
+     E*調出產品數量ARR
+M003AE                    @AR2      999  5 0
+     E* KEEP HIH05
+M003AE                    @AR3      999  5 0
+     E*調入產品ARR
+M003AE                    @BR1      999  9
+     E* KEEP DOPT2
+M003AE                    @DP2      999  1
+     E*
+     I*SDS        SDS
+     I*                                     *PROGRAM APPPGM
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+M001AI                                      201 2080DATE
+ @   I*                                     140 140 $RMK02
+ @   I*                                     141 141 $RMK03
+     I*                                     162 1620$EVR
+     I*                                     125 1270$CPY
+     I*                                     598 5990$LPRT
+     I*                                     501 505 $WRHUS
+     I*                                     506 506 $PURID
+     I*                                     507 508 $TRNID
+     I*                                     509 513 $APAUT
+     I*                                     514 521 $#101
+     I            DS
+     I                                        1   1 DOPT1
+     I                                        1   10WNUM
+     I#FRCDN      DS
+     I                                     *RECORD  RCDN
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I            DS
+     I                                        1   2 DIG01
+     I                                        1   1 DIG01L
+     I**   SCR002 CHANGE (Y/N)
+     I            DS
+     I                                        1  11 SCR2CN
+     I                                        1   60DIG05
+     I* FOR UPDATE 調整日期年份不能修改
+     I                                        5   60IG055N
+     I* FOR UPDATE 調整日期年月須＞結案年月
+     I                                        1   20IG05M
+     I*物流點
+     I                                        7  11 DIG03
+     I* FOR CHK 物流點第一碼不得修改
+     I                                        7   7 DFIRW
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C                     Z-ADD0         HRRN1   40
+     C* FOR F4 PARM
+     C                     MOVE *BLANKS   APPSCR  6
+     C                     MOVE *BLANK    PARMI1 10
+     C                     MOVE *BLANK    PARMO1 10
+     C*
+     C                     MOVE *BLANK    WQUERY  1
+     C           *LIKE     DEFN DBGN1     OBGN1            *START KEY
+     C           *LIKE     DEFN DBGN2     OBGN2            *START KEY
+      *  FOR SUBFILE (SYS+PGM CONTROL)
+     C           *LIKE     DEFN DBGN1     BBGN1            *SUBFIL BUTTOM
+     C           *LIKE     DEFN DBGN2     BBGN2            *SUBFIL BUTTOM
+      *MM/DD/YY--->YY/MM/DD
+     C           *LIKE     DEFN DBGN1     DBGN1D+ 2        *SUBFIL BUTTOM
+B2MODC           *LIKE     DEFN DBGN1     BBGN1D+ 2        *SUBFIL BUTTOM
+     C*
+     C           *LIKE     DEFN IG03      HIG03            物流點    OM
+     C*
+     C           *LIKE     DEFN IA01      WIA01                        OM
+     C           *LIKE     DEFN IA02      WIA02                        OM
+     C           *LIKE     DEFN IA03      WIA03                        OM
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYIG1    KLIST
+     C                     KFLD           DIG02
+     C           KEYIG2    KLIST
+     C                     KFLD           DBGN1D
+     C                     KFLD           DBGN2
+     C           KEYIG3    KLIST
+     C                     KFLD           BBGN1D
+     C                     KFLD           BBGN2
+     C           KEYIG4    KLIST
+     C                     KFLD           IG02
+     C           KEYIH1    KLIST
+     C                     KFLD           DIG02
+     C           KEYIH2    KLIST
+     C                     KFLD           DIG02
+     C                     KFLD           DIH03
+     C                     KFLD           DIH04
+     C           KEYIA     KLIST
+     C                     KFLD           WIA01
+     C                     KFLD           WIA02
+     C                     KFLD           WIA03
+     C           KEYMA     KLIST
+     C                     KFLD           MA01
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEY#B     KLIST
+     C                     KFLD           DIG01
+     C           KEY#F     KLIST
+     C                     KFLD           DIG03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *
+M002MC                     Z-ADD123129    OBGN1
+      *
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+      *
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN06     CASEQ'1'       RTN110
+    C           *IN25     CASEQ'1'       RTN192
+    C                     CAS            RTN170
+  02-C                     END
+    C  N03                EXSR RTN195
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE $ADD      WA01,1
+|    C                     MOVE $UPD      WA01,2
+|    C                     MOVE $DLT      WA01,4
+|    C                     MOVE $INQ      WA01,5
+|    C                     MOVE 'SCR001'  APPSCR
+|    C*M001D               Z-ADD0         DATE    60
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+|    C*                    PARM $EGMDY    S001I2  60
+|    C*M001D     DATE      PARM           S001O1  60
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN110....F6(ADD)
+      *==============================================================*
+02===C           RTN110    BEGSR
+|    C*
+|    C                     MOVE '1'       DOPT1
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     9699
+| 01*C                     ELSE
+|   C                     EXSR RTN200
+| 02-C           DRRN1     IFGT 0
+|   C           DRRN1     SUB  1         HRRN1
+| 02-C                     END
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 01-C                     END
+|    C                     SETOF                     12
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+03===C           RTN170    BEGSR
+|    C*
+| 01-C           DBGN1     IFEQ 0
+|   C                     Z-ADD0         HRRN1
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+|   C                     MOVE DBGN1     OBGN1
+|   C                     MOVE DBGN2     OBGN2
+| 01*C                     ELSE
+|   C*
+| 02-C           DBGN1     IFNE OBGN1
+|   C           DBGN2     ORNE OBGN2
+|   C                     Z-ADD0         HRRN1
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+|   C                     MOVE DBGN1     OBGN1
+|   C                     MOVE DBGN2     OBGN2
+| 02*C                     ELSE
+|   C                     EXSR RTN171
+| 03-C           *IN99     IFEQ '0'
+|   C                     Z-ADDRRN1      HRRN1
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 03-C                     END
+| 02-C                     END
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN171....READC SFL
+      *==============================================================*
+04===C           RTN171    BEGSR
+|    C*
+|    C                     SETON                     54
+|    C*
+|    C                     READCSFLSR1                 5757*NF
+| 01-C           *IN57     DOWEQ'0'                        *57 LOOP
+|   C*
+|   C                     SETOF                     60    *DOP *IND
+| 02-C           *IN99     IFEQ '0'
+|   C*
+| 03-C           DOPT1     IFNE *BLANK
+|   C                     EXSR RTN180                     *CHK
+|   C*
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C                     Z-ADDRRN1      DRRN1
+|   C                     EXSR RTN200
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END                             *IN99
+|   C*
+|   C           RRN1      CHAINSFLSR1               40
+|   C  N99                MOVE *BLANKS   DOPT1
+|   C                     UPDATSFLSR1
+|   C                     READCSFLSR1                 5757*NF
+|   C*
+| 01-C                     END                             *57 END
+| 05-C           *IN99     IFEQ '0'
+|   C                     SETOF                     5412
+|   C                     SETON                     95
+| 05-C                     END
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN180....CHECK 'SC01' SCREEN
+     C*==============================================================*
+05===CSR         RTN180    BEGSR
+|    C*
+|    C* CHK AUT *
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     609699
+| 01-C                     END
+|    C   99                GOTO END180
+|    C*IG07='V'表已結帳，不得修改刪除
+| 02-C           DOPT1     IFEQ '2'
+|   C           DOPT1     OREQ '4'
+      *
+| 03-C           HIG07     IFEQ 'V'
+|   C                     SETON                     608899
+| 03-C                     END
+      *
+     C           IG02      SETLL#G0                      40
+| 09-C           *IN40     IFEQ '1'
+|   C                     SETON                     608799
+| 09-C                     END
+      *
+| 02-C                     END
+|    C   99                GOTO END180
+|    C*
+|    C           END180    TAG
+|    C   99                Z-ADDRRN1      DRRN1
+|    C*
+05===C                     ENDSR
+     C*=========================================================*
+     C*          RTN191....INITIAL                              *
+     C*=========================================================*
+06===C           RTN191    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     Z-ADD1         DRRN1
+|    C                     Z-ADD0         RRN1
+|    C                     Z-ADD0         WRRN1   40
+|    C                     Z-ADD10        WPRCD1  30
+|    C                     Z-ADD0         DSPRC1  40
+|    C           HRRN1     DIV  WPRCD1    DSPRC1
+|    C                     MULT WPRCD1    DSPRC1
+|    C                     MOVE 'N'       WBOTM1  1
+|    C                     SETOF                     53
+|    C                     SETON                     5254
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+      *
+| 01-C           DBGN1     IFEQ 0
+M002MC                     Z-ADD123129    DBGN1
+| 01-C                     END
+      *
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM DBGN1     S001I2  60
+|    C           W6        PARM           S001O1  60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M001AC                     MOVE HB2@T8    DBGN1D
+|    C*
+B2???C           KEYIG2    SETLLIG0L
+B2INF *CVR5011 sev.50 Field DBGN1D is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2INF *CVR0001 sev.00 Field DBGN2 is not a date or year
+B2INF *CVR0001 sev.00 Field IG02 is not a date or year
+|    C                     MOVE DBGN1     BBGN1
+|    C                     MOVE DBGN2     BBGN2
+|    C*
+06===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+07===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTM1    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN1      DRRN1
+| 01*C                     ELSE
+|   C                     EXSR RTN193
+|   C                     Z-ADD0         WIG051  60
+M001AC                     Z-ADDIG05      W6      60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2???C                     PARM W6        S001I2  60
+B2INF *CVR5011 sev.50 Field S001I2 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|   C           WIG051    PARM           S001O1  60
+      *
+B2000C                     Z-ADDIG05      BBGN1D
+|   C                     Z-ADDWIG051    BBGN1
+|   C                     MOVE IG02      BBGN2
+| 01-C                     END
+|    C*
+07===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+08===C           RTN193    BEGSR
+|    C*
+|    C                     SETOF                     54
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     Z-ADDWRRN1     RRN1
+|    C                     ADD  WPRCD1    DSPRC1
+| 01-C           RRN1      DOWLTDSPRC1
+|   C                     READ IG0L                     46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C*
+|   C* GET型態
+| 03-C           IG04      IFEQ '1'
+|   C                     MOVELWTYPE,1   DTYPE
+| 03-C                     END
+| 04-C           IG04      IFEQ '2'
+|   C                     MOVELWTYPE,2   DTYPE
+| 04-C                     END
+|   C* GET物流點
+|   C           IG03      CHAINPA#FLF               40
+| 05-C           RCDN      IFEQ 'MD0'
+|   C           IG03      CHAINME0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVELME04      DSTOR
+| 05*C                     ELSE
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELIG03      #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVEL#A03      DSTOR
+| 05-C                     END
+|   C* GET日期轉換
+M001AC                     Z-ADDIG05      W6      60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2???C                     PARM W6        S001I2  60
+B2INF *CVR5011 sev.50 Field S001I2 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|   C           DIG05     PARM           S001O1  60
+|   C*
+|   C*MOVE 結案碼 HIDDEN FIELD
+|   C                     MOVE IG07      HIG07
+|   C*
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+| 02*C                     ELSE
+|   C                     Z-ADDRRN1      DSPRC1
+|   C                     MOVE 'Y'       WBOTM1
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN1      DRRN1      50
+|    C                     Z-ADDRRN1      WRRN1
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+09===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN1      IFLE *ZEROS
+|   C                     SETON                     94    *NODATA
+| 01*C                     ELSE
+|   C                     SETON                     50
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     Z-ADD0         D#ROW
+|    C                     Z-ADD0         D#COL
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN200....'SC02' SCREEN MAIN ROUTINE
+      *==============================================================*
+10===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE 'SCR002'  APPSCR
+|    C                     MOVE WFUN,WNUM DFUN
+| 01-C           DOPT1     CASEQ'1'       RTN210           *ADD
+|   C           DOPT1     CASEQ'2'       RTN220           *UPD
+|   C           DOPT1     CASEQ'4'       RTN230           *DEL
+|   C           DOPT1     CASEQ'5'       RTN240           *INQ
+| 01-C                     END
+|    C*
+|    C           *LOVAL    SETLLIG0
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN210....ADD DATA
+      *==============================================================*
+11===C           RTN210    BEGSR
+|    C*
+|    C                     SETON                     3031  *ADD MSG
+|    C                     EXSR RTN251                     *CLR FIELD
+|    C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C*
+| 03-C           *IN04     CASEQ'1'       RTNF4
+|   C           *IN05     CASEQ'1'       RTN260
+|   C                     CAS            RTN280
+| 03-C                     END
+|   C*
+| 04-C           *IN99     IFEQ '0'
+|   C****                 EXSR RTN253
+|   C****                 WRITE#B0
+|   C                     MOVE 'SCR003'  APPSCR
+|   C                     EXSR RTN300
+| 04-C                     END
+|   C*
+| 02*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN220....UPD DATA
+      *==============================================================*
+12===C           RTN220    BEGSR
+|    C*
+|    C           KEYIG4    CHAINIG0                  40
+|    C           *LOVAL    SETLLIG0
+|    C                     EXSR RTN252                     *FIEL->SCRN
+|    C                     MOVE SCR2CN    SCR2CO 11
+|    C                     Z-ADDIG055N    IG055O  20
+|    C*
+| 01-C           *IN03     DOWEQ'0'
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     SETOF                     30
+|   C                     SETON                     31    *CAN INPUT
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C*
+| 04-C           *IN04     CASEQ'1'       RTNF4
+|   C           *IN05     CASEQ'1'       RTN260
+|   C                     CAS            RTN280
+| 04-C                     END
+|   C*
+| 05-C           *IN99     IFEQ '0'
+|   C**         D#B01     CHAIN#B0                  41
+|   C**                   EXSR RTN253
+|   C**                   UPDAT#B0
+|   C                     MOVE 'SCR003'  APPSCR
+|   C                     EXSR RTN300
+| 05-C                     END
+|   C*
+| 03*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 03-C                     END
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN230....DEL DATA
+      *==============================================================*
+13===C           RTN230    BEGSR
+|    C*
+|    C           KEYIG4    CHAINIG0                  40
+|    C           *LOVAL    SETLLIG0
+|    C                     EXSR RTN252                     *FIEL->SCRN
+|    C                     SETOF                     3031  *NO INPUT
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C**                   CALL 'WDS000'
+|   C**                   PARM 'N'       DLTFLG  1
+| 04-C**         DLTFLG    IFEQ 'Y'
+|   C**         D#B01     CHAIN#B0                  41
+|   C**                   DELET#B0
+| 04-C**                   END
+|   C                     MOVE 'SCR003'  APPSCR
+|   C                     EXSR RTN300
+| 03*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 03-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+13===C                     ENDSR
+      *==============================================================*
+      *          RTN240....INQ DATA
+      *==============================================================*
+14===C           RTN240    BEGSR
+|    C*
+|    C           KEYIG4    CHAINIG0                  40
+|    C           *LOVAL    SETLLIG0
+|    C                     EXSR RTN252                     *FIEL->SCRN
+|    C                     SETOF                     3031  *NO INPUT
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C                     MOVE 'SCR003'  APPSCR
+|   C                     EXSR RTN300
+| 03*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 03-C                     END
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+14===C                     ENDSR
+      *==============================================================*
+      *          RTN251....CLEAR SCREEN DATA
+      *==============================================================*
+15===CSR         RTN251    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DIG01
+|    C                     MOVE *BLANKS   #B03
+|    C                     MOVE *BLANKS   DIG02
+|    C                     MOVE *BLANKS   DIG03
+|    C                     MOVE *BLANKS   DSTOR
+|    C                     MOVE '1'       DIG04
+|    C                     Z-ADD$EGMDY    DIG05
+|    C                     MOVE *BLANKS   DIG06
+|    C                     MOVE *BLANKS   D#A03
+|    C*
+15===CSR                   ENDSR
+      *==============================================================*
+      *          RTN252....MOVE DATA TO SCREEN
+      *==============================================================*
+16===CSR         RTN252    BEGSR
+|    C*
+|    C                     MOVE IG01      DIG01
+|    C* GET 公司代號
+|    C           KEY#B     CHAIN#B0                  40
+|    C   40                MOVE *BLANKS   #B03
+|    C*
+|    C                     MOVE IG02      DIG02
+|    C                     MOVE IG03      DIG03
+|    C* GET物流點
+|    C           KEY#F     CHAINPA#FLF               40
+| 01-C           RCDN      IFEQ 'MD0'
+|   C           KEY#F     CHAINME0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVELME04      DSTOR
+| 01*C                     ELSE
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELIG03      #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVEL#A03      DSTOR
+| 01-C                     END
+|    C*
+|    C                     MOVE IG04      DIG04
+|    C* GET日期轉換
+M001AC                     Z-ADDIG05      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2???C                     PARM W6        S001I2  60
+B2INF *CVR5011 sev.50 Field S001I2 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|    C           DIG05     PARM           S001O1  60
+|    C*
+|    C                     MOVE IG06      DIG06
+|    C* GET原因
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVEL'ADJUST  '#A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVELIG06      #A02
+|    C           KEY#A     CHAIN#A0                  40
+|    C   40                MOVE *BLANKS   D#A03
+|    C  N40                MOVEL#A03      D#A03
+|    C* FOR UPDAT CHK
+|    C                     MOVE IG03      HIG03
+|    C*
+|    C                     MOVE DFIRW     HFIRW   1
+|    C*
+16===CSR                   ENDSR
+      *==============================================================*
+      *          RTN253....MOVE SCREEN DATA TO FILE
+      *==============================================================*
+17===C**         RTN253    BEGSR
+|    C*
+|    C*
+17===C**                   ENDSR
+      *==============================================================*
+      *          RTN260....F5 -- 參考資料
+      *==============================================================*
+18===CSR         RTN260    BEGSR
+|    C*
+|    C                     EXSR RTN280
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+| 01-C           *IN99     IFEQ '0'
+|   C           #CSR      DIV  256       D#ROW            *ROW
+|   C                     MVR            D#COL            *COL
+| 01-C                     END
+|    C                     SETON                     99
+|    C*
+18===C                     ENDSR
+      *==============================================================*
+      *          RTN280....CHECK 'SC02' SCREEN
+      *==============================================================*
+19===CSR         RTN280    BEGSR
+|    C*
+| 01-C           DOPT1     IFEQ '1'
+|   C           DIG01     ANDEQ*BLANKS
+|   C                     MOVE *BLANKS   #B03
+|   C                     SETON                     609399
+| 01-C                     END
+|    C   99                GOTO END280
+|    C* GET公司代號
+|    C           DIG01     CHAIN#B0                  40
+     C           *IN40     IFEQ '1'
+     C           DIG01L    OREQ 'C'
+|    C                     MOVE *BLANKS   #B03
+|    C                     SETON                     608999
+     C                     END
+|    C   99                GOTO END280
+|    C*
+| 02-C           DIG03     IFEQ *BLANKS
+|   C                     SETON                     619399
+|   C                     MOVE *BLANKS   DSTOR
+| 02*C                     ELSE
+|   C****                 MOVELDIG03     WK01    1
+| 03-C**         WK01      IFEQ 'T'
+|   C**                   SETON                     618799
+| 04-C           DOPT1     IFEQ '2'
+|   C           DFIRW     ANDNEHFIRW
+|   C                     SETON                     618799
+|   C                     MOVE *BLANKS   DSTOR
+| 04-C                     END
+| 03-C                     END
+|   C   99                GOTO END280
+|   C* GET物流點
+|   C           KEY#F     CHAINPA#FLF               40
+| 05-C           *IN40     IFEQ '0'
+| 06-C           RCDN      IFEQ 'MD0'
+|   C           KEY#F     CHAINME0                  40
+|   C  N40                MOVELME04      DSTOR
+| 06*C                     ELSE
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELDIG03     #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C  N40                MOVEL#A03      DSTOR
+| 06-C                     END
+| 05*C                     ELSE
+|   C                     SETON                     618999
+|   C                     MOVE *BLANKS   DSTOR
+| 05-C                     END
+|   C   99                GOTO END280
+|   C*
+|   C* CHK型態
+| 07-C           DOPT1     IFEQ '1'
+|   C           DIG04     ANDEQ*BLANKS
+|   C                     SETON                     629399
+| 07-C                     END
+|   C   99                GOTO END280
+|   C* CHK調整日期
+| 08-C           DIG05     IFEQ *ZEROS
+|   C                     SETON                     639399
+| 08*C                     ELSE
+|   C                     CALL 'P09'
+|   C                     PARM DIG05     P0901I  60
+|   C                     PARM           P0901O  1
+| 09-C           P0901O    IFEQ 'N'
+|   C                     SETON                     639099
+| 09-C                     END
+| 08-C                     END
+|   C   99                GOTO END280
+|   C*年份不得修改
+| 10-C           DOPT1     IFEQ '2'
+|   C           IG055N    ANDNEIG055O
+|   C                     SETON                     638899
+| 10-C                     END
+|   C   99                GOTO END280
+|   C* UPDATE -- 年月須＞結案年月
+| 11-C           DOPT1     IFEQ '1'
+|   C           DOPT1     OREQ '2'
+|   C*M001D               MOVELIG055N    IG05MO  40       * 結案年月
+|   C*M001D               MOVE IG05M     IG05MO  40       * 結案年月
+M001AC                     MOVE IG055N    HB2@YY  2
+M001AC                     EXSR HB@24Y
+M001AC                     MOVE HB2@Y4    FYY4    40
+M001MC                     MOVELFYY4      IG05MO  60       * 結案年月
+M001MC                     MOVE IG05M     IG05MO  60       * 結案年月
+|   C           DIG01     CHAIN#B0                  40
+B2???C           *IN40     IFEQ '0'
+B2INF *CVR5011 sev.50 Field IG05MO is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|   C           IG05MO    ANDLE#B16
+|   C                     SETON                     638699
+| 12-C                     END
+| 11-C                     END
+|   C   99                GOTO END280
+|   C* CHK原因
+| 13-C           DIG06     IFEQ *BLANKS
+|   C                     SETON                     649399
+|   C                     MOVE *BLANKS   D#A03
+| 13*C                     ELSE
+|   C* GET調整原因
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'ADJUST  '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELDIG06     #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C  N40                MOVEL#A03      D#A03
+|   C   40                MOVE *BLANKS   D#A03
+|   C   40                SETON                     648999
+| 13-C                     END
+|   C   99                GOTO END280
+|   C*
+19===CSR         END280    ENDSR
+    C*==============================================================*
+    C*          RTN300....'SC03' SCREEN MAIN ROUTINE --- SFLSR
+    C*==============================================================*
+20===C           RTN300    BEGSR
+|   C*
+| 01-C           DOPT1     CASEQ'1'       RTN310           *ADD
+|   C           DOPT1     CASEQ'2'       RTN320           *UPD
+|   C           DOPT1     CASEQ'4'       RTN330           *DLT
+|   C           DOPT1     CASEQ'5'       RTN340           *INQ
+| 01-C                     END
+|   C   12                SETOF                     12
+|   C*
+20===C                     ENDSR
+    C*==============================================================*
+    C*          RTN310....ADD DATA --- SFLSR
+    C*==============================================================*
+21===C           RTN310    BEGSR
+|   C*
+|   C                     SETON                     323334
+|   C                     EXSR RTN391                     *INT SFLSR
+|   C                     EXSR RTN397                     *READ BLANK
+|   C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           APPSCR    ANDEQ'SCR003'
+|   C*
+|   C                     WRITEDSPC3
+|   C                     EXFMTSFLCR2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C*
+| 04-C           *IN04     CASEQ'1'       RTN381
+|   C           *IN05     CASEQ'1'       RTN360
+|   C                     CAS            RTN380            CHK SFLSR
+| 04-C                     END
+|   C*
+| 05-C           *IN99     IFEQ '0'                         SAVE
+|   C           *IN05     ANDEQ'0'                         SAVE
+|   C                     EXSR RTN39S                     *SAVE
+|   C                     MOVE 'SCR001'  APPSCR
+| 05-C                     END
+|   C*
+| 03*C                     ELSE
+|   C           *LOVAL    SETLLIG0
+|   C           *LOVAL    SETLLIH0
+|   C                     MOVE 'SCR002'  APPSCR
+| 03-C                     END                             *IN03 ENDIF
+| 02-C                     END                             *IN12 ENDIF
+|   C*
+| 01-C                     END                             *ENDDO
+|   C*
+21===C                     ENDSR
+    C*==============================================================*
+    C*          RTN320....UPD DATA --- SFLSR
+    C*==============================================================*
+22===C           RTN320    BEGSR
+|   C*
+|   C                     SETON                     34
+|   C                     SETOF                     3233
+|   C                     EXSR RTN391                     *INT SFLSR
+|   C                     EXSR RTN398                     *READ DATA
+|   C                     EXSR RTN397                     *READ BLANK
+|   C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           APPSCR    ANDEQ'SCR003'
+|   C*
+|   C                     WRITEDSPC3
+|   C                     EXFMTSFLCR2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C*
+| 04-C           *IN05     IFEQ '1'
+|   C                     MOVE 'N'       WINDLT  1
+| 04*C                     ELSE
+|   C                     MOVE 'Y'       WINDLT
+| 04-C                     END
+|   C*
+| 05-C           *IN04     CASEQ'1'       RTN381
+|   C           *IN05     CASEQ'1'       RTN360
+|   C                     CAS            RTN380            CHK SFLSR
+| 05-C                     END
+|   C*
+| 06-C           *IN99     IFEQ '0'                         SAVE
+|   C           *IN05     ANDEQ'0'                         SAVE
+|   C                     EXSR RTN39S                      ADD D
+|   C                     MOVE 'SCR001'  APPSCR
+| 06-C                     END
+|   C*
+| 03*C                     ELSE
+|   C           *LOVAL    SETLLIG0
+|   C           *LOVAL    SETLLIH0
+|   C                     MOVE 'SCR002'  APPSCR
+| 03-C                     END                             *IN03 ENDIF
+| 02-C                     END                             *IN12 ENDIF
+|   C*
+| 01-C                     END                             *ENDDO
+|   C*
+22===C                     ENDSR
+    C*==============================================================*
+    C*          RTN330....DEL DATA --- SFLSR2
+    C*==============================================================*
+23===C           RTN330    BEGSR
+|   C*
+|   C                     SETOF                     323334*NO INPUT
+|   C                     EXSR RTN391                     *INT SFLSR
+|   C                     EXSR RTN398                     *READ DATA TO SFLSR
+|   C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           APPSCR    ANDEQ'SCR003'
+|   C*
+|   C                     WRITEDSPC3
+|   C                     EXFMTSFLCR2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C*
+|   C                     MOVE 'N'       WINDLT
+|   C*
+| 04-C           *IN04     CASEQ'1'       RTN381
+|   C           *IN05     CASEQ'1'       RTN360
+|   C                     CAS            RTN380            CHK SFLSR
+| 04-C                     END
+|   C*
+| 05-C           *IN99     IFEQ '0'                         SAVE
+|   C           *IN05     ANDEQ'0'
+|   C                     CALL 'WDS000'
+|   C                     PARM 'N'       DLTFLG  1
+| 06-C           DLTFLG    IFEQ 'Y'
+|   C                     EXSR RTN39T                      DLT D
+| 06-C                     END
+|   C                     MOVE 'SCR001'  APPSCR
+| 05-C                     END
+|   C*
+| 03*C                     ELSE
+|   C           *LOVAL    SETLLIG0
+|   C           *LOVAL    SETLLIH0
+|   C                     MOVE 'SCR002'  APPSCR
+| 03-C                     END                             *IN03 ENDIF
+| 02-C                     END                             *IN12 ENDIF
+|   C*
+| 01-C                     END                             *ENDDO
+|   C*
+23===C                     ENDSR
+    C*==============================================================*
+    C*          RTN340....INQ DATA --- SFLSR2
+    C*==============================================================*
+24===C           RTN340    BEGSR
+|   C*
+|   C                     SETOF                     323334*NO INPUT
+|   C                     EXSR RTN391                     *INT SFLSR
+|   C                     EXSR RTN398                     *READ DATA TO SFLSR
+|   C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           APPSCR    ANDEQ'SCR003'
+|   C*
+|   C                     WRITEDSPC3
+|   C                     EXFMTSFLCR2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C*
+| 04-C           *IN04     CASEQ'1'       RTN381
+|   C           *IN05     CASEQ'1'       RTN360
+|   C                     CAS            RTN380            CHK SFLSR
+| 04-C                     END
+|   C*
+| 05-C           *IN99     IFEQ '0'                         SAVE
+|   C           *IN05     ANDEQ'0'
+|   C                     MOVE 'SCR001'  APPSCR
+| 05-C                     END
+|   C*
+| 03*C                     ELSE
+|   C           *LOVAL    SETLLIG0
+|   C           *LOVAL    SETLLIH0
+|   C                     MOVE 'SCR002'  APPSCR
+| 03-C                     END                             *IN03 ENDIF
+| 02-C                     END                             *IN12 ENDIF
+|   C*
+| 01-C                     END                             *ENDDO
+|   C*
+24===C                     ENDSR
+    C*==============================================================*
+    C*          RTN360....F5 -- 參考資料
+    C*==============================================================*
+25===CSR         RTN360    BEGSR
+|   C*
+|   C                     EXSR RTN380
+|   C********************
+|   C*  GET ROW,COL     *
+|   C********************
+| 01-C           *IN99     IFEQ '0'
+|   C           #CSR      DIV  256       D#ROW            *ROW
+|   C                     MVR            D#COL            *COL
+| 01-C                     END
+|   C                     SETON                     99
+|   C*
+25===C                     ENDSR
+    C*==============================================================*
+    C*          RTN380....CHECK 'SC03' --- SFLSR
+    C*==============================================================*
+26===C           RTN380    BEGSR
+|   C*
+|   C*CHK SCREEN
+M003AC                     MOVEL*BLANKS   @AR1
+M003AC                     Z-ADD0         @AR2
+M003AC                     Z-ADD0         @AR3
+M003AC                     MOVEL*BLANKS   @BR1
+M003AC                     MOVEL*BLANKS   @DP2
+|   C                     SETON                     54
+|   C                     READCSFLSR2                 5757
+|   C*
+| 01-C           *IN57     DOWEQ'0'
+|   C*
+| 02-C*          DOPT1     IFEQ '4'
+|   C*                    MOVE '4'       DOPT2
+| 02-C*                    END
+|   C*
+|   C                     SETOF                     6061
+|   C                     SETOF                     6263
+|   C*                                  DATA ENTRY & *IN99 OFF ->CHECK
+| 03-C           DCHK      IFEQ 'Y'
+|   C                     SETOF                     3233  *PROTECT FIELD
+| 03*C                     ELSE
+|   C                     SETON                     3233
+| 03-C                     END
+|   C   99                GOTO UPD
+|   C*
+| 04-C           DOPT2     IFEQ *BLANKS
+|   C           DIH03     ANDEQ*BLANKS
+|   C           DIH04     ANDEQ*BLANKS
+|   C                     EXSR RTN39A
+|   C                     GOTO UPD
+| 04-C                     END
+|   C*
+| 05-C           DCHK      IFEQ 'Y'
+| 06-C           DOPT2     IFEQ '1'
+|   C                     SETON                     609199
+| 06-C                     END
+| 05*C                     ELSE
+| 07-C           DOPT2     IFEQ '2'
+|   C           DOPT2     OREQ '4'
+|   C                     SETON                     609299
+| 07-C                     END
+| 05-C                     END
+|   C   99                GOTO DSP
+|   C*****
+|   C* DLETE : WINDOW CHK FOR SUMMARY
+| 08-C           DOPT2     IFEQ '4'
+|   C           WINDLT    ANDEQ'Y'
+|   C                     CALL 'WDS000'
+|   C                     PARM 'N'       DLTFLG  1
+| 09-C           DLTFLG    IFNE 'Y'
+|   C                     MOVE *BLANK    DOPT2
+| 09-C                     END
+|   C*
+|   C* WDS000 SHARE OPEN ---> DON'T WRITE
+|   C***                  SETON                     37    *FORCE DATA
+|   C***                  WRITEDSPC3
+|   C***                  WRITESFLCR2
+|   C***                  SETOF                     37
+| 08-C                     END
+|   C*****
+|   C* 5.庫存查詢
+| 10-C           DOPT2     IFEQ '5'
+|   C                     CALL 'IMI0211'
+|   C                     PARM DIH03     I021I1  9
+|   C                     PARM           I021O1  1
+|   C                     SETON                     99
+|   C                     MOVE *BLANKS   DOPT2
+|   C                     GOTO UPD
+| 10-C                     END
+|   C* CHK 產品代號
+| 11-C           DOPT2     IFNE *BLANKS
+| 12-C           DIG04     IFEQ '1'
+| 13-C           DIH03     IFEQ *BLANKS
+|   C           DIH04     ANDEQ*BLANKS
+|   C**ADD BY STEPHANIE 81/05/15
+|   C           DIH03     ORNE *BLANKS
+|   C           DIH04     ANDNE*BLANKS
+|   C                     SETON                     6162
+|   C                     SETON                     8699
+| 13-C                     END
+| 12*C                     ELSE
+| 14-C           DIH03     IFEQ *BLANKS
+|   C                     SETON                     619399
+| 14-C                     END
+| 15-C           DIH04     IFEQ *BLANKS
+|   C                     SETON                     629399
+| 15-C                     END
+| 16-C           DIH03     IFEQ DIH04
+|   C                     SETON                     6162
+|   C                     SETON                     8599
+| 16-C                     END
+| 12-C                     END
+| 11-C                     END
+|   C   99                GOTO DSP
+|   C* GET 調出產品代號
+| 17-C           DIH03     IFNE *BLANKS
+|   C                     MOVELDIH03     MA01
+|   C           KEYMA     CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+|   C  N40                MOVELMA03      DMA031
+|   C   40                SETON                     618999
+|   C   40                MOVE *BLANKS   DMA031
+| 17-C                     END
+|   C   99                GOTO DSP
+|   C* GET 調入產品代號
+| 18-C           DIH04     IFNE *BLANKS
+|   C                     MOVELDIH04     MA01
+|   C           KEYMA     CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+| 19-C           *IN40     IFEQ '0'
+|   C                     MOVELMA03      DMA032
+| 19*C                     ELSE
+|   C                     SETON                     628999
+|   C                     MOVE *BLANKS   DMA032
+| 19-C                     END
+| 18-C                     END
+|   C   99                GOTO DSP
+|   C*
+| 20-C           DOPT2     IFNE *BLANKS
+| 21-C           DIH03     IFNE *BLANKS
+|   C           DIH04     ORNE *BLANKS
+| 22-C           DIH05     IFLE 0
+|   C                     SETON                     639399
+| 22-C                     END
+| 21-C                     END
+| 20-C                     END
+|   C   99                GOTO DSP
+|   C*
+| 23-C           DOPT1     IFEQ '1'
+|   C           DOPT1     OREQ '2'
+|   C           DOPT1     OREQ '4'
+| 24-C           DIH03     IFNE *BLANKS
+|   C           DIH04     ORNE *BLANKS
+| 25-C           DIH05     IFNE 0
+|   C*
+|   C* CHK產品庫存檔(ADD, UPD)
+|   C* USE調出產品代號(IH03)
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE DIG03     WIA02            新物流點
+|   C                     MOVE DIH03     WIA03            *DIH03
+|   C           KEYIA     CHAINIA0                  40
+|   C           *LOVAL    SETLLIA0
+|   C*
+|   C**START ADD BY STEPHANIE 81/05/15
+|   C**調出時該產品須存於庫存檔中(IMIAPF)
+| 26-C           DIH03     IFNE *BLANKS
+|   C           *IN40     ANDEQ'1'
+|   C                     SETON                     876399
+| 26-C                     END
+|   C   99                GOTO DSP
+|   C**END ADD
+     C*
+|   C*記錄同一張單據，調出產品的可用量
+     C*
+M003AC           *IN40     IFEQ '0'
+M003AC                     Z-ADD1         X       30
+M003AC                     Z-ADDDIH05     WIH05   60
+"    C           *IN49     DOUEQ'0'
+M003AC           DIH03     LOKUP@AR1,X                   49
+M003AC           *IN49     IFEQ '1'
+      *
+     C* WIH05預計使用的數量
+      *
+M003AC           @DP2,X    IFEQ '1'
+M003AC                     ADD  @AR2,X    WIH05
+"    C                     ELSE
+M003AC           @DP2,X    IFEQ '2'
+"    C                     ADD  @AR2,X    WIH05
+"    C                     SUB  @AR3,X    WIH05
+"    C                     ELSE
+"    C           @DP2,X    IFEQ '4'
+"    C                     SUB  @AR3,X    WIH05
+"    C                     END
+"    C                     END
+"    C                     END
+      *
+M003AC                     END
+"    C                     ADD  1         X
+"    C                     END
+M003AC                     END
+     C*
+|   C* ADD CHK
+| 27-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDEQ'1'
+|   C*
+M003MC*          IA10      ANDLTDIH05
+M003MC           IA10      ANDLTWIH05
+|   C                     SETON                     876399
+| 27-C                     END
+|   C   99                GOTO DSP
+|   C* UPD(IG03 CHANGE) CHK
+| 28-C           *IN40     IFEQ '0'
+|   C           DOPT1     ANDEQ'2'
+|   C           DIG03     ANDNEHIG03
+|   C*
+|   C*M003M     IA10      ANDLTDIH05
+M003MC           IA10      ANDLTWIH05
+|   C                     SETON                     876399
+| 28-C                     END
+|   C   99                GOTO DSP
+|   C*
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE HIG03     WIA02            舊物流點
+|   C                     MOVE DIH03     WIA03
+|   C           KEYIA     CHAINIA0                  40
+|   C           *LOVAL    SETLLIA0
+|   C*
+|   C* UPD(IG03 NO CHANGE) CHK
+| 29-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDEQ'2'
+|   C           DIG03     ANDEQHIG03
+|   C*
+|   C                     ADD  HIH05     IA10
+|   C*M003M               SUB  DIH05     IA10
+M003MC                     SUB  WIH05     IA10
+| 30-C           IA10      IFLT 0
+|   C                     SETON                     876399
+| 30-C                     END
+| 29-C                     END
+|   C   99                GOTO DSP
+|   C* USE調入產品代號(IH04)
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE HIG03     WIA02            舊物流點
+|   C                     MOVE DIH04     WIA03
+|   C           KEYIA     CHAINIA0                  40
+|   C           *LOVAL    SETLLIA0
+     C*
+|   C*記錄同一張單據，調入產品的可用量
+     C*
+M003AC           *IN40     IFEQ '0'
+M003AC                     Z-ADD1         X       30
+M003AC                     Z-ADDDIH05     KIH05   60
+"    C           *IN49     DOUEQ'0'
+M003AC           DIH04     LOKUP@BR1,X                   49
+M003AC           *IN49     IFEQ '1'
+      *
+     C* KIH05調入產品預計增加的數量
+      *
+M003AC           @DP2,X    IFEQ '1'
+M003AC                     ADD  @AR2,X    KIH05
+"    C                     ELSE
+M003AC           @DP2,X    IFEQ '2'
+"    C                     ADD  @AR2,X    KIH05
+"    C                     SUB  @AR3,X    KIH05
+"    C                     ELSE
+"    C           @DP2,X    IFEQ '4'
+"    C                     SUB  @AR3,X    KIH05
+"    C                     END
+"    C                     END
+"    C                     END
+      *
+M003AC                     END
+"    C                     ADD  1         X
+"    C                     END
+M003AC                     END
+     C*
+|   C* UPD(IG03 NO CHANGE) CHK
+| 31-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDEQ'2'
+|   C           DIG03     ANDEQHIG03
+|   C*
+|   C                     SUB  HIH05     IA10
+|   C*M003M               ADD  DIH05     IA10
+M003MC                     ADD  KIH05     IA10
+| 32-C           IA10      IFLT 0
+|   C                     SETON                     876399
+| 32-C                     END
+| 31-C                     END
+|   C   99                GOTO DSP
+      *
+     C           DIH04     IFNE *BLANKS
+     C           WIA03     CHAINMA0                  40
+     C           *IN40     IFEQ '1'
+|   C                     SETON                     628499
+     C                     END
+     C                     END
+|   C   99                GOTO DSP
+      *
+|   C* UPD(IG03 CHANGE) CHK
+| 33-C           *IN40     IFEQ '0'
+|   C           DOPT1     ANDEQ'2'
+|   C           DIG03     ANDNEHIG03
+|   C*
+| 34-C           IA10      IFLT HIH05
+|   C                     SETON                     876399
+| 34-C                     END
+| 33-C                     END
+|   C   99                GOTO DSP
+|   C* DLT CHK
+| 35-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDEQ'4'
+|   C*
+| 36-C           IA10      IFLT HIH05
+|   C                     SETON                     876399
+| 36-C                     END
+| 35-C                     END
+|   C   99                GOTO DSP
+| 25-C                     END
+|   C*
+| 24-C                     END
+| 23-C                     END
+|   C   99                GOTO DSP
+|   C*
+M003AC*MOVE KEY AND RRN TO ARR Y
+|   C*
+M003AC                     Z-ADDRRN2      A       30
+M003AC                     MOVEL*BLANKS   @AR1,A
+M003AC                     MOVELDIH03     @AR1,A
+M003AC                     Z-ADDDIH05     @AR2,A
+M003AC                     Z-ADDHIH05     @AR3,A
+M003AC                     MOVEL*BLANKS   @BR1,A
+M003AC                     MOVELDIH04     @BR1,A
+M003AC                     MOVELDOPT2     @DP2,A
+|    C*
+|   C   99                GOTO DSP
+|   C*
+|   C           DSP       TAG
+|   C   99                Z-ADDRRN2      DRRN2
+|   C*
+|   C           UPD       TAG
+|   C                     UPDATSFLSR2
+|   C                     READCSFLSR2                   57
+|   C* READC DOW LOOP
+| 01-C                     END
+|   C********************
+|   C*  GET ROW,COL     *
+|   C********************
+| 37-C           *IN99     IFEQ '0'
+|   C           #CSR      DIV  256       D#ROW            *ROW
+|   C                     MVR            D#COL            *COL
+| 37-C                     END
+|   C** 游標位置即為(D#ROW,D#COL)
+|   C*
+26===C           END380    ENDSR
+    C*==============================================================*
+    C*          RTN381....F4 --- SFLSR
+    C*==============================================================*
+27===C           RTN381    BEGSR
+|   C********************
+|   C*  GET ROW,COL     *
+|   C********************
+|   C           #CSR      DIV  256       D#ROW            *ROW
+|   C                     MVR            D#COL            *COL
+|   C** 游標位置即為(D#ROW,D#COL)
+|   C*
+|   C*CHK SCREEN
+|   C                     SETOF                     38
+|   C                     SETON                     54
+|   C                     SETOF                     6061
+|   C                     SETOF                     6263
+|   C                     READCSFLSR2                 5757
+|   C*
+| 01-C           *IN57     DOWEQ'0'
+| 02-C           DCHK      IFEQ 'Y'
+|   C                     SETOF                     3233  *PROTECT FIELD
+| 02*C                     ELSE
+|   C                     SETON                     3233
+| 02-C                     END
+|   C*挑選調出產品代號
+|   C                     MOVELDIH03     WQUERY
+| 03-C           WQUERY    IFEQ '?'
+|   C                     CALL 'WDS001'
+|   C           DIH03     PARM DIH03     DS01O1  9
+|   C                     SETON                     38
+|   C                     MOVELDIH03     WQUERY
+| 04-C           WQUERY    IFEQ '?'
+|   C                     MOVEL' '       DIH03
+| 04-C                     END
+| 03-C                     END
+|   C   38                GOTO UPD1
+|   C*挑選調入產品代號
+|   C                     MOVELDIH04     WQUERY
+| 05-C           WQUERY    IFEQ '?'
+|   C                     CALL 'WDS001'
+|   C           DIH04     PARM DIH04     DS01O1  9
+|   C                     SETON                     38
+|   C                     MOVELDIH04     WQUERY
+| 06-C           WQUERY    IFEQ '?'
+|   C                     MOVEL' '       DIH04
+| 06-C                     END
+| 05-C                     END
+|   C   38                GOTO UPD1
+|   C*
+|   C           UPD1      TAG
+|   C                     UPDATSFLSR2
+| 07-C           *IN38     IFEQ '1'
+|   C                     SETON                     37
+|   C                     WRITEDSPC3
+|   C                     WRITESFLCR2
+|   C                     SETOF                     3738
+| 07-C                     END
+|   C                     READCSFLSR2                   57
+|   C* READC DOW LOOP
+| 01-C                     END
+|   C*
+|   C                     SETON                     99
+|   C*
+27===C           END381    ENDSR
+    C*==============================================================*
+    C*          RTN391....INIT 'SC03' -- SFLSR2
+    C*==============================================================*
+28===C           RTN391    BEGSR
+|   C*
+|   C                     Z-ADD1         DRRN2
+|   C                     Z-ADD0         WRRN2   40
+|   C                     Z-ADD0         RRN2
+|   C                     Z-ADD120       DSPRC2  40       *SFL SIZE
+|   C                     Z-ADD10        WPRCD2  40       *PAG RCD
+|   C                     MOVE 'N'       WBOTM2  1        *BOTTOM
+|   C*
+|   C                     SETON                     52    *SFLCLR
+|   C                     WRITESFLCR2
+|   C                     SETOF                     525053
+|   C                     SETON                     51    *SFLDSPCTL
+|   C*
+|   C           KEYIH1    SETLLIH0
+|   C*
+28===C                     ENDSR
+    C*==============================================================*
+    C*          RTN397....FILE TO SCREEN --- SFLSR(FOR ADD OR UPD)
+    C*==============================================================*
+29===C           RTN397    BEGSR
+|   C*
+|   C                     SETOF                     54    *45 FOR BLANK LOOP
+|   C                     SETON                     3233
+|   C                     EXSR RTN39A                     *INIT SFLDTA
+|   C*
+| 01-C           RRN2      DOWLTDSPRC2
+|   C                     ADD  1         RRN2
+|   C                     WRITESFLSR2
+| 01-C                     END
+|   C*
+|   C                     SETON                     5053
+|   C*
+29===C                     ENDSR
+    C*==============================================================*
+    C*          RTN398....FILE TO SCREEN --- SFLSR(FOR A,U,D,I)
+    C*==============================================================*
+30===C           RTN398    BEGSR
+|   C*
+| 01-C           DOPT1     IFEQ '2'
+| 02-C           SCR2CN    IFNE SCR2CO
+|   C           DIG03     ORNE HIG03
+|   C                     SETON                     54
+| 02*C                     ELSE
+|   C                     SETOF                     54
+| 02-C                     END
+| 01-C                     END
+|   C           KEYIH1    READEIH0                      44*NF/EOF
+|   C*
+| 03-C           *IN44     DOWEQ'0'
+|   C                     EXSR RTN39B
+|   C                     ADD  1         RRN2
+|   C                     WRITESFLSR2
+|   C           KEYIH1    READEIH0                      44*NF/EOF
+| 03-C                     END
+|   C*
+|   C                     SETON                     53
+|   C                     Z-ADDRRN2      WRRN2      50
+|   C*
+30===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39A....INIT 'SC03' -- SFLSR(DTA)
+    C*==============================================================*
+31===C           RTN39A    BEGSR
+|   C*
+|   C                     MOVE *BLANKS   DCHK
+|   C                     MOVE *BLANKS   DOPT2
+|   C                     MOVE *BLANKS   DIH03
+|   C                     MOVE *BLANKS   DMA031
+|   C                     MOVE *BLANKS   DIH04
+|   C                     MOVE *BLANKS   DMA032
+|   C                     MOVE *BLANKS   MA13
+|   C                     Z-ADD0         DIH05
+|   C                     Z-ADD0         HIH05
+|   C*
+31===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39B....FILE TO SCREEN --- MOVE
+    C*==============================================================*
+32===C           RTN39B    BEGSR
+|   C*
+|   C                     MOVE 'Y'       DCHK
+|   C                     MOVE *BLANKS   DOPT2
+|   C                     MOVE IH03      DIH03
+|   C                     MOVE IH03      MA01
+|   C* GET 產品名稱／單位
+|   C           KEYMA     CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+|   C   40                MOVE *BLANKS   DMA031
+|   C  N40                MOVELMA03      DMA031
+|   C*
+|   C                     MOVE IH04      DIH04
+|   C                     MOVE IH04      MA01
+|   C* GET 產品名稱／單位
+|   C           KEYMA     CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+|   C   40                MOVE *BLANKS   DMA032
+|   C  N40                MOVELMA03      DMA032
+|   C*
+|   C                     Z-ADDIH05      DIH05
+|   C                     Z-ADDIH05      HIH05
+|   C*
+32===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39C....SCREEN TO FILE --- HEADFILE
+    C*==============================================================*
+33===C           RTN39C    BEGSR
+|   C*** IMIGPF
+|   C                     MOVE DIG01     IG01
+|   C                     MOVE DIG02     IG02
+|   C                     MOVE DIG03     IG03
+|   C                     MOVE DIG04     IG04
+|   C                     MOVE DIG06     IG06
+|   C                     MOVE *BLANK    IG07
+|   C* GET日期轉換
+|   C                     CALL 'RES001'
+|   C                     PARM 'MDY'     S001I1  3
+|   C                     PARM DIG05     S001I2  60
+B2???C           W6        PARM           S001O1  60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M001AC                     MOVE HB2@T8    IG05
+B2INF *CVR5011 sev.50 Field S001O1 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|   C**
+B2???C                     Z-ADDDATE      IGXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IGYY
+|   C                     MOVE $USER     IGZZ
+|   C*
+33===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39D....SCREEN TO FILE --- D
+    C*==============================================================*
+34===C           RTN39D    BEGSR
+|   C*** IMIHPF
+| 01-C           DOPT2     IFEQ '1'
+|   C                     MOVE DIG01     IH01
+|   C                     MOVE DIG02     IH02
+| 01-C                     END
+|   C                     MOVE DIH03     IH03
+|   C                     MOVE DIH04     IH04
+|   C                     Z-ADDDIH05     IH05
+|   C*調整日期，物流點代號
+|   C* GET日期轉換
+|   C                     CALL 'RES001'
+|   C                     PARM 'MDY'     S001I1  3
+|   C                     PARM DIG05     S001I2  60
+B2???C           W6        PARM           S001O1  60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M001AC                     MOVE HB2@T8    IH06
+B2INF *CVR5011 sev.50 Field S001O1 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|   C                     MOVE DIG03     IH07
+|   C**
+|   C                     Z-ADD0         MA31
+|   C                     Z-ADD0         MA32
+|   C                     Z-ADD0         MA33
+| 02-C           IH03      IFNE *BLANKS
+|   C                     MOVE IH03      MA01
+     C                     EXSR RTN39H
+| 02*C                     ELSE
+|   C                     MOVE IH04      MA01
+     C                     EXSR RTN39H
+| 02-C                     END
+|   C           IH05      MULT MA31      IH08      H
+|   C           IH05      MULT MA32      IH09      H
+      *Ｔ庫　ＤＵＴＹ不計算
+     C           DFIRW     IFNE 'T'
+|   C           IH05      MULT MA33      IH10      H
+     C                     ELSE
+     C                     Z-ADD0         IH10
+     C                     END
+|   C**
+B2???C                     Z-ADDDATE      IHXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IHYY
+|   C                     MOVE $USER     IHZZ
+|   C*
+|   C           *LOVAL    SETLLMA0
+34===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39S....SAVE D
+    C*==============================================================*
+35===C           RTN39S    BEGSR
+|   C* GET 調整單號
+| 01-C           DOPT1     IFEQ '1'
+|   C                     CALL 'RES008'
+|   C                     PARM DIG01     S008I1  2
+|   C                     PARM 'A1'      S008I2  2
+|   C                     PARM DIG04     S008I3  1
+|   C                     PARM IG055N    S008I4  20
+|   C           DIG02     PARM           S008O1 12
+| 01-C                     END
+|   C*****************
+|   C* UPDATE IMIHPF *
+|   C*****************
+|   C                     READCSFLSR2                 5757
+| 02-C           *IN57     DOWEQ'0'
+|   C*
+| 03-C           DOPT2     IFEQ '1'
+|   C           KEYIH2    CHAINIH0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C                     EXSR RTN39F                     *SAV OTHER FILE
+|   C                     EXSR RTN39D
+|   C                     UPDATIH0
+| 04*C                     ELSE
+|   C                     Z-ADD0         IH05
+|   C                     EXSR RTN39F                     *SAV OTHER FILE
+|   C                     EXSR RTN39D
+|   C                     WRITEIH0
+| 04-C                     END
+| 03-C                     END
+|   C*
+| 05-C           DOPT2     IFEQ '2'
+|   C           KEYIH2    CHAINIH0                  40
+|   C                     EXSR RTN39F                     *SAV OTHER FILE
+|   C                     EXSR RTN39D
+|   C                     UPDATIH0
+| 05-C                     END
+|   C*
+| 06-C           DOPT2     IFEQ '4'
+|   C**                   CALL 'WDS000'
+|   C**                   PARM 'N'       DLTFLG  1
+| 07-C**         DLTFLG    IFEQ 'Y'
+|   C           KEYIH2    CHAINIH0                  40
+|   C                     EXSR RTN39F                     *SAV OTHER FILE
+|   C                     DELETIH0
+| 07-C**                   END
+|   C**                   SETON                     37
+|   C**                   WRITEDSPC3
+|   C**                   WRITESFLCR2
+|   C**                   SETOF                     37
+| 06-C                     END
+|   C*日期更動，明細檔全部更動
+| 08-C           DOPT2     IFEQ *BLANK
+| 09-C           SCR2CN    IFNE SCR2CO
+|   C           KEYIH2    CHAINIH0                  40
+|   C                     EXSR RTN39D
+|   C  N40                UPDATIH0
+| 09-C                     END
+| 08-C                     END
+|   C*
+| 10-C           DOPT2     IFEQ *BLANK
+|   C           DIG03     ANDNEHIG03
+|   C           KEYIH2    CHAINIH0                  40
+|   C  N40                EXSR RTN39F                     *SAV OTHER FILE
+| 10-C                     END
+|   C*
+|   C                     READCSFLSR2                 5757
+| 02-C                     END
+|   C           *LOVAL    SETLLIH0
+|   C*****************
+|   C* UPDATE IMIGPF *
+|   C*****************
+| 11-C           DOPT1     IFEQ '1'
+|   C                     EXSR RTN39C
+|   C                     WRITEIG0
+|   C                     SETON                     70
+| 11-C                     END
+|   C*
+| 12-C           DOPT1     IFEQ '2'
+|   C           KEYIG4    CHAINIG0                  40
+|   C                     EXSR RTN39C
+|   C                     UPDATIG0
+| 12-C                     END
+|   C*
+35===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39F....UPDATE  IMIAPF , MTMAPF
+    C*==============================================================*
+36===C           RTN39F    BEGSR
+|   C*****************
+|   C* UPDATE IMIAPF *
+|   C*****************
+|   C*
+| 01-C           DOPT2     IFEQ '4'
+|   C           HIG03     ORNE DIG03
+|   C           DOPT2     ANDNE'1'
+|   C* USE調出產品代號(IH03)
+| 02-C           DIH03     IFNE *BLANKS
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE HIG03     WIA02
+|   C                     MOVE DIH03     WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2???C                     Z-ADDDATE      IAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 03-C           *IN40     IFEQ '0'
+|   C                     ADD  IH05      IA06
+|   C                     ADD  IH05      IA07
+|   C                     ADD  IH05      IA10
+|   C                     UPDATIA0
+| 03-C                     END
+| 02-C                     END
+|   C*
+|   C* USE調入產品代號(IH04)
+| 04-C           DIH04     IFNE *BLANKS
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE HIG03     WIA02
+|   C                     MOVE DIH04     WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2???C                     Z-ADDDATE      IAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 05-C           *IN40     IFEQ '0'
+|   C                     SUB  IH05      IA06
+|   C                     SUB  IH05      IA07
+|   C                     SUB  IH05      IA10
+|   C                     UPDATIA0
+| 05*C                     ELSE
+|   C                     MOVELDIG01     IA01
+|   C                     MOVE HIG03     IA02
+|   C                     MOVE DIH04     IA03
+|   C           IA03      CHAINMA0                  40
+|   C  N40                MOVE MA09      IA04
+|   C  N40                MOVE MA08      IA05
+|   C   40                MOVE *BLANKS   IA04
+|   C   40                MOVE *BLANKS   IA05
+|   C           *LOVAL    SETLLMA0
+|   C                     Z-SUBIH05      IA06
+|   C                     Z-SUBIH05      IA07
+|   C                     Z-ADD0         IA08
+|   C                     Z-ADD0         IA09
+|   C                     Z-SUBIH05      IA10
+|   C                     WRITEIA0
+| 05-C                     END
+| 04-C                     END
+| 01-C                     END
+|   C* 物流點改變
+| 06-C           HIG03     IFNE DIG03
+|   C*
+| 07-C           DOPT2     IFNE '4'
+|   C* USE調出產品代號(IH03)
+| 08-C           DIH03     IFNE *BLANKS
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE DIG03     WIA02
+|   C                     MOVE DIH03     WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2???C                     Z-ADDDATE      IAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 09-C           *IN40     IFEQ '0'
+|   C                     SUB  DIH05     IA06
+|   C                     SUB  DIH05     IA07
+|   C                     SUB  DIH05     IA10
+| 10-C           DOPT2     IFNE *BLANKS
+|   C           DOPT2     ANDNE'2'
+|   C                     ADD  IH05      IA06
+|   C                     ADD  IH05      IA07
+|   C                     ADD  IH05      IA10
+| 10-C                     END
+|   C                     UPDATIA0
+| 09-C                     END
+| 08-C                     END
+|   C*
+|   C* USE調入產品代號(IH04)
+| 11-C           DIH04     IFNE *BLANKS
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE DIG03     WIA02
+|   C                     MOVE DIH04     WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2???C                     Z-ADDDATE      IAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 12-C           *IN40     IFEQ '0'
+|   C                     ADD  DIH05     IA06
+|   C                     ADD  DIH05     IA07
+|   C                     ADD  DIH05     IA10
+| 13-C           DOPT2     IFNE *BLANKS
+|   C           DOPT2     ANDNE'2'
+|   C                     SUB  IH05      IA06
+|   C                     SUB  IH05      IA07
+|   C                     SUB  IH05      IA10
+| 13-C                     END
+|   C                     UPDATIA0
+| 12*C                     ELSE
+|   C                     MOVELDIG01     IA01
+|   C                     MOVE DIG03     IA02
+|   C                     MOVE DIH04     IA03
+|   C           IA03      CHAINMA0                  40
+|   C  N40                MOVE MA09      IA04
+|   C  N40                MOVE MA08      IA05
+|   C   40                MOVE *BLANKS   IA04
+|   C   40                MOVE *BLANKS   IA05
+|   C           *LOVAL    SETLLMA0
+|   C                     Z-ADDDIH05     IA06
+|   C                     Z-ADDDIH05     IA07
+|   C                     Z-ADD0         IA08
+|   C                     Z-ADD0         IA09
+|   C                     Z-ADDDIH05     IA10
+|   C                     WRITEIA0
+| 12-C                     END
+| 11-C                     END
+| 07-C                     END
+|   C* 物流點未變
+| 06*C                     ELSE
+|   C*
+| 14-C           DOPT2     IFEQ '1'
+|   C           DOPT2     OREQ '2'
+|   C* USE調出產品代號(IH03)
+| 15-C           DIH03     IFNE *BLANKS
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE DIG03     WIA02
+|   C                     MOVE DIH03     WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2???C                     Z-ADDDATE      IAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 16-C           *IN40     IFEQ '0'
+|   C                     SUB  DIH05     IA06
+|   C                     ADD  IH05      IA06
+|   C                     SUB  DIH05     IA07
+|   C                     ADD  IH05      IA07
+|   C                     SUB  DIH05     IA10
+|   C                     ADD  IH05      IA10
+|   C                     UPDATIA0
+| 16-C                     END
+| 15-C                     END
+|   C* USE調入產品代號(IH04)
+| 17-C           DIH04     IFNE *BLANKS
+|   C                     MOVELDIG01     WIA01
+|   C                     MOVE DIG03     WIA02
+|   C                     MOVE DIH04     WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2???C                     Z-ADDDATE      IAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 18-C           *IN40     IFEQ '0'
+|   C                     ADD  DIH05     IA06
+|   C                     SUB  IH05      IA06
+|   C                     ADD  DIH05     IA07
+|   C                     SUB  IH05      IA07
+|   C                     ADD  DIH05     IA10
+|   C                     SUB  IH05      IA10
+|   C                     UPDATIA0
+| 18*C                     ELSE
+|   C                     MOVELDIG01     IA01
+|   C                     MOVE DIG03     IA02
+|   C                     MOVE DIH04     IA03
+|   C           IA03      CHAINMA0                  40
+|   C  N40                MOVE MA09      IA04
+|   C  N40                MOVE MA08      IA05
+|   C   40                MOVE *BLANKS   IA04
+|   C   40                MOVE *BLANKS   IA05
+|   C           *LOVAL    SETLLMA0
+|   C                     Z-ADDDIH05     IA06
+|   C                     Z-ADDDIH05     IA07
+|   C                     Z-ADD0         IA08
+|   C                     Z-ADD0         IA09
+|   C                     Z-ADDDIH05     IA10
+|   C                     WRITEIA0
+| 18-C                     END
+| 17-C                     END
+| 14-C                     END
+| 06-C                     END
+|   C*
+|   C                     EXSR RTN39E
+|   C*
+|   C*
+35===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39E....UPDATE  MTMAPF
+    C*==============================================================*
+36===C           RTN39E    BEGSR
+|   C*****************
+|   C* UPDATE MTMAPF *
+|   C*****************
+|   C* USE調出產品代號(IH03)
+| 19-C           DIH03     IFNE *BLANKS
+|   C                     MOVE DIH03     MA01
+|   C                     EXSR RTN39H
+|   C                     Z-ADD0         WQTY    70
+B2???C                     Z-ADDDATE      MAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           MAYY
+|   C                     MOVE $USER     MAZZ
+| 20-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDNE*BLANK
+| 21-C           DOPT2     IFEQ '1'
+|   C           DOPT2     OREQ '2'
+| 22-C           DFIRW     IFEQ 'T'
+|   C                     SUB  DIH05     MA29
+|   C                     ADD  IH05      MA29
+| 22*C                     ELSE
+|   C                     SUB  DIH05     MA30
+|   C                     ADD  IH05      MA30
+| 22-C                     END
+|   C                     SUB  DIH05     WQTY
+|   C                     ADD  IH05      WQTY
+| 21*C                     ELSE
+| 23-C           DOPT2     IFEQ '4'
+| 24-C           DFIRW     IFEQ 'T'
+|   C                     ADD  IH05      MA29
+| 24*C                     ELSE
+|   C                     ADD  IH05      MA30
+| 24-C                     END
+|   C                     ADD  IH05      WQTY
+| 23-C                     END
+| 21-C                     END
+|   C**
+      *TOTAL異動金額
+|   C           WQTY      MULT MA31      FOB    174
+|   C                     ADD  FOB       MA26      H
+|   C           WQTY      MULT MA32      FHI    174
+|   C                     ADD  FHI       MA27      H
+| 25-C           DFIRW     IFNE 'T'
+|   C           WQTY      MULT MA33      DUTY   174
+|   C                     ADD  DUTY      MA28      H
+| 25*C                     ELSE
+|   C                     Z-ADD0         DUTY
+| 25-C                     END
+|   C                     EXSR RTN39I
+| 20-C                     END
+| 19-C                     END
+|   C*
+|   C* USE調入產品代號(IH04)
+|   C****單一產品
+| 26-C           DIG04     IFEQ '1'
+|   C*
+| 27-C           DIH04     IFNE *BLANKS
+|   C                     MOVE DIH04     MA01
+|   C                     EXSR RTN39H
+|   C                     Z-ADD0         WQTY
+B2???C                     Z-ADDDATE      MAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           MAYY
+|   C                     MOVE $USER     MAZZ
+| 28-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDNE*BLANK
+| 29-C           DOPT2     IFEQ '1'
+|   C           DOPT2     OREQ '2'
+| 30-C           DFIRW     IFEQ 'T'
+|   C                     ADD  DIH05     MA29
+|   C                     SUB  IH05      MA29
+| 30*C                     ELSE
+|   C                     ADD  DIH05     MA30
+|   C                     SUB  IH05      MA30
+| 30-C                     END
+|   C                     ADD  DIH05     WQTY
+|   C                     SUB  IH05      WQTY
+| 29*C                     ELSE
+| 31-C           DOPT2     IFEQ '4'
+| 32-C           DFIRW     IFEQ 'T'
+|   C                     SUB  IH05      MA29
+| 32*C                     ELSE
+|   C                     SUB  IH05      MA30
+| 32-C                     END
+|   C                     SUB  IH05      WQTY
+| 31-C                     END
+| 29-C                     END
+|   C**
+      *TOTAL異動金額
+|   C           WQTY      MULT MA31      FOB    174
+|   C                     ADD  FOB       MA26      H
+|   C           WQTY      MULT MA32      FHI    174
+|   C                     ADD  FHI       MA27      H
+| 33-C           DFIRW     IFNE 'T'
+|   C           WQTY      MULT MA33      DUTY   174
+|   C                     ADD  DUTY      MA28      H
+| 33-C                     END
+|   C                     EXSR RTN39I
+| 28-C                     END
+| 27-C                     END
+|   C*
+| 26-C                     END
+|   C*
+|   C****不同產品
+|   C****調入產品之成本由調出產品轉入
+| 34-C           DIG04     IFEQ '2'
+|   C*
+| 35-C           DIH04     IFNE *BLANKS
+|   C                     MOVE DIH04     MA01
+|   C                     EXSR RTN39H
+B2???C                     Z-ADDDATE      MAXX
+B2INF *CVR5011 sev.50 Field DATE is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     TIME           MAYY
+|   C                     MOVE $USER     MAZZ
+| 36-C           *IN40     IFEQ '0'
+|   C           DOPT2     ANDNE*BLANK
+| 37-C           DFIRW     IFEQ 'T'
+|   C                     SUB  WQTY      MA29
+| 37*C                     ELSE
+|   C                     SUB  WQTY      MA30
+| 37-C                     END
+      *TOTAL異動金額
+|   C           MA30      ADD  MA29      @QTY   155
+|   C*
+|   C                     SUB  FOB       MA26
+|   C                     SUB  FHI       MA27
+     C           @QTY      IFNE 0
+|   C           MA26      DIV  @QTY      MA31      H
+|   C*
+|   C           MA27      DIV  @QTY      MA32      H
+     C                     END
+|   C*
+| 38-C           DFIRW     IFNE 'T'
+|   C                     SUB  DUTY      MA28
+     C           MA30      IFNE 0
+|   C           MA28      DIV  MA30      MA33      H
+     C                     END
+| 38-C                     END
+|   C*
+|   C           MA31      ADD  MA32      MA34
+|   C                     ADD  MA33      MA34
+|   C                     EXSR RTN39I
+| 36-C                     END
+| 35-C                     END
+| 34-C                     END
+|   C*
+36===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39H....CHAIN   MTMAPF
+    C*==============================================================*
+36===C           RTN39H    BEGSR
+|   C*
+     C*          DIG01     IFLE 'K9'
+     C*          DIG01     ANDGE'K1'
+     C*          KEYMA     CHAINMH0                  40
+     C*                    ELSE
+|   C*          KEYMA     CHAINMA0                  40
+     C*                    END
+|   C*
+     C           KEYMA     CHAINMA0                  40
+     C           MA07      IFEQ 'K'
+     C           KEYMA     CHAINMH0                  40
+     C                     ENDIF
+|   C*
+36===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39I....UPDATE  MTMAPF
+    C*==============================================================*
+36===C           RTN39I    BEGSR
+|   C*
+     C*          DIG01     IFLE 'K9'
+     C*          DIG01     ANDGE'K1'
+     C*                    UPDATMH0
+     C*                    ELSE
+|   C*                    UPDATMA0
+     C*                    END
+|   C*
+     C           MA07      IFEQ 'K'
+|   C                     UPDATMH0
+     C                     ELSE
+|   C                     UPDATMA0
+     C                     ENDIF
+|   C*
+36===C                     ENDSR
+    C*==============================================================*
+    C*          RTN39T....DLT D
+    C*==============================================================*
+37===C           RTN39T    BEGSR
+|   C*
+|   C* DLT DETAIL
+|   C           KEYIH1    SETLLIH0
+|   C           KEYIH1    READEIH0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C* FOR OTHER FILE AND KEY
+|   C                     MOVE '4'       DOPT2
+|   C                     MOVE IH03      DIH03
+|   C                     MOVE IH04      DIH04
+|   C*
+|   C                     EXSR RTN39F                     *SAV OTHER FILE
+|   C                     DELETIH0
+|   C           KEYIH1    READEIH0                      44
+| 01-C                     END
+|   C* DLT HEADER
+|   C           KEYIG4    CHAINIG0                  40
+|   C                     DELETIG0
+|   C*
+37===C                     ENDSR
+    C*==============================================================*
+    C*          RTN990....AUT CHK (CALL SUBPGM)
+    C*==============================================================*
+38===C           RTN990    BEGSR
+|   C*
+|   C                     CALL 'S#S01'
+|   C                     PARM $USER     S0101I 10
+|   C                     PARM           S0102I 10
+|   C                     PARM           S0101O  1
+| 01-C           S0101O    IFEQ 'N'
+|   C                     SETON                     9699
+| 01-C                     END
+|   C*
+38===C                     ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+39===C           RTNF4     BEGSR
+|   C*
+|   C                     SETON                     99
+|   C*
+|   C********************
+|   C*  GET ROW,COL     *
+|   C********************
+|   C           #CSR      DIV  256       D#ROW            *ROW
+|   C                     MVR            D#COL            *COL
+|   C** 游標位置即為(D#ROW,D#COL)
+|   C*
+| 01-C           APPSCR    IFEQ 'SCR002'
+|   C*
+| 02-C           D#ROW     IFEQ 10
+|   C           D#COL     ANDGE15
+|   C           D#COL     ANDLE19
+|   C                     CALL 'WDS013'
+|   C                     PARM 'ABCDEFTW'PARMI1
+|   C           DIG03     PARM DIG03     PARMO1
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 03-C           D#ROW     IFEQ 16
+|   C           D#COL     ANDGE15
+|   C           D#COL     ANDLE16
+|   C                     CALL 'WDS012'
+|   C                     PARM 'ADJUST'  PARMI1
+|   C           DIG06     PARM DIG06     PARMO1
+|   C                     GOTO ENDF4
+| 03-C                     END
+|   C*
+| 01-C                     END
+|   C*
+39===C           ENDF4     ENDSR
+    C*==============================================================*
+    C*          ERRSR ....DATA LOCK ROUTINE
+    C*==============================================================*
+40===C           ERRSR     BEGSR
+|   C*
+|   C                     CALL 'P50'
+|   C           DMSG      PARM           P5001O 78
+|   C                     SETON                     9799
+|   C*
+40===C                     ENDSR'*DETC'
+*ERR*C*                    ENDSR
+M001AC/COPY HBP2CVTR
+**
+新增修改      刪除查詢
+**
+單一產品不同產品
+

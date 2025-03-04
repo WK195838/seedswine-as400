@@ -1,0 +1,190 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0591                                       *
+      * AUTHER       : ANDY                                          *
+      * CREATE DATE  : 81/10/03                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :預開發票明細表　　                           *
+     A*==============================================================*
+     A* CODE | AUTHOR |  DATE  | DESCRIPTION
+     A*--------------------------------------------------------------
+     A* M001 |MICHELLE|03.03.19| ADD NEW COLUMN:DUTY & INVOICE AMT
+     A*==============================================================*
+      ****************************************************************
+     FSOSIPF  IP  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARR059P O   E             39     PRINTER
+     ISI0
+     I                                              SI01  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 602 DSI01S
+     I                                      603 604 DSI01E
+     I*(MM/YY)
+     I                                      611 6140DSI21
+     I                                      611 6120DS211
+     I                                      613 6140DS212
+     I*(YY/MM)
+     I                                      621 6240YSI21
+     I                                      621 6220YS211
+     I                                      623 6240YS212
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSJ     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C*
+     C           KEYME     KLIST
+     C                     KFLD           SI12
+     C                     KFLD           SI13
+      *==============================================================*
+      *                    DEFINE KEY
+      *==============================================================*
+     C           *LIKE     DEFN PAMT      WAMT
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C           *IN10     IFEQ '0'
+     C                     EXSR RTN010                     *SET INIT
+     C                     ELSE
+     C           *INL1     IFEQ '1'
+     C                     WRITEPE1
+     C                     EXSR RTN010
+     C                     END
+     C                     END
+     C*
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTNL1
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*公司名稱
+|    C*
+|    C           SI01      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    #B03
+     C                     WRITEPH1
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     SETOF                     55
+|    C*
+|    C                     Z-ADD0         PGRO
+|    C                     Z-ADD0         PDIS
+|    C                     Z-ADD0         PAMT
+M001AC                     Z-ADD0         TAMT
+M001AC                     Z-ADD0         IAMT
+|    C*
+|    C           KEYSJ     CHAINSJ0                  40
+|    C*
+| 01-C           *IN40     DOWEQ'0'
+|   C                     SETON                     55
+|   C                     ADD  SJ06      PGRO
+|   C                     ADD  SJ07      PDIS
+|   C           SJ06      SUB  SJ07      WAMT
+|   C                     ADD  WAMT      PAMT
+|   C           KEYSJ     READESJ0                      40
+| 01-C                     END
+     C**
+     C*稅額及發票金額
+     C**
+M001AC                     Z-ADDSI24      TAMT
+M001AC                     Z-ADDSI25      IAMT
+|    C**
+|    C*發票日期
+|    C**
+M001AC                     Z-ADDSI21      XSI21   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI21      S001I2  80
+M001AC                     PARM XSI21     S001I2  60
+|    C           PSI21     PARM           S001O1  60
+|    C**
+|    C*確認日期
+|    C**
+M001AC                     Z-ADDSI35      XSI35   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI35      S001I2  80
+M001AC                     PARM XSI35     S001I2  60
+|    C           PSI35     PARM           S001O1  60
+|    C**
+|    C*客戶代號／名稱
+|    C**
+|    C           KEYME     CHAINME0                  41
+|    C   41                MOVE *BLANK    ME04
+|    C*
+     C   39                EXSR RTN900                     *跳頁列印
+|    C                     WRITEPD1
+|    C*總和
+|    C                     ADD  PGRO      PGROT
+|    C                     ADD  PDIS      PDIST
+|    C                     ADD  PAMT      PAMTT
+M001AC                     ADD  TAMT      TAMTT
+M001AC                     ADD  IAMT      IAMTT
+"    C                     ADD  PGRO      PGROT1
+"    C                     ADD  PDIS      PDIST1
+"    C                     ADD  PAMT      PAMTT1
+M001AC                     ADD  TAMT      TAMTT1
+M001AC                     ADD  IAMT      IAMTT1
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL1.....公司別不同換頁
+      *==============================================================*
+05===C           RTNL1     BEGSR
+|    C*
+|    C*控制第一次列印
+|    C                     WRITEPD2
+|    C*變數清為零
+|    C                     Z-ADD0         PGROT
+|    C                     Z-ADD0         PDIST
+|    C                     Z-ADD0         PAMTT
+M001AC                     Z-ADD0         TAMTT
+M001AC                     Z-ADD0         IAMTT
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNLR.....ENDPGM
+      *==============================================================*
+06===C           RTNLR     BEGSR
+|    C*
+     C           *IN10     IFEQ '0'
+     C                     EXSR RTN010
+|    C                     WRITEPE4
+M001AC                     ELSE
+M001AC                     WRITEPT1
+     C                     END
+|    C                     WRITEPE2
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C*控制第一次列印
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+04===C                     ENDSR
+

@@ -1,0 +1,828 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : MTA002                                     *
+     A*    AUTHOR       : A1034  STEPHANIE                           *
+     A*    DATE WRITTEN : 81/01/13                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :主檔資料維護子系統                        *
+     A*    PROCEDURE    :供應商資料建立 (A/U/D/I)                  *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.04 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*00A需求單號: 1070818                                         *
+     A*00A 2019/01/31 ADAM  EDI匯款                                 *
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FMTMBLF  IF  E           K        DISK
+     F            MB0                               KRENAMEMB0L
+     FMTMBPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+ 00A+FMTMBPFA UF  E           K        DISK                      A
+     FPA#APF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FLY#SPF  UF  E           K        DISK                      A
+     FPOPBLF01IF  E           K        DISK
+     FMTA002D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     F                                              KINFDS DSPFDS
+     E*: FUNCTION DATA :
+     E                    WFUN    5   5  6
+     E*: A/U/D/I AUT
+     E                    WA01        5  1
+     I*
+     ISDS        SDS
+     I                                     *PROGRAM APPPGM
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+ @   I**                                    140 140 $RMK02
+ @   I**                                    141 141 $RMK03
+     I**                                    162 1620$EVR
+     I**                                    125 1270$CPY
+M001AI                                      201 2080$EG8
+     I                                      598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I                                      506 506 $PURID
+     I                                      507 508 $TRNID
+     I                                      509 513 $APAUT
+     I                                      514 521 $#101
+     I            DS
+     I                                        1   1 DOPT1
+     I                                        1   10WNUM
+     I            DS
+     I                                        1  10 MB01A
+     I                                        1   5 MB01
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C                     Z-ADD0         HRRN    40
+     C* FOR F4 PARM
+     C                     MOVE *BLANKS   APPSCR  6
+     C                     MOVE *BLANK    PARMI1 10
+     C                     MOVE *BLANK    PARMO1 10
+     C*
+     C           *LIKE     DEFN MB01      OBGN1            *START KEY
+     C*  FOR SUBFILE (SYS+PGM CONTROL)
+     C           *LIKE     DEFN MB01      BMB01            *SUBFIL BUTTOM
+     C                     MOVE *BLANK    WBOTOM  1
+     C           *LIKE     DEFN RRN       WRRN
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+     C           *LIKE     DEFN MB17      WMB17
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYPB     KLIST
+     C                     KFLD           PB05
+     C                     KFLD           PB04
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+     C*
+     C                     MOVE *ALL'0'   *IN,60
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN04     CASEQ'1'       RTNF4
+    C           *IN06     CASEQ'1'       RTN120
+    C           *IN25     CASEQ'1'       RTN192
+    C                     CAS            RTN170
+  02-C                     END
+    C  N03                EXSR RTN195
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE $ADD      WA01,1
+|    C                     MOVE $UPD      WA01,2
+|    C                     MOVE $DLT      WA01,4
+|    C                     MOVE $INQ      WA01,5
+|    C                     MOVE 'SCR001'  APPSCR
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN120....F6(ADD)
+      *==============================================================*
+02===C           RTN120    BEGSR
+|    C*
+|    C                     MOVE '1'       DOPT1
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     9099
+| 01-C                     END
+|    C  N99                EXSR RTN200
+| 02-C           DRRN      IFGT 0
+|   C           DRRN      SUB  1         HRRN
+| 02-C                     END
+|    C                     EXSR RTN191
+|    C                     EXSR RTN192
+|    C                     SETOF                     12
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+03===C           RTN170    BEGSR
+|    C*
+| 01-C           DBGN1     IFNE OBGN1
+|   C                     Z-ADD0         HRRN
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+|   C                     MOVE DBGN1     OBGN1
+| 01*C                     ELSE
+|   C                     EXSR RTN171
+| 02-C           *IN99     IFEQ '0'
+|   C                     Z-ADDRRN       HRRN
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 02-C                     END
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN171....READC SFL
+      *==============================================================*
+04===C           RTN171    BEGSR
+|    C*
+|    C                     SETON                     54
+|    C*
+|    C                     READCSFLSR                  4040*NF
+| 01-C           *IN40     DOWEQ'0'                        *40 LOOP
+|   C*
+|   C                     SETOF                     60    *DOP *IND
+| 02-C           *IN99     IFEQ '0'
+|   C*
+| 03-C           DOPT1     IFNE *BLANK
+|   C                     EXSR RTN180                     *CHK
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C                     Z-ADDRRN       DRRN
+|   C                     EXSR RTN200
+|   C                     MOVE *BLANKS   DOPT1
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END                             *IN99
+|   C*
+|   C           UPD       TAG
+|   C*
+|   C                     UPDATSFLSR
+|   C                     READCSFLSR                    40*NF
+|   C*
+| 01-C                     END                             *40 END
+| 05-C           *IN99     IFEQ '0'
+|   C                     SETOF                     5412
+|   C                     SETON                     98
+| 05-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN180....CHECK 'SC01' SCREEN
+      *==============================================================*
+05===CSR         RTN180    BEGSR
+|    C*
+|    C* CHK AUT *
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     609099
+| 01-C                     END
+|    C   99                GOTO END180
+|    C*
+05===C           END180    ENDSR
+      *=========================================================*
+      *          RTN191....INITIAL                              *
+      *=========================================================*
+06===C           RTN191    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         WRRN
+|    C                     Z-ADD10        WPRCD
+|    C                     Z-ADD0         DSPRCD
+|    C           HRRN      DIV  WPRCD     DSPRCD
+|    C                     MULT WPRCD     DSPRCD
+|    C                     MOVE 'N'       WBOTOM
+|    C                     SETOF                     53
+|    C                     SETON                     5254
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C           DBGN1     SETLLMB0L
+|    C                     MOVE DBGN1     BMB01
+|    C*
+06===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+07===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                     97    *LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+| 02-C           BMB01     IFNE DBGN1
+|   C           BMB01     SETGTMB0L
+| 02-C                     END
+|   C                     EXSR RTN193
+|   C                     MOVE MB01      BMB01
+|   C           *LOVAL    SETLLMB0L
+| 01-C                     END
+|    C*
+07===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+08===C           RTN193    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DOPT1
+|    C                     SETOF                     54
+|    C                     Z-ADDWRRN      RRN
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C                     READ MB0L                     46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVE 'Y'       WBOTOM
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN       DRRN
+|    C                     Z-ADDRRN       WRRN
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+09===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN       IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     Z-ADD0         D#ROW
+|    C                     Z-ADD0         D#COL
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN200....'SC02' SCREEN MAIN ROUTINE
+      *==============================================================*
+10===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE 'SCR002'  APPSCR
+|    C                     MOVE WFUN,WNUM DFUN
+| 01-C           DOPT1     CASEQ'1'       RTN210           *ADD
+|   C           DOPT1     CASEQ'2'       RTN220           *UPD
+|   C           DOPT1     CASEQ'4'       RTN230           *DEL
+|   C           DOPT1     CASEQ'5'       RTN240           *INQ
+| 01-C                     END
+|    C           *LOVAL    SETLLMB0
+|    C                     MOVE 'SCR001'  APPSCR
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN210....ADD DATA
+      *==============================================================*
+11===C           RTN210    BEGSR
+|    C*
+|    C                     SETON                     3031  *ADD MSG
+|    C                     EXSR RTN251                     *CLR FIELD
+|    C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C*
+| 03-C           *IN04     CASEQ'1'       RTNF4
+|   C                     CAS            RTN280
+| 03-C                     END
+|   C*
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN05     ANDEQ'0'
+|   C           *IN04     ANDEQ'0'
+|   C                     EXSR RTN253
+|   C                     WRITEMB0
+|   C                     WRITE#S0
+|00A+C                     WRITEMBA0
+|   C                     MOVE 'SCR001'  APPSCR
+| 04-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN220....UPD DATA
+      *==============================================================*
+12===C           RTN220    BEGSR
+|    C*
+|    C           MB01A     CHAIN#S0                  40
+|    C           MB01      CHAINMB0                  40
+|    C                     EXSR RTN252                     *FIEL->SCRN
+| 01-C           *IN03     DOWEQ'0'
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     SETOF                     30
+|   C                     SETON                     31    *CAN INPUT
+|   C                     EXFMTDSPD2
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C*
+| 02-C           *IN03     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C*
+| 03-C           *IN04     CASEQ'1'       RTNF4
+|   C                     CAS            RTN280
+| 03-C                     END
+|   C*
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN05     ANDEQ'0'
+|   C           *IN04     ANDEQ'0'
+| 05-C           WMB17     IFNE DMB17
+|   C                     EXFMTDSPD3
+| 05-C                     END
+| 06-C           *IN14     IFEQ '1'
+|   C           WMB17     OREQ DMB17
+|   C                     EXSR RTN253
+|   C                     UPDATMB0
+|   C                     UPDAT#S0
+|00A+C                     UPDATMBA0
+|   C                     MOVE 'SCR001'  APPSCR
+| 06-C                     END
+|   C                     SETOF                     1214
+| 04-C                     END
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN230....DEL DATA
+      *==============================================================*
+13===C           RTN230    BEGSR
+|    C*
+|    C           MB01A     CHAIN#S0                  40
+|    C           MB01      CHAINMB0                  40
+|    C                     EXSR RTN252                     *FIEL->SCRN
+|    C                     SETOF                     3031  *NO INPUT
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+| 02-C           *IN03     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C           *IN05     ANDEQ'0'
+|   C           *IN04     ANDEQ'0'
+|   C                     CALL 'WDS000'
+|   C                     PARM 'N'       DLTFLG  1
+| 03-C           DLTFLG    IFEQ 'Y'
+|   C                     DELETMB0
+|   C                     DELET#S0
+|00A+C                     DELETMBA0
+| 03-C                     END
+|   C                     MOVE 'SCR001'  APPSCR
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+13===C                     ENDSR
+      *==============================================================*
+      *          RTN240....INQ DATA
+      *==============================================================*
+14===C           RTN240    BEGSR
+|    C*
+|    C           MB01A     CHAIN#S0                  40
+|    C           MB01      CHAINMB0L                 40
+|    C                     EXSR RTN252                     *FIEL->SCRN
+|    C                     SETOF                     3031  *NO INPUT
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C           *IN05     ANDEQ'0'
+|   C           *IN04     ANDEQ'0'
+|   C                     MOVE 'SCR001'  APPSCR
+|   C                     Z-ADDRRN       DRRN
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+14===C                     ENDSR
+      *==============================================================*
+      *          RTN251....CLEAR SCREEN DATA
+      *==============================================================*
+15===CSR         RTN251    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DMB01
+|    C                     MOVE *BLANK    DMB02
+|    C                     MOVE *BLANK    DMB03
+|    C                     MOVE *BLANK    DMB04
+|    C                     MOVE *BLANK    DMB05
+|    C                     MOVE *BLANK    DMB06
+|    C                     MOVE *BLANK    DMB24
+|    C                     MOVE *BLANK    DMB07
+|    C                     MOVE *BLANK    DMB08
+|    C                     MOVE *BLANK    DMB09
+|    C                     MOVE *BLANK    DMB10
+|    C                     MOVE *BLANK    DMB11
+|    C                     MOVE *BLANK    DMB12
+|    C                     MOVE *BLANK    DMB13
+|    C                     MOVE *BLANK    DMB14
+|    C                     MOVE *BLANK    DMB15
+|    C                     MOVE *BLANK    DMB16
+|    C                     MOVE *BLANK    DMB17
+|    C                     MOVE *BLANK    DCURR
+|    C                     MOVE *BLANK    DMB18
+|    C                     MOVE *BLANK    DPAY
+|    C                     MOVE *BLANK    DMB19
+|    C                     MOVE *BLANK    DMB20
+|    C                     MOVE *BLANK    DMB21
+|    C                     Z-ADD0         DMB22
+B2000C                     Z-ADD$EGMDY    DMB23
+|    C                     MOVE *BLANKS   MC02
+|00A+C                     MOVEL*BLANK    DMBA02           收款銀行
+|00A+C                     MOVEL*BLANK    DMBA03           收款帳號
+|00A+C                     MOVEL*BLANK    DMBA04           統一編號
+|00A+C                     MOVEL*BLANK    DMBA05           戶名
+|    C*
+15===CSR                   ENDSR
+      *==============================================================*
+      *          RTN252....MOVE DATA TO SCREEN
+      *==============================================================*
+16===CSR         RTN252    BEGSR
+|    C*
+|    C                     MOVE MB01      DMB01
+|    C                     MOVE MB02      DMB02
+|    C                     MOVE MB03      DMB03
+|    C                     MOVE MB04      DMB04
+|    C                     MOVE MB05      DMB05
+|    C                     MOVE MB06      DMB06
+|    C                     MOVE MB07      DMB07
+|    C                     MOVE MB08      DMB08
+|    C                     MOVE MB09      DMB09
+|    C                     MOVE MB10      DMB10
+|    C                     MOVE MB11      DMB11
+|    C                     MOVE MB12      DMB12
+|    C                     MOVE MB13      DMB13
+|    C                     MOVE MB14      DMB14
+|    C                     MOVE MB15      DMB15
+|    C                     MOVE MB16      DMB16
+|    C                     MOVE MB17      DMB17
+|    C                     MOVE MB17      WMB17
+|    C                     MOVE MB18      DMB18
+|    C                     MOVE MB19      DMB19
+|    C                     MOVE MB20      DMB20
+|    C                     MOVE MB21      DMB21
+|    C**
+B2000C                     MOVE *HIVAL    PB04
+|    C           KEYPB     SETLLPB0
+|    C           PB05      READEPB0                      45
+|    C   45                Z-ADD0         PB04
+M001AC                     Z-ADDPB04      WPB04   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM PB04      S001I2  80
+M001MC                     PARM WPB04     S001I2  60
+B2MODC*M001M     DMB22     PARM           S001O1  80
+M001MC           DMB22     PARM           S001O1  60
+|    C**
+M001AC                     Z-ADDMB23      WMB23   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM MB23      S001I2  80
+M001MC                     PARM WMB23     S001I2  60
+B2MODC*M001M     DMB23     PARM           S001O1  80
+M001MC           DMB23     PARM           S001O1  60
+|    C**
+| 01-C           MB24      IFEQ '1'
+|   C                     MOVE 'F'       DMB24
+| 01*C                     ELSE
+|   C                     MOVE 'L'       DMB24
+| 01-C                     END
+|    C*
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVEL'CURRENCY'#A01
+|    C                     MOVELDMB17     #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   DCURR
+| 02*C                     ELSE
+|   C                     MOVEL#A03      DCURR
+| 02-C                     END
+|    C*
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVEL'PAYMENT '#A01
+|    C                     MOVELDMB18     #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   DPAY
+| 03*C                     ELSE
+|   C                     MOVEL#A03      DPAY
+| 03-C                     END
+|    C*
+|    C           DMB19     CHAINMC0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   MC02
+| 04-C                     END
+|00A+C*
+|00A+C           MB01      CHAINMBA0                 40
+|00A+C           *IN40     IFEQ '0'
+|00A+C                     MOVELMBA02     DMBA02    P      收款銀行
+|00A+C                     MOVELMBA03     DMBA03    P      收款帳號
+|00A+C                     MOVELMBA04     DMBA04    P      統一編號
+|00A+C                     MOVELMBA05     DMBA05    P      戶名
+|00A+C                     ELSE
+|00A+C                     MOVEL*BLANK    DMBA02           收款銀行
+|00A+C                     MOVEL*BLANK    DMBA03           收款帳號
+|00A+C                     MOVEL*BLANK    DMBA04           統一編號
+|00A+C                     MOVEL*BLANK    DMBA05           戶名
+|00A+C                     ENDIF
+|    C*
+16===CSR                   ENDSR
+      *==============================================================*
+      *          RTN253....MOVE SCREEN DATA TO FILE
+      *==============================================================*
+17===CSR         RTN253    BEGSR
+|    C*
+|    C                     MOVE DMB01     MB01
+|    C                     MOVE DMB02     MB02
+|    C                     MOVE DMB03     MB03
+|    C                     MOVE DMB04     MB04
+|    C                     MOVE DMB05     MB05
+|    C                     MOVE DMB06     MB06
+|    C                     MOVE DMB07     MB07
+|    C                     MOVE DMB08     MB08
+|    C                     MOVE DMB09     MB09
+|    C                     MOVE DMB10     MB10
+|    C                     MOVE DMB11     MB11
+|    C                     MOVE DMB12     MB12
+|    C                     MOVE DMB13     MB13
+|    C                     MOVE DMB14     MB14
+|    C                     MOVE DMB15     MB15
+|    C                     MOVE DMB16     MB16
+|    C                     MOVE DMB17     MB17
+|    C                     MOVE DMB18     MB18
+|    C                     MOVE DMB19     MB19
+|    C                     MOVE DMB20     MB20
+|    C                     MOVE DMB21     MB21
+|    C**
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C*M001M               PARM DMB23     S001I2  80
+M001MC                     PARM DMB23     S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC*M001M     MB23      PARM           S001O1  80
+M001MC           WMB23     PARM           S001O1  60
+M001AC                     MOVE WMB23     HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    MB23    80
+|    C**
+| 01-C           DMB24     IFEQ 'F'
+|   C                     MOVE '1'       MB24
+| 01*C                     ELSE
+|   C                     MOVE '2'       MB24
+| 01-C                     END
+|    C**
+     C           DOPT1     IFEQ '1'
+     C                     Z-ADD0         MB25
+     C                     Z-ADD0         MB26
+     C                     END
+|    C**
+|    C*M001D               CALL 'RES001'
+|    C*M001D               PARM 'MDY'     S001I1  3
+B2???C*M001D               PARM $EGMDY    S001I2  80
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC*M001D     MBXX      PARM           S001O1  80
+|    C**
+M001AC                     Z-ADD$EG8      MBXX
+     C                     MOVEL*BLANK    #S01
+     C                     MOVELMB01      #S02
+     C                     MOVELMB03      #S04
+     C                     MOVELMB02      #S05
+     C                     MOVELMB05      #S07
+     C                     MOVELMB06      #S081
+     C                     MOVELMB07      #S082
+     C                     MOVELMB08      #S083
+|    C**
+B2000C                     TIME           MBYY
+|    C                     MOVE $USER     MBZZ
+ 00A+C*
+ 00A+C                     MOVELDMB01     MBA01     P      供應商代號
+ 00A+C           MBA01     CHAINMBA0                 40
+ 00A+C                     MOVELDMBA02    MBA02     P      收款銀行
+ 00A+C                     MOVELDMBA03    MBA03     P      收款帳號
+ 00A+C                     MOVELDMBA04    MBA04     P      統一編號
+ 00A+C                     MOVELDMBA05    MBA05     P      戶名
+ 00A+C                     Z-ADDMBXX      MBAXX            異動日期
+ 00A+C                     TIME           MBAYY            異動時間
+ 00A+C                     MOVEL$USER     MBAZZ            異動者　
+|    C*
+17===CSR                   ENDSR
+     C*==============================================================*
+     C*          RTN280....CHECK 'SC02' SCREEN
+     C*==============================================================*
+18===CSR         RTN280    BEGSR
+|    C*
+| 01-C           DOPT1     IFEQ '1'
+| 02-C           DMB01     IFEQ *BLANK
+|   C                     SETON                     609899
+| 02*C                     ELSE
+|   C           DMB01     SETLLMB0                      41
+| 03-C           *IN41     IFEQ '1'
+|   C                     SETON                     609799
+| 03-C                     END
+| 02-C                     END
+| 01-C                     END
+|    C   99                GOTO END280
+|    C*
+| 04-C           DMB03     IFEQ *BLANKS
+|   C                     CALL 'P65'
+|   C                     PARM DMB02     P6501I 80
+|   C                     PARM 17        P6502I  30
+|   C           DMB03     PARM           P6501O 80
+|   C                     PARM           P6502O 80
+| 04-C                     END
+|    C*
+|    C                     MOVELDMB01     DMB24
+| 05-C           DMB24     IFNE 'F'
+|   C           DMB24     ANDNE'L'
+|   C                     SETON                     609699
+| 05-C                     END
+|    C   99                GOTO END280
+|    C*
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVEL'CURRENCY'#A01
+|    C                     MOVELDMB17     #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 06-C           *IN40     IFEQ '1'
+|   C                     SETON                     619699
+| 06*C                     ELSE
+|   C                     MOVEL#A03      DCURR
+| 06-C                     END
+|    C   99                GOTO END280
+|    C*
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVEL'PAYMENT '#A01
+|    C                     MOVELDMB18     #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 07-C           *IN40     IFEQ '1'
+|   C                     SETON                     629699
+| 07*C                     ELSE
+|   C                     MOVEL#A03      DPAY
+| 07-C                     END
+|    C   99                GOTO END280
+|    C*
+|    C           DMB19     CHAINMC0                  40
+| 08-C           *IN40     IFEQ '1'
+|   C                     SETON                     639699
+|   C                     MOVE *BLANKS   MC02
+| 08-C                     END
+|    C*
+18===CSR         END280    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+19===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C*
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C*
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C**
+| 02-C           D#ROW     IFEQ 8
+|   C           D#COL     ANDGE9
+|   C           D#COL     ANDLE13
+|   C                     CALL 'WDS002'
+|   C           DBGN1     PARM DBGN1     PARMI1
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 03-C           APPSCR    IFEQ 'SCR002'
+|   C**
+| 04-C           D#ROW     IFEQ 17
+|   C           D#COL     ANDGE16
+|   C           D#COL     ANDLE18
+|   C                     CALL 'WDS012'
+|   C                     PARM 'CURRENCY'PARMI1
+|   C           DMB17     PARM DMB17     PARMO1
+|   C                     GOTO ENDF4
+| 04-C                     END
+|   C*
+| 05-C           D#ROW     IFEQ 17
+|   C           D#COL     ANDGE56
+|   C           D#COL     ANDLE57
+|   C                     CALL 'WDS012'
+|   C                     PARM 'PAYMENT 'PARMI1
+|   C           DMB18     PARM DMB18     PARMO1
+|   C                     GOTO ENDF4
+| 05-C                     END
+|   C*
+| 06-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE16
+|   C           D#COL     ANDLE21
+|   C                     CALL 'WDS005'
+|   C           DMB19     PARM DMB19     PARMI1
+|   C                     GOTO ENDF4
+| 06-C                     END
+|   C*
+| 03-C                     END
+|    C*
+19===C           ENDF4     ENDSR
+     C*==============================================================*
+     C*          RTN990....AUT CHK (CALL SUBPGM)
+     C*==============================================================*
+20===C           RTN990    BEGSR
+|    C*
+|    C                     CALL 'S#S01'
+|    C                     PARM $USER     S0101I 10
+|    C                     PARM           S0102I 10
+|    C                     PARM           S0101O  1
+| 01-C           S0101O    IFEQ 'N'
+|   C                     SETON                     9099
+| 01-C                     END
+|    C*
+20===C                     ENDSR
+     C*==============================================================*
+     C*          ERRSR ....DATA LOCK ROUTINE
+     C*==============================================================*
+21===C           ERRSR     BEGSR
+|    C*
+|    C                     CALL 'P50'
+|    C           DMSG      PARM           P5001O 78
+|    C                     SETON                     2899
+|    C*
+21===C                     ENDSR'*DETC'
+M001AC/COPY HBP2CVTR
+**
+新增修改      刪除查詢
+

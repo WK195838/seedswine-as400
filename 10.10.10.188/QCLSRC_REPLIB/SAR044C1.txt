@@ -1,0 +1,100 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1084  CHARLES                            */
+     /*    CREATE DATE  : 81/05/04                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : SAR044C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :銷售分析系統                             */
+     /*    REMARK       :地區達成率分析表                         */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DSC31S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSC31E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&WSC39Y) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&SCRYM) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&SCRM1) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&SCRY1) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DSEL) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN20) TYPE(*CHAR) LEN(1)
+
+
+             CHGVAR     VAR(&DSC31S) VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DSC31E) VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&WSC39Y) VALUE(%SST(*LDA 611 2))
+             CHGVAR     VAR(&DSEL) VALUE(%SST(*LDA 617 1))
+             CHGVAR     VAR(&SCRYM) VALUE(%SST(*LDA 618 4))
+             CHGVAR     VAR(&SCRY1) VALUE(%SST(*LDA 622 4))
+             CHGVAR     VAR(&SCRM1) VALUE(%SST(*LDA 626 4))
+             CHGVAR     VAR(&IN20) VALUE(%SST(*LDA 750 1))
+
+             OVRPRTF    FILE(SAR044P) PAGESIZE(*N 157) CPI(12)  +
+                        USRDTA('地區達成')
+             CPYF       FROMFILE(REWF13) TOFILE(QTEMP/REWF13) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF13))
+             OVRDBF     FILE(REWF13) TOFILE(QTEMP/REWF13) SHARE(*YES)
+     /*  禮盒拆單瓶 */
+             CPYF       FROMFILE(RES18WF) TOFILE(QTEMP/RES18WF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/RES18WF))
+             OVRDBF     FILE(RES18WF) TOFILE(QTEMP/RES18WF) SHARE(*YES)
+
+
+             OVRDBF     FILE(SOSKPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSKPF)) QRYSLT('SK07 *EQ %RANGE("' +
+                          *CAT &DSC31S *CAT '" "' *CAT &DSC31E *CAT +
+                          '") & MSK02 *EQ "' *CAT &WSC39Y *CAT '" +
+                          ') KEYFLD((SK07) (SK01)) MAPFLD((MSK02 +
+                          SK02 *CHAR 2))
+
+             OVRDBF     FILE(SOSCPF) SHARE(*YES)
+             IF         COND(&IN20 = '0') THEN(DO)
+             OPNQRYF    FILE((SOSCPF)) QRYSLT('SC31 *EQ %RANGE("' +
+                          *CAT &DSC31S *CAT '" "' *CAT &DSC31E *CAT +
+                          '") & (MSC08 *EQ "' *CAT &SCRYM *CAT '" +
+                          *OR MSC08 *EQ "' *CAT &SCRY1 *CAT '" *OR +
+                          MSC08 *EQ "' *CAT &SCRM1 *CAT '" ) *AND +
+                          SC35 *NE "T" *AND SC13 *NE "*" ') +
+                          KEYFLD((SC31) (SC02)) MAPFLD((CSC08 SC08 +
+                          *CHAR 6) (MSC08 '%SST(CSC08 1 4)' *CHAR 4))
+             ENDDO
+             ELSE       CMD(DO)
+             OPNQRYF    FILE((SOSCPF)) QRYSLT('SC31 *EQ %RANGE("' +
+                          *CAT &DSC31S *CAT '" "' *CAT &DSC31E *CAT +
+                          '") & (MSC39 *EQ "' *CAT &SCRYM *CAT '" +
+                          *OR MSC39 *EQ "' *CAT &SCRY1 *CAT '" *OR +
+                          MSC39 *EQ "' *CAT &SCRM1 *CAT '" ) *AND +
+                          SC35 *NE "T" *AND SC13 *EQ "V" ') +
+                          KEYFLD((SC31) (SC02)) MAPFLD((CSC39 SC39 +
+                          *CHAR 6) (MSC39 '%SST(CSC39 1 4)' *CHAR 4))
+             ENDDO
+
+             CALL       SAR0441
+             CALL       SAR0442
+
+             CLOF       OPNID(SOSKPF)
+             CLOF       OPNID(SOSCPF)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6601I) VALUE('SAR044P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+             ENDPGM
+

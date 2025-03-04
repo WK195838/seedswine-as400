@@ -1,0 +1,165 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : POI023                                     *
+     A*    AUTHOR       : A1139  JANE                                *
+     A*    DATE WRITTEN : 81/01/22                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :採購子系統                                *
+     A*    PROCEDURE    :未結案採購單狀況（依採購單號）            *
+     A****************************************************************
+     FPOPCPF  IF  E           K        DISK
+     FPOPBPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPOI023D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+  02-C           *IN25     CASEQ'1'       RTN100           下一頁
+    C                     CAS            RTN400            START KEY
+  02-C                     END
+    C*
+    C                     EXSR RTN500                     EXFMTSFL
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*=============================================================*
+     C*          RTN100....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+01===C           RTN100    BEGSR
+| 03-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                         97*LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 03*C                     ELSE
+|   C                     EXSR RTN810                     *ADD SFL DTA
+| 03-C                     END
+01===C                     ENDSR
+     C*=============================================================*
+     C*          RTN400....SFL MAIN RUTINE (START KEY)
+     C*=============================================================*
+02===C           RTN400    BEGSR
+|    C                     EXSR RTN405                     *INIT SFL
+|    C                     EXSR RTN810                     *ADD SFL DTA
+02===C                     ENDSR
+     C*=============================================================*
+     C*          RTN405....SFL INITIAL
+     C*=============================================================*
+03===C           RTN405    BEGSR
+|    C*
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         DSPRCD
+|    C                     Z-ADD12        WPRCD            *PAG RCD
+|    C                     MOVE 'N'       WBOTOM  1        *BOTTOM
+|    C***                  SETOF                     53    *EOF
+|    C*
+|    C                     SETON                     52    *SFLCLR
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C                     SETON                     51    *SFLDSPCTL
+|    C*
+|    C           DBGN1     SETLLPC0
+03===C                     ENDSR
+     C*=============================================================*
+     C*          RTN500....EXFMT DSPF
+     C*=============================================================*
+04===C           RTN500    BEGSR
+|    C*
+| 01-C           RRN       IFGT 0
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NO DTA
+| 01-C                     END
+|    C*
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     50
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+04===C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA
+     C*=============================================================*
+05===C           RTN810    BEGSR
+|    C*
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C                     READ PC0                      46*NF/EOF
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C                     EXSR RTN811                     DTA->SFL
+|   C                     EXSR RTN812                     SELECT-DATA
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVE 'Y'       WBOTOM
+|   C***                  SETON                         53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN       DRRN
+05===C                     ENDSR
+     C*=============================================================*
+     C*          RTN811....MOVE DTA TO SFL
+     C*=============================================================*
+06===C           RTN811    BEGSR
+|    C*
+|    C*產品代號
+|    C           PC03      CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   MA06
+|   C                     MOVE *BLANKS   MA03
+| 01-C                     END
+|    C*計算未收量
+|    C           PC06      SUB  PC11      DNET
+|    C*
+|    C*(ETD/DTA)
+|    C           PC02      CHAINPB0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         PB14
+|   C                     Z-ADD0         PB15
+| 02-C                     END
+|    C*
+M001AC                     Z-ADDPB14      XPB14   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM PB14      S001I2  80
+M001AC                     PARM XPB14     S001I2  60
+|    C           DPB14     PARM           S001O1  60
+|    C*
+M001AC                     Z-ADDPB15      XPB15   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM PB15      S001I2  80
+M001AC                     PARM XPB15     S001I2  60
+|    C           DPB15     PARM           S001O1  60
+06===C                     ENDSR
+     C*=============================================================*
+     C*          RTN812....SELECT DATA TO SFL
+     C*=============================================================*
+07===C           RTN812    BEGSR
+| 01-C           PC12      IFEQ *BLANK
+|   C           PC11      ANDNEPC06
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+| 01-C                     END
+07===C                     ENDSR
+

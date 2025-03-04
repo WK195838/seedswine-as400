@@ -1,0 +1,209 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : KIB001                                        *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 03/05/94                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :盤點系統                                     *
+      * REMARK       :年終成本庫存備份　　　　　　                 *
+      ****************************************************************
+     FIMIAPF@@IF  E           K        DISK
+     FIMI2PF  O   E           K        DISK
+     FIMI1PF  UF  E           K        DISK                      A
+     FMTMHPF@@IF  E           K        DISK
+     FKIB001D CF  E                    WORKSTN
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+     I                                      501 505 $WRHUS
+     I                                      513 513 $WRHTY
+     I            DS
+     I                                        1   40DIX11
+     I                                        1   20MM
+     I                                        3   40YY
+     I            DS
+B2MODI                                        1   60DYYMM
+B2MODI                                        1   40WYY
+B2MODI                                        5   60WMM
+     I*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRM
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+    C*
+    C                     EXSR RTN100                     *CHECK SCR01?
+  02-C           *IN14     IFEQ '1'
+    C           *IN99     ANDEQ'0'
+    C                     EXSR RTN200                     *PROCESS    ?
+  03-C           *IN99     IFEQ '0'
+    C                     SETON                     98                ?
+  03-C                     END
+  02-C                     END
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         DYYMM
+|    C                     Z-ADD0         WYY
+|    C                     Z-ADD0         WMM
+|    C                     Z-ADD0         DIX11
+|    C                     Z-ADD0         YY
+|    C                     Z-ADD0         MM
+|    C*
+B2MODC                     Z-ADD0         DATE    80
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C                     PARM $EGMDY    S001I2  80
+B2INF *CVR3012 sev.30 Field $EGMDY contains more than one year
+B2INF *CVR3012 sev.30 Field S001I2 contains more than one year
+B2MODC           DATE      PARM           S001O1  80
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*年終年月
+B2CHKC           DIX11     IFEQ 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|   C                     SETON                     619599
+| 01-C                     END
+|    C   99                GOTO END100
+| 02-C           MM        IFLT 1
+|   C           MM        ORGT 12
+|   C                     SETON                     619399
+| 02-C                     END
+|    C   99                GOTO END100
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADDYY        WYY
+B2NEWC                     MOVE YY        HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    WYY
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|    C                     Z-ADDMM        WMM
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTN200....DATA PROCESS
+      *===============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C*檢查IMI1PF及IMI2PF是否己存在
+|    C* IMI1PF
+B2000C           DYYMM     CHAINIX0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     SETON                     619499
+| 01-C                     END
+|    C   99                GOTO END200
+|    C*
+|    C*將IMIAPF及MTMHPF寫入IMI1PF及IMI2PF
+|    C                     EXSR RTN210                                 ?
+|    C*
+|    C*
+03===C           END200    ENDSR
+      *===============================================================*
+      *          RTN210....DATA PROCESS
+      *===============================================================*
+04===C           RTN210    BEGSR
+|    C*
+|    C*寫入IMI1PF
+|    C                     READ MA0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN211
+|   C                     READ MA0                      41
+| 01-C                     END
+|    C*
+|    C*寫入IMI2PF
+|    C                     READ IA0                      41
+| 02-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN212
+|   C                     READ IA0                      41
+| 02-C                     END
+|    C           *LOVAL    SETLLMA0
+|    C           *LOVAL    SETLLIA0
+|    C*
+04===C                     ENDSR
+      *===============================================================*
+      *          RTN211....IMI1PF
+      *===============================================================*
+05===C           RTN211    BEGSR
+|    C*
+|    C                     MOVE MA01      IX01
+|    C                     Z-ADDMA31      IX02
+|    C                     Z-ADDMA32      IX03
+|    C                     Z-ADDMA33      IX04
+|    C                     Z-ADDMA34      IX05
+|    C                     Z-ADDMA29      IX06
+|    C                     Z-ADDMA30      IX07
+|    C                     Z-ADDMA26      IX08
+|    C                     Z-ADDMA27      IX09
+|    C                     Z-ADDMA28      IX10
+B2000C                     Z-ADDDYYMM     IX11
+|    C*
+B2000C                     Z-ADDDATE      IXXX
+B2000C                     TIME           IXYY
+|    C                     MOVE $USER     IXZZ
+|    C*
+|    C                     WRITEIX0
+|    C*
+05===C                     ENDSR
+      *===============================================================*
+      *          RTN212....IMI2PF
+      *===============================================================*
+06===C           RTN212    BEGSR
+|    C*
+| 01-C           IA06      IFNE 0
+|   C                     MOVE IA01      IY01
+|   C                     MOVE IA02      IY02
+|   C                     MOVE IA03      IY03
+|   C                     MOVE IA04      IY04
+|   C                     MOVE IA05      IY05
+|   C                     Z-ADDIA06      IY06
+|   C                     Z-ADDIA07      IY07
+|   C                     Z-ADDIA08      IY08
+|   C                     Z-ADDIA09      IY09
+|   C                     Z-ADDIA10      IY10
+B2000C                     Z-ADDDYYMM     IY15
+|   C*
+B2000C                     Z-ADDDATE      IYXX
+B2000C                     TIME           IYYY
+|   C                     MOVE $USER     IYZZ
+|   C*
+|   C                     WRITEIY0
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+      *===============================================================*
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2NEWC/COPY HBP2CVTR
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+

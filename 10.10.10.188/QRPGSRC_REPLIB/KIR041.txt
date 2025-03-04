@@ -1,0 +1,197 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : KIR041                                        *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/04/24                                      *
+      * UPDATE DATE  : 11/14/92 JUDY                                 *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :盤點系統                                     *
+      * REMARK       :盤點單                                       *
+      ****************************************************************
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#FLF  IF  E           K        DISK
+     F                                              KINFDS #FRCDN
+     F            #A0                               KRENAME#F0L
+     F            MD0                               KRENAMEMD0L
+     FKIR041D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+ @   I                                      135 135 $ADD
+     I                                      501 505 $WRHUS
+     I                                      513 513 $WRHTY
+     I                                      598 5990$PRTID
+     I*                                     601 601 DIO01
+     I                                      601 605 DIO02
+     I                                      601 601 DIO02L
+     I                                      606 6070DNUM
+     I*
+     I                                      611 611 DSEL
+     I                                      612 6130DPNO
+     I                                      614 622 DIO03S
+     I                                      623 631 DIO03E
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I#FRCDN      DS
+     I                                     *RECORD  RCDN
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  02-C           *IN03     IFEQ '0'
+  03-C           *IN04     IFEQ '1'
+    C**********************
+    C*  F4 PROMPT PROCESS *
+    C**********************
+    C                     EXSR RTNF4
+  03*C                     ELSE
+    C                     EXSR RTN100                     .CHECK      ?
+  03-C                     END
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*                    MOVE *BLANK    DIO01
+|    C                     MOVE *BLANK    DIO02
+|    C                     Z-ADD0         DNUM
+|    C                     MOVE 'A'       DSEL
+|    C                     MOVEL*BLANKS   DIO03S
+|    C                     Z-ADD0         DPNO
+|    C                     MOVEL*BLANKS   DIO03E
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*物流點權限檢查
+| 03-C           DIO02     IFEQ *BLANK
+|   C                     SETON                     619699
+| 03-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C***
+     C           $WRHUS    IFNE '*ALL  '
+     C           $WRHUS    IFNE *BLANKS
+     C           DIO02     IFNE $WRHUS
+     C                     SETON                     619099
+     C                     END
+     C                     ELSE
+     C           DIO02L    IFNE $WRHTY
+     C                     SETON                     619099
+     C                     END
+     C                     END
+     C                     END
+|    C   99                GOTO END100
+|    C* GET物流點
+| 06-C           *IN99     IFEQ '0'
+|   C           DIO02     CHAINPA#FLF               40
+| 07-C           RCDN      IFEQ 'MD0L'
+|   C           DIO02     CHAINME0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVELME04      DSTOR
+| 07*C                     ELSE
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELDIO02     #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVEL#A03      DSTOR
+| 07-C                     END
+| 08-C           DSTOR     IFEQ *BLANKS
+|   C                     SETON                     619499
+| 08-C                     END
+| 06-C                     END
+      *
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+      *
+| 10-C           D#ROW     IFEQ 13
+|   C           D#COL     ANDGE43
+|   C           D#COL     ANDLE51
+|   C*
+|   C                     CALL 'WDS025'
+|   C                     PARM DIO02     WIO02   5
+|   C                     PARM           DIO03S
+|   C*
+|   C                     GOTO ENDF4
+| 10-C                     END
+|   C*
+| 10-C           D#ROW     IFEQ 13
+|   C           D#COL     ANDGE55
+|   C           D#COL     ANDLE63
+|   C*
+|   C                     CALL 'WDS025'
+|   C                     PARM DIO02     WIO02
+|   C                     PARM           DIO03E
+|   C*
+|   C                     GOTO ENDF4
+| 10-C                     END
+|   C*
+| 02-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE38
+|   C           D#COL     ANDLE39
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+03===C           ENDF4     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+

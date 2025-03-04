@@ -1,0 +1,766 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INT0061                                       *
+      * AUTHER       : A1546  VINCENT                                *
+      * CREATE DATE  : 97/10/28                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存月結批次處理主程式                       *
+      ****************************************************************
+     FPOCLLF06IF  E           K        DISK
+     FINTCLF05IF  E           K        DISK
+     FINTCLF06IF  E           K        DISK
+     F            TC0                               KRENAMETC0L
+     FINTELF03IF  E           K        DISK
+     FINTGLF04IF  E           K        DISK
+     FINTKLF04IF  E           K        DISK
+     FINTILF03IF  E           K        DISK
+     FINTMLF03IF  E           K        DISK
+     FINTOLF03IF  E           K        DISK
+     F            CM0                               KRENAMECM0L3
+     F            TF0                               KRENAMETF0L3
+     F            TH0                               KRENAMETH0L3
+     F            TJ0                               KRENAMETJ0L3
+     F            TM0                               KRENAMETM0L3
+     F                                              KINFDS TORCD3
+     FINTAPF  UF  E           K        DISK                      A
+     FINTBPF  UF  E           K        DISK                      A
+     FC#EHPF  UF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANDPF  UF  E           K        DISK
+     FPOCCLF02IF  E           K        DISK
+     FUTL3PF  IF  E           K        DISK
+     FINT006P1O   E             38     PRINTER
+     FINT006P2O   E             39     PRINTER
+     E*
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      201 2080A8YMD
+     I                                      601 601 MODE
+     I                                      602 603 WEH01
+     I            DS
+     I                                        1   80BDATE
+     I                                        1   60BDAYM
+     I                                        3   40BDAYY
+     I                                        5   60BDAMM
+     I                                        7   80BDADD
+     I            DS
+     I                                        1   80EDATE
+     I                                        1   60EDAYM
+     I                                        7   80EDADD
+     I            DS
+     I                                        1   80KCC07
+     I                                        1   40KCC07Y
+     I            DS
+     I                                        1  13 KL3
+     I                                        3   3 KL301
+     I                                        3   4 KL302
+     I            DS
+     I                                        1   60WNY
+     I                                        1   40WYY
+     I                                        5   60WMM
+     ITORCD3      DS
+     I                                     *RECORD  RCDR3
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN CC09      WCC09
+     C           *LIKE     DEFN TO04      KTO04
+     C           *LIKE     DEFN TO04      WTO04
+     C           *LIKE     DEFN TA10      WQTY
+     C           *LIKE     DEFN TA09      WTA09
+     C           *LIKE     DEFN TA08      TTAMT
+     C           *LIKE     DEFN TA07      WTA07
+     C           *LIKE     DEFN TA08      WFLD1
+     C           *LIKE     DEFN TA10      WFLD2
+     C           *LIKE     DEFN TA01      KTA01
+     C           *LIKE     DEFN TA02      KTA02
+     C           *LIKE     DEFN TB01      KTB01
+     C           *LIKE     DEFN TB02      KTB02
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYZZ     KLIST
+     C                     KFLD           EH01
+     C                     KFLD           BDATE
+     C           KEYL3     KLIST
+     C                     KFLD           KL301
+     C                     KFLD           KL302
+     C           KEYTO     KLIST
+     C                     KFLD           EH01
+     C                     KFLD           KTO04
+     C                     KFLD           BDATE
+     C           KEYTA     KLIST
+     C                     KFLD           TA01
+     C                     KFLD           TA02
+     C                     KFLD           TA03
+     C           KEYTA1    KLIST
+     C                     KFLD           KTA01
+     C                     KFLD           KTA02
+     C           KEYTB1    KLIST
+     C                     KFLD           KTB01
+     C                     KFLD           KTB02
+     C           KEYCC     KLIST
+     C                     KFLD           KCC01   2
+     C                     KFLD           KCC02   2
+     C                     KFLD           KCC04   9
+     C                     KFLD           KCC06   1
+     C                     KFLD           KCC07
+     C           KEYCC1    KLIST
+     C                     KFLD           KCC01
+     C                     KFLD           KCC02
+     C                     KFLD           KCC04
+     C                     KFLD           KCC06
+     C           KEYNC     KLIST
+     C                     KFLD           TA01
+     C                     KFLD           TA03
+     C           KEYND     KLIST
+     C                     KFLD           EH01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN010
+     C*目前不使用MODE2
+  01-C           MODE      CASEQ'1'       RTN100           1指定公司
+    C*          MODE      CASEQ'2'       RTN200           2全部公司
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN010....INITIAL VALUE
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVEL'INT0061' PGWW   10
+| 01-C           MODE      IFEQ '1'                        指定公司
+|   C                     MOVE WEH01     EH01
+|   C           WEH01     CHAIN#B0                  40
+|   C  N40                MOVEL#B03      P#B03
+|   C   40                MOVEL*BLANK    P#B03
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN020....處理起訖日期
+      *===============================================================*
+02===C           RTN020    BEGSR
+|    C*
+|    C           EH01      CHAINEH0                  40
+|    C                     Z-ADDEH02      BDAYM
+|    C                     Z-ADDEH02      EDAYM
+|    C                     Z-ADD1         BDADD            月初日
+|    C*
+|    C                     CALL 'P22'
+|    C                     PARM EH02      P22I1   40
+|    C                     PARM           P22O1   1
+|    C           EDADD     PARM           P22O2   20       月底日
+|    C*
+|    C                     MOVE EH01      PEH01            指定公司
+|    C           BDAMM     MULT 100       PMMYY
+|    C                     ADD  BDAYY     PMMYY
+|    C*
+|    C                     WRITEP1H1
+|    C                     WRITEP2H1
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN030....取得單別名稱
+      *===============================================================*
+03===C           RTN030    BEGSR
+|    C*
+|    C                     MOVE PDNO      KL3
+|    C           KEYL3     CHAINL30                  47
+|    C   47                MOVE *BLANK    PDNM
+|    C  N47                MOVELL303      PDNM
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN040....取得最新年度報價單價
+     C*==============================================================*
+04===C           RTN040    BEGSR
+|     *
+|    C                     Z-ADD0         WCC09
+|     *
+|    C           KEYCC     SETGTCC0
+|    C           KEYCC1    REDPECC0                      47
+| 01-C           *IN47     IFEQ '0'
+|   C           KCC07Y    ANDEQCC05
+|    *
+| 02-C           CC08      IFNE 0
+| 03-C           KCC07     IFLE CC08
+|   C           KCC07     ANDGECC07
+|   C                     Z-ADDCC09      WCC09
+| 03-C                     ENDIF
+| 02*C                     ELSE
+| 04-C           KCC07     IFGE CC07
+|   C                     Z-ADDCC09      WCC09
+| 04-C                     ENDIF
+| 02-C                     ENDIF
+| 01-C                     ENDIF
+|     *
+04===C                     ENDSR
+      *===============================================================*
+      *          RTN080....錯誤訊息列表
+      *===============================================================*
+05===C           RTN080    BEGSR
+|    C*
+|    C                     WRITEP1D1
+|    C                     SETON                     10
+| 01-C           *IN38     IFEQ '1'
+|   C                     WRITEP1E1
+|   C                     WRITEP1H1
+|   C                     SETOF                     38
+| 01-C                     ENDIF
+|    C*
+05===C                     ENDSR
+      *===============================================================*
+      *          RTN090....錯誤訊息列表
+      *===============================================================*
+06===C           RTN090    BEGSR
+|    C*
+|    C                     WRITEP2D1
+|    C                     SETON                     11
+| 01-C           *IN39     IFEQ '1'
+|   C                     WRITEP2E1
+|   C                     WRITEP2H1
+|   C                     SETOF                     39
+| 01-C                     ENDIF
+|    C*
+06===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....MODE 1 指定公司
+      *===============================================================*
+07===C           RTN100    BEGSR
+|    C*
+|    C                     EXSR RTN020
+|    C*
+|    C*檢核是否有未庫存日結處理單據
+|    C                     EXSR RTN310
+|    C                     EXSR RTN320
+|    C                     EXSR RTN330
+|    C                     EXSR RTN340
+|    C                     EXSR RTN350
+|    C                     EXSR RTN360
+|    C                     EXSR RTN370
+|    C                     EXSR RTN380
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEP1E31
+| 01-C                     ENDIF
+|    C                     WRITEP1E2
+|    C*
+|    C   99                GOTO END100
+|    C*
+|    C*計算單位成本及帳列庫存金額
+|    C                     EXSR RTN400
+|    C   99                GOTO END100
+|    C*
+|    C*產生新月份產品庫存記錄
+|    C                     EXSR RTN600
+|    C*
+|    C*更新控制欄位
+|    C                     EXSR RTN700
+|    C*
+07===C           END100    ENDSR
+      *===============================================================*
+      *          RTN310....採購驗收單據
+      *===============================================================*
+08===C           RTN310    BEGSR
+|    C*
+|    C           KEYZZ     SETLLCL0
+|    C                     READ CL0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           CL01      IFEQ EH01
+|   C           CL03      ANDLEEDATE
+|   C                     SETON                     99
+|   C                     EXSR RTN080
+|   C                     READ CL0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+08===C                     ENDSR
+      *===============================================================*
+      *          RTN320....調撥單－後台單
+      *===============================================================*
+09===C           RTN320    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTC0
+|    C                     READ TC0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TC01      IFEQ EH01
+|   C           TC06      ANDLEEDATE
+|   C                     SETON                     99
+|   C                     MOVELTC02      PCNO
+|   C                     MOVELTC05      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TC0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+09===C                     ENDSR
+      *===============================================================*
+      *          RTN330....調撥單－前台單
+      *===============================================================*
+10===C           RTN330    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTC0L
+|    C                     READ TC0L                     44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TC01      IFEQ EH01
+|   C           TC03      ANDLEEDATE                      調出日期
+|   C                     SETON                     99
+|   C                     MOVELTC02      PCNO
+|   C                     MOVELTC05      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TC0L                     44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+10===C                     ENDSR
+      *===============================================================*
+      *          RTN340....進貨退出單
+      *===============================================================*
+11===C           RTN340    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTE0
+|    C                     READ TE0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TE01      IFEQ EH01
+|   C           TE03      ANDLEEDATE                      退出日期
+|   C                     SETON                     99
+|   C                     MOVELTE02      PCNO
+|   C                     MOVELTE05      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TE0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+11===C                     ENDSR
+      *===============================================================*
+      *          RTN350....陳列轉進貨單
+      *===============================================================*
+12===C           RTN350    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTG0
+|    C                     READ TG0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TG01      IFEQ EH01
+|   C           TG03      ANDLEEDATE                      進貨日期
+|   C                     SETON                     99
+|   C                     MOVELTG02      PCNO
+|   C                     MOVELTG05      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TG0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+12===C                     ENDSR
+      *===============================================================*
+      *          RTN360....陳列品退出單
+      *===============================================================*
+13===C           RTN360    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTK0
+|    C                     READ TK0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TK01      IFEQ EH01
+|   C           TK03      ANDLEEDATE                      退出日期
+|   C                     SETON                     99
+|   C                     MOVELTK02      PCNO
+|   C                     MOVELTK05      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TK0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+13===C                     ENDSR
+      *===============================================================*
+      *          RTN370....存貨調整單
+      *===============================================================*
+14===C           RTN370    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTI0
+|    C                     READ TI0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TI01      IFEQ EH01
+|   C           TI03      ANDLEEDATE                      調整日期
+|   C                     SETON                     99
+|   C                     MOVELTI02      PCNO
+|   C                     MOVELTI05      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TI0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+14===C                     ENDSR
+      *===============================================================*
+      *          RTN380....產品成本調整單
+      *===============================================================*
+15===C           RTN380    BEGSR
+|    C*
+|    C           KEYZZ     SETLLTM0
+|    C                     READ TM0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+| 02-C           TM01      IFEQ EH01
+|   C           TM02      ANDLEEDATE                      調整日期
+|   C                     SETON                     99
+|   C                     MOVEL*BLANK    PCNO
+|   C                     MOVELTM08      PDNO
+|   C                     EXSR RTN030
+|   C                     EXSR RTN080
+|   C                     READ TM0                      44
+| 02*C                     ELSE
+|   C                     SETON                     44
+| 02-C                     ENDIF
+| 01-C                     ENDDO
+|    C*
+15===C                     ENDSR
+      *===============================================================*
+      *          RTN400....計算單位成本
+      *===============================================================*
+16===C           RTN400    BEGSR
+|    C*
+|    C                     MOVE EH01      KTA01
+|    C                     MOVE EH02      KTA02
+|    C                     SETOF                     52    ON無負庫存
+|    C           OK400     TAG
+|    C*
+|    C*讀取每一筆總庫產品
+|    C           KEYTA1    SETLLTA0
+|    C           KEYTA1    READETA0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+|   C                     Z-ADD0         WQTY
+|   C                     Z-ADD0         WTA09            成本調整金額
+|   C                     Z-ADD0         TTAMT
+|   C                     SETOF                     53
+|   C*讀取同產品異動明細
+|   C                     MOVELTA03      KTO04
+|   C           KEYTO     SETLLINTOLF03
+|   C                     READ INTOLF03                 45
+| 02-C           *IN45     DOWEQ'0'
+| 03-C           TO01      IFEQ EH01
+|   C           TO04      ANDEQKTO04
+|   C           TO05      ANDLEEDATE
+|   C                     SETON                     53
+|   C                     EXSR RTN401                     累計單據數量
+|   C                     READ INTOLF03                 45
+| 03*C                     ELSE
+|   C  N52 53             EXSR RTN402                     檢核負值
+|   C   52                EXSR RTN403                     UPDATE INTAP
+|   C                     SETON                     45
+| 03-C                     ENDIF
+| 02-C                     ENDDO
+|   C*
+|   C           KEYTA1    READETA0                      44
+| 01-C                     ENDDO
+|    C*
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN52     ANDEQ'0'
+|   C                     SETON                     52
+|   C                     GOTO OK400
+| 04-C                     ENDIF
+|    C*
+| 05-C           *IN11     IFEQ '0'
+|   C                     WRITEP2E31
+| 05-C                     ENDIF
+|    C                     WRITEP2E2
+|    C*
+16===C                     ENDSR
+      *===============================================================*
+      *          RTN401....累計單據數量及金額
+      *===============================================================*
+17===C           RTN401    BEGSR
+|    C*
+| 01-C           RCDR3     IFEQ 'TM0L3'                    <產品成本調整
+|   C                     ADD  TO104     WTA09            調整金額
+| 01*C                     ELSE
+| 02-C                     SELEC
+|   C           RCDR3     WHEQ 'CM0L3'                    <驗收單
+|   C           TO101     MULT TO121     WAMT1  112H      當時進價
+|   C                     ADD  WAMT1     TTAMT
+|   C           RCDR3     WHEQ 'TF0L3'                    <進貨退出單
+|   C                     MOVELTO01      KCC01            公司別
+|   C                     MOVELTO14      KCC02            通路別
+|   C                     MOVELTO04      KCC04            產品代號
+|   C                     MOVEL'1'       KCC06            年度報價
+|   C                     Z-ADDTO05      KCC07            退出日期
+|   C                     EXSR RTN040
+|   C           WCC09     MULT TO121     WAMT1     H      最新年度價
+|   C                     SUB  WAMT1     TTAMT
+|   C           RCDR3     WHEQ 'TH0L3'                    <陳列轉進貨單
+|   C           TO101     MULT TO121     WAMT1     H      當時進價
+|   C                     ADD  WAMT1     TTAMT
+|   C           RCDR3     WHEQ 'TJ0L3'                    <存貨調整單
+|   C           TA04      MULT TO121     WAMT1     H      上月單位成本
+|   C                     ADD  WAMT1     TTAMT
+| 02-C                     ENDSL
+|   C*
+| 03-C           RCDR3     IFEQ 'TF0L3'                    <進貨退出單
+|   C                     SUB  TO121     WQTY
+| 03*C                     ELSE
+|   C                     ADD  TO121     WQTY
+| 03-C                     ENDIF
+|   C*
+| 01-C                     ENDIF
+|    C*
+17===C                     ENDSR
+      *===============================================================*
+      *          RTN402....檢核「單位成本計算」之負庫存量及金額
+      *===============================================================*
+18===C           RTN402    BEGSR
+|    C*
+|    C* 期初庫存金額＋本月異動金額
+|    C           TA05      ADD  TTAMT     WFLD1
+|    C                     ADD  WTA09     WFLD1
+|    C* 期初庫存量＋本月異動量
+|    C           TA06      ADD  WQTY      WFLD2
+|    C*
+|    C* CHK負庫存量及金額
+| 01-C           WFLD1     IFLT 0
+|   C           WFLD2     ORLT 0
+|   C*注意：除銷售外的異動單據造成負庫存已在日結處理時阻擋及列表，
+|   C*    因此，此處視為銷售造成負庫存，西祺開放此情形，不再阻擋。
+|   C*                    SETON                     99    REMARK
+|   C           KEYNC     CHAINNC0                  41
+|   C   41                MOVEL*BLANK    NC05
+|   C                     Z-ADDWFLD2     PQTY
+|   C                     Z-ADDWFLD1     PAMT
+|   C                     EXSR RTN090
+| 01-C                     ENDIF
+|    C*
+18===C                     ENDSR
+      *===============================================================*
+      *          RTN403....UPDATE INTAPF
+      *===============================================================*
+19===C           RTN403    BEGSR
+|    C*
+|    C*本月有異動
+| 01-C           *IN53     IFEQ '1'
+|   C*單位成本
+|   C           TA05      ADD  TTAMT     WFLD1
+|   C                     ADD  WTA09     WFLD1            庫存金額
+|   C           TA06      ADD  WQTY      WFLD2            庫存量
+| 02-C           WFLD1     IFGT 0
+|   C           WFLD2     ANDGT0
+|   C           WFLD1     DIV  WFLD2     TA07      H
+| 02*C                     ELSE
+|   C*負庫存之單位成本為零
+|   C                     Z-ADD0         TA07
+| 02-C                     ENDIF
+|   C*
+|   C*帳列庫存金額(含成本調整金額)
+|   C           TA06      ADD  TA11      TATT2   60       帳列庫存量
+|   C                     SUB  TA12      TATT2
+|   C                     ADD  TA13      TATT2
+|   C                     SUB  TA14      TATT2
+|   C                     ADD  TA15      TATT2
+|   C                     SUB  TA16      TATT2
+|   C           TA07      MULT TATT2     TA08      H
+|   C                     ADD  WTA09     TA08             成本調整金
+|   C*成本調整金額
+|   C                     Z-ADDWTA09     TA09
+|   C*
+| 01*C                     ELSE
+|   C*本月無異動（上月->本月）
+|   C                     Z-ADDTA04      TA07             單位成本
+|   C                     Z-ADDTA05      TA08             庫存金額
+|   C                     Z-ADD0         TA09             成本調整金額
+| 01-C                     ENDIF
+|    C*
+|    C                     MOVE *BLANK    TAWW
+|    C                     MOVELPGWW      TAWW
+|    C                     Z-ADDA8YMD     TAXX
+|    C                     TIME           TAYY
+|    C                     MOVEL$USER     TAZZ
+|    C                     UPDATTA0
+|    C*
+19===C                     ENDSR
+      *===============================================================*
+      *          RTN600....產生新月份產品庫存記錄
+      *===============================================================*
+20===C           RTN600    BEGSR
+|    C*
+|    C* 新年月份
+|    C                     Z-ADDEH02      WNY
+| 01-C           WMM       IFEQ 12
+|   C                     ADD  1         WYY
+|   C                     Z-ADD1         WMM
+| 01*C                     ELSE
+|   C                     ADD  1         WMM
+| 01-C                     ENDIF
+|    C*
+|    C                     MOVE EH01      KTA01
+|    C                     MOVE EH02      KTA02
+|    C*新年度總庫產品記錄
+|    C           KEYTA1    SETLLTA0
+|    C           KEYTA1    READETA0                      44
+| 02-C           *IN44     DOWEQ'0'
+|   C                     EXSR RTN610
+|   C                     WRITETA0
+|   C           KEYTA1    READETA0                      44
+| 02-C                     ENDDO
+|    C           *LOVAL    SETLLTA0
+|    C*
+|    C                     MOVE EH01      KTB01
+|    C                     MOVE EH02      KTB02
+|    C*新年度分庫產品記錄
+|    C           KEYTB1    SETLLTB0
+|    C           KEYTB1    READETB0                      44
+| 03-C           *IN44     DOWEQ'0'
+|   C                     EXSR RTN620
+|   C                     WRITETB0
+|   C           KEYTB1    READETB0                      44
+| 03-C                     ENDDO
+|    C           *LOVAL    SETLLTB0
+|    C*
+20===C                     ENDSR
+      *===============================================================*
+      *          RTN610....產品總庫欄位
+      *===============================================================*
+21===C           RTN610    BEGSR
+|    C*
+|    C                     Z-ADDWNY       TA02             新年月份
+|    C                     Z-ADDTA07      TA04             上月單位成本
+|    C* 期初庫存金額TA05+TA08(TA08已含TA09)
+|    C                     ADD  TA08      TA05             +帳列庫存金額
+|    C* 期初庫存量
+|    C                     ADD  TA11      TA06
+|    C                     SUB  TA12      TA06
+|    C                     ADD  TA13      TA06
+|    C                     SUB  TA14      TA06
+|    C                     ADD  TA15      TA06
+|    C                     SUB  TA16      TA06
+|    C* 陳列期初量
+|    C                     ADD  TA17      TA18             +陳列異動
+|    C*
+|    C                     Z-ADD0         TA07
+|    C                     Z-ADD0         TA08
+|    C                     Z-ADD0         TA09
+|    C                     Z-ADD0         TA10
+|    C                     Z-ADD0         TA11
+|    C                     Z-ADD0         TA12
+|    C                     Z-ADD0         TA13
+|    C                     Z-ADD0         TA14
+|    C                     Z-ADD0         TA15
+|    C                     Z-ADD0         TA16
+|    C                     Z-ADD0         TA17             陳列量
+|    C*
+|    C                     Z-ADDA8YMD     TAVV
+|    C                     MOVE *BLANK    TAWW
+|    C                     MOVELPGWW      TAWW
+|    C                     Z-ADDA8YMD     TAXX
+|    C                     TIME           TAYY
+|    C                     MOVEL$USER     TAZZ
+|    C*
+21===C                     ENDSR
+      *===============================================================*
+      *          RTN620....產品分庫欄位
+      *===============================================================*
+22===C           RTN620    BEGSR
+|    C*
+|    C*新月份期初值，調撥在途量直接移轉
+|    C*
+|    C                     Z-ADDWNY       TB02             新年月份
+|    C*期初庫存量不含調撥在途量
+|    C                     ADD  TB08      TB06             期初庫存量
+|    C                     SUB  TB09      TB06
+|    C                     ADD  TB10      TB06
+|    C                     SUB  TB11      TB06
+|    C                     ADD  TB12      TB06
+|    C                     SUB  TB13      TB06
+|    C*
+|    C                     ADD  TB16      TB17             陳列期初量
+|    C*
+|    C                     Z-ADD0         TB07
+|    C                     Z-ADD0         TB08
+|    C                     Z-ADD0         TB09
+|    C                     Z-ADD0         TB10
+|    C                     Z-ADD0         TB11
+|    C                     Z-ADD0         TB12
+|    C                     Z-ADD0         TB13
+|    C                     Z-ADD0         TB16             陳列量
+|    C*
+|    C                     Z-ADDA8YMD     TBVV
+|    C                     MOVE *BLANK    TBWW
+|    C                     MOVELPGWW      TBWW
+|    C                     Z-ADDA8YMD     TBXX
+|    C                     TIME           TBYY
+|    C                     MOVEL$USER     TBZZ
+|    C*
+22===C                     ENDSR
+      *===============================================================*
+      *          RTN700....更新控制欄位
+      *===============================================================*
+23===C           RTN700    BEGSR
+|    C*
+|    C*清除銷售通路主檔/銷售確認欄位
+|    C*
+|    C           KEYND     SETLLND0
+|    C           KEYND     READEND0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C                     MOVE *BLANK    ND22             銷售確認
+|   C                     MOVEL*BLANK    NDWW
+|   C                     MOVELPGWW      NDWW
+|   C                     Z-ADDA8YMD     NDXX
+|   C                     TIME           NDYY
+|   C                     MOVEL$USER     NDZZ
+|   C                     UPDATND0
+|   C           KEYND     READEND0                      45
+| 01-C                     ENDDO
+|    C           *LOVAL    SETLLND0
+|    C*
+|    C*公司參數檔更新年月份
+|    C           EH01      CHAINEH0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     Z-ADDWNY       EH02
+|   C                     MOVEL*BLANK    EH03
+|   C                     MOVEL*BLANK    EH04
+|   C                     MOVEL*BLANK    EH05
+|   C                     MOVEL*BLANK    EHWW
+|   C                     MOVELPGWW      EHWW
+|   C                     Z-ADDA8YMD     EHXX
+|   C                     TIME           EHYY
+|   C                     MOVEL$USER     EHZZ
+|   C                     UPDATEH0
+| 02-C                     ENDIF
+|    C           *LOVAL    SETLLEH0
+|    C*
+23===C                     ENDSR
+

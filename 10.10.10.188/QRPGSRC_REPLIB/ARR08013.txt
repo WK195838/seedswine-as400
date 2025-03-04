@@ -1,0 +1,213 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR08012                                      *
+      ***BEFORE CREAT  ARR08012  MUST CREAT REW100 KEY WF1002        *
+      * AUTHER       : 910074 TINA                                   *
+      * CREATE DATE  : 83/12/05                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :帳齡分析表                                   *
+      ****************************************************************
+     FARACPF  IP  E           K        DISK
+     FARADLF04IF  E           K        DISK
+     F            AD0                               KRENAMEAD0L
+     FMTMDPF  IF  E           K        DISK
+     FREW100  UF  E           K        DISK                      A
+     IAC0
+     I                                              AC02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+B2MODI*                                     617 6240YDATES
+M001AI                                      617 6220YDATES
+     I                                      600 600 COMPS
+     I                                      604 604 COMPE
+     I                                      601 601 DSI01
+     I                                      602 602 DSI01S
+     I                                      603 603 DSI01E
+     I                                      605 605 DSI03S
+     I                                      606 606 DSI03E
+     I                                      607 608 DSI04S
+     I                                      609 610 DSI04E
+     I                                      611 6160DSI35
+B2MODI*                                     627 6300DSORT
+M001AI                                      625 6280DSORT
+     I*(YYYY/MM/DD)
+     I                                      850 8570YMD8S
+      *==============================================================*
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF1003    WORK1            *LE 30DAYS
+     C           *LIKE     DEFN WF1004    WORK2            *30-60DAYS
+     C           *LIKE     DEFN WF1005    WORK3            *61-90DAYS
+     C           *LIKE     DEFN WF1006    WORK4            *91-120DAYS
+     C           *LIKE     DEFN WF1007    WORK5            *GT 121DAYS
+     C           *LIKE     DEFN WF1008    WORK6            *TOTAL
+B2MODC           *LIKE     DEFN YDATES    WSDATE
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYAD     KLIST
+     C                     KFLD           AC01
+     C                     KFLD           AC02
+     C                     KFLD           AC03
+     C                     KFLD           AC04
+     C                     KFLD           AC05
+     C                     KFLD           AC06
+     C           KE100     KLIST
+     C                     KFLD           WF1001
+     C                     KFLD           WF1002
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *計算帳齡
+     C  N10                EXSR RTN010
+     C                     EXSR RTN100
+      *WRITE REW100
+      *
+     CL1 10                EXSR RTN200
+     C*
+      *==============================================================*
+      *          RTN010....INITIAL
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+|    C                     Z-ADD0         DAY     90
+|    C                     Z-ADD0         WORK1
+|    C                     Z-ADD0         WORK2
+|    C                     Z-ADD0         WORK3
+|    C                     Z-ADD0         WORK4
+|    C                     Z-ADD0         WORK5
+|    C                     Z-ADD0         WORK6
+|    C                     SETON                     10
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....計算帳齡
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C***
+|    C           AC02      CHAINMD0                  45
+| 01-C           *IN45     IFEQ '0'
+|   C                     MOVELMD06      WF1001
+| 01*C                     ELSE
+|   C                     MOVEL*BLANK    WF1001
+| 01-C                     END
+| 02-C           MD08      IFGE DSI04S
+|   C           MD08      ANDLEDSI04E
+|   C                     MOVELAC02      WF1002
+|   C*
+B2000C           KEYAD     SETLLAD0L
+B2000C           KEYAD     READEAD0L                     46
+| 03-C           *IN46     DOWEQ'0'
+B2000C           AD11      IFLE YMD8S
+| 04-C           AD12      ANDLEYMD8S
+|   C***
+B2???C           AD11      SUB  110000    DSI21   60
+B2INF *CVR0001 sev.00 Field DSI21 is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|   C***
+|   C*(螢幕上輸入之確認日轉成中國年月日)
+|   C***
+B2???C           YMD8S     SUB  110000    WSDATE
+B2INF *CVR0001 sev.00 Field WSDATE is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|   C***
+|   C*發票日與確認日之相距天數
+|   C***
+|   C                     CALL 'P20'
+|   C                     PARM DSI21     P2001I  60       *發票日
+|   C                     PARM WSDATE    P2002I  60       *確認日
+|   C           DAY       PARM           P2011O  90
+|   C*(A)
+| 05-C           DAY       IFGE 0
+|   C           DAY       ANDLE30
+|   C                     ADD  AD08      WORK1
+| 05-C                     END
+|   C*(B)
+| 06-C           DAY       IFGE 31
+|   C           DAY       ANDLE60
+|   C                     ADD  AD08      WORK2
+| 06-C                     END
+|   C*(C)
+| 07-C           DAY       IFGE 61
+|   C           DAY       ANDLE90
+|   C                     ADD  AD08      WORK3
+| 07-C                     END
+|   C*(D)
+| 08-C           DAY       IFGE 91
+|   C           DAY       ANDLE120
+|   C                     ADD  AD08      WORK4
+| 08-C                     END
+|   C*(E)
+| 09-C           DAY       IFGT 120
+|   C                     ADD  AD08      WORK5
+| 09-C                     END
+|   C***
+|   C*(總額)---SUBTOT
+|   C***
+|   C                     ADD  AD08      WORK6
+| 04-C                     END
+|   C***
+B2000C           KEYAD     READEAD0L                     46
+| 03-C                     END
+| 02-C                     END
+      *
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE OR UPDATE REW100
+      *==============================================================*
+03===C           RTN200    BEGSR
+      *
+|    C           KE100     CHAINWF100                45
+| 01-C           *IN45     IFEQ '0'
+|   C                     ADD  WORK1     WF1003
+|   C                     ADD  WORK2     WF1004
+|   C                     ADD  WORK3     WF1005
+|   C                     ADD  WORK4     WF1006
+|   C                     ADD  WORK5     WF1007
+|   C                     ADD  WORK6     WF1008
+|   C                     UPDATWF100
+| 01*C                     ELSE
+|   C                     Z-ADDWORK1     WF1003
+|   C                     Z-ADDWORK2     WF1004
+|   C                     Z-ADDWORK3     WF1005
+|   C                     Z-ADDWORK4     WF1006
+|   C                     Z-ADDWORK5     WF1007
+|   C                     Z-ADDWORK6     WF1008
+| 02-C           WF1008    IFNE 0
+|   C                     WRITEWF100
+| 02-C                     END
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         WORK1
+|    C                     Z-ADD0         WORK2
+|    C                     Z-ADD0         WORK3
+|    C                     Z-ADD0         WORK4
+|    C                     Z-ADD0         WORK5
+|    C                     Z-ADD0         WORK6
+      *
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....換票
+      *==============================================================*
+03===C*M001D     RTN300    BEGSR
+      *
+     C*                    MOVEL'Y'       LOOP
+     C*          LOOP      DOWEQ'Y'
+     C*          KEYHA1    CHAINHA0                  40
+     C*          *IN40     IFEQ '0'
+     C*          HA17      ANDEQ'6'
+     C*          KEYHA2    CHAINHA1                  40
+      *
+03===C*M001D               ENDSR
+

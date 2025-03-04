@@ -1,0 +1,152 @@
+      ****************************************************************
+      * PROGRAM ID : P03                                             *
+      * SYSTEM ID  : PTPTLIB                                         *
+      * FUNTCTION  :驗証營利事業統一編號                           *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P0301I    I   *CHAR   8   待驗統一編號    *
+      *             02   P0311O    O   *CHAR   1   驗証結果...     *
+      *                                             Y=OK , N =ERROR  *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P0302     N   *CHAR   8   文字編號        *
+      *             02   P0303     N   *DEC    8 0 數字編號        *
+      *             03   P0304     N   *CHAR  26   英文字母        *
+      *             04   P0305     N   *CHAR  26   加權數          *
+      *                                                              *
+      * ID-CARD-NO CHECK FLOW.....                                   *
+      *                    (N)                                       *
+      *                     +- P0311O=N                              *
+      *              DIGIT  |                                        *
+      *  CHECK CODE --------+           (N)                          *
+      *                     | CHECK 7TH  +- INDEPENTDENT PROCESS     *
+      *                     | CODE       |  SUM/10=VARIABLE-----A    *
+      *                     +------------+  A=0 P0311O='Y'           *
+      *                    (Y)  EQ 7     |  ELSE      ='N'           *
+      *                                  +-------------------------  *
+      *                                 (Y) NORMAL PROCESS           *
+      *                                     SUM/10=VARIABLE-----A    *
+      *                                     A=0 P0311O='Y'           *
+      *                                     ELSE      ='N'           *
+      *--------------------------------------------------------------*
+      *00A需求單號: 1130570                                        *
+      *00A 2024/11/01 DEREK統一編號舊邏輯為可被10整除            *
+      *00A                 統一編號新邏輯為可被5整除             *
+      ****************************************************************
+     E                    P0304  10  10  1               CHECK DIGIT
+     E                    P0305   8   8  1 0             CHECK RIGHT
+     E                    P0302       8  1 0             INPUT CHARACTER
+     E                    P0303       8  1               INPUT DIGIT
+     E                    P03A        8  2 0             SUM
+     E                    P03B        8  1 0             SEP-SUM1
+     E                    P03C        8  1 0             SEP-SUM2
+     IP0301I      DS
+     I                                        1   80P0302
+     I                                        1   8 P0303
+     I            DS
+     I                                        1   20TEMP
+     I                                        1   10TEMP1
+     I                                        2   20TEMP2
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P0301I  8
+     C                     PARM           P0311O  1
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C**                   MOVE *BLANK    P0311O
+     C************
+     C                     Z-ADD0         SUM2    20
+     C************
+     C                     SETOF                     4041
+     C                     EXSR CHKCN1
+     C           *IN41     IFEQ '0'
+     C*          *IN41     ANDEQ'0'
+     C                     MOVE *BLANK    P0311O
+     C                     EXSR CHKCN2
+     C                     END
+      *
+     C*                    RETRN
+     C                     SETON                     LR
+      /EJECT
+      *--------------------------------------------------------------*
+      *          CHKCN1....CHECK CHOP-NUMBER DIGIT                   *
+      *--------------------------------------------------------------*
+     C           CHKCN1    BEGSR
+     C                     Z-ADD1         I       20
+     C           I         DOWLE8
+     C           P0303,I   LOKUPP0304                    40
+     C           *IN40     IFEQ '0'
+     C                     MOVE '1'       *IN41
+     C                     MOVE 'N'       P0311O
+     C                     END
+     C                     Z-ADD0         P03A,I
+     C                     Z-ADD0         P03B,I
+     C                     Z-ADD0         P03C,I
+     C                     ADD  1         I
+     C                     END
+     C*
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          CHKCN2....CHECK CHOP-NUMBER                         *
+      *--------------------------------------------------------------*
+     C           CHKCN2    BEGSR
+     C                     Z-ADD1         J       20
+     C*
+     C           J         DOWLE8
+     C           P0302,J   MULT P0305,J   P03A,J
+     C           P03A,J    IFLE 9
+     C                     Z-ADD0         P03C,J
+     C                     Z-ADDP03A,J    P03B,J
+     C                     ELSE
+     C           P03A,J    DIV  10        A1      20
+     C                     MVR            A2      20
+     C                     Z-ADDA1        P03C,J
+     C                     Z-ADDA2        P03B,J
+     C                     END
+     C                     ADD  1         J
+     C                     END
+     C*
+     C                     Z-ADD1         K       20
+     C*
+     C           K         DOWLE8
+     C           P03B,K    ADD  P03C,K    SUM3    30
+     C                     ADD  SUM3      SUM     30
+     C                     ADD  1         K
+     C                     END
+     C*
+ 00A-C*          SUM       DIV  10        SUM1    20
+ 00A+C           SUM       DIV  5         SUM1    20
+     C                     MVR            SUM2
+     C*
+     C           SUM2      IFEQ 0
+     C                     MOVE 'Y'       P0311O
+     C                     ELSE
+     C           P0302,7   IFEQ 7
+     C           P03B,7    ADD  P03C,7    TEMP
+     C                     SUB  P03B,7    SUM
+     C                     SUB  P03C,7    SUM
+     C                     ADD  TEMP1     SUM
+ 00A-C*          SUM       DIV  10        SUM1    20
+ 00A+C           SUM       DIV  5         SUM1    20
+     C                     MVR            SUM2
+     C           SUM2      IFEQ 0
+     C                     MOVE 'Y'       P0311O
+     C                     ELSE
+     C                     MOVE 'N'       P0311O
+     C                     END
+     C                     ELSE
+     C                     MOVE 'N'       P0311O
+     C                     END
+     C                     END
+     C*
+     C                     ENDSR
+**
+1234567890
+**
+12121241
+

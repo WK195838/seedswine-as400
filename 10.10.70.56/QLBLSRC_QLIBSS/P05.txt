@@ -1,0 +1,198 @@
+       ID  DIVISION.
+       PROGRAM-ID. P05.
+      ******************************************************************
+      * AUTHOR :  A1010      邱振鴻
+      * REMARKS.
+      * I/O DATA :                                                     *
+      *             IN-01 : 發票日期    YYMMDD   PIC X(06)
+      *             IN-02 : 日期種類             PIC X(01)           *
+      *             IN-03 : 發票號碼             PIC X(10)           *
+      *             OU-01 : 驗証結果             PIC X(01)           *
+      *             OU-02 : 發票種類             PIC X(01)           *
+      *                                                                *
+      * DATA DESCRIPTION :                                             *
+      *             IN-01 : 中國曆或西元曆                           *
+      *             IN-02 : "1" 代表　中曆                           *
+      *                     "2" 代表　西曆                           *
+      *             IN-03 : 統一發票號碼                             *
+      *             OU-01 : " " 代表正確                             *
+      *                     "Y" 代表不正確                           *
+      *                     "*" INPUT DATA ERROR                       *
+      *             OU-02 : "2" 代表普通二聯式發票                   *
+      *             OU-02 : "B" 代表台北市二聯式發票                 *
+      *             OU-02 : "3" 代表三聯式發票                       *
+      *                                                                *
+      ******************************************************************
+       ENVIRONMENT     DIVISION.
+       CONFIGURATION   SECTION.
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  YEAR-TAB.
+           05  FILLER  PIC X(12)  VALUE "FGHJKLMNPQRS".
+           05  FILLER  PIC X(12)  VALUE "TUVWXYZABCDE".
+       01  YEAR-TAB-R    REDEFINES    YEAR-TAB.
+           05  YEAR-CODE-G        OCCURS    12  TIMES.
+               10  YEAR-CODE1          PIC X(01).
+               10  YEAR-CODE2          PIC X(01).
+       01  YEAR-IDX-MAX                PIC 9(02)    VALUE  12.
+      *----------------------------------------------------------------
+      *   CURRENT RULE EFFECTIVE AT 1989-09 (民國78-09)
+      *
+      *    ----  年碼 ------            月碼     月份
+      * ** FG   78     TU   84           A  B  C     1   7
+      *    HJ   79     VW   85           D  E  F     2   8
+      *    KL   80     XY   86           G  H  J     3   9
+      *    MN   81     ZA   87           K  L  M     4  10
+      *    PQ   82     BC   88           N  P  Q     5  11
+      *    RS   83     DE   89           R  S  T     6  12
+      *----------------------------------------------------------------
+       01  MON-TAB.
+           05  FILLER  PIC X(09)  VALUE "ABCDEFGHJ".
+           05  FILLER  PIC X(09)  VALUE "KLMNPQRST".
+       01  MON-TAB-R     REDEFINES    MON-TAB.
+           05  MON-TAB-G          OCCURS    6    TIMES.
+               10  MON-CODE1           PIC X(01).
+               10  MON-CODE2           PIC X(01).
+               10  MON-CODE3           PIC X(01).
+       01  MON-IDX-MAX                 PIC 9(02)    VALUE  6.
+      *----------------------------------------------------------------
+       01  WORK-FIELD.
+           05  WK-INVNO.
+               10 WK-INVNO1.
+                  15  WK-INVNO11       PIC X(01).
+                  15  WK-INVNO12       PIC X(01).
+               10 WK-INVNO2            PIC X(08).
+           05  WK-DATE.
+               10  WK-YY               PIC 9(02).
+               10  WK-MM               PIC 9(02).
+               10  WK-DD               PIC 9(02).
+           05  WK-YY4                  PIC 9(04).
+           05  WK-YY4A                 PIC 9(04).
+           05  WK-YY4B                 PIC 9(04).
+           05  IDX-1                   PIC 9(02).
+           05  IDX-2                   PIC 9(02).
+           05  WK-ERR                  PIC X(01).
+           05  WK-INVFMT               PIC X(01).
+           05  WK-DTFMT                PIC X(01).
+           05  WK-INVNOA.
+               10  WK-INVNOA1          PIC X(01).
+               10  WK-INVNOA2          PIC X(01).
+      *----------------------------------------------------------------
+       LINKAGE SECTION.
+       01  IN-01                       PIC X(06).
+       01  IN-02                       PIC X(01).
+       01  IN-03                       PIC X(10).
+       01  OU-01                       PIC X(01).
+       01  OU-02                       PIC X(01).
+       PROCEDURE DIVISION    USING     IN-01
+                                       IN-02
+                                       IN-03
+                                       OU-01
+                                       OU-02.
+       0000-BEGIN.
+      *--------------------------------------------------------------
+           PERFORM 0000-INIT-RTN    THRU    0000-EXIT.
+           PERFORM 1000-MAIN-RTN    THRU    1000-EXIT.
+           PERFORM 8000-ENDJ-RTN    THRU    8000-EXIT.
+           GOBACK.
+      *--------------------------------------------------------------
+       0000-INIT-RTN.
+           MOVE    SPACES   TO    WK-INVNO
+                                  WK-DATE
+                                  WK-ERR
+                                  WK-INVFMT
+                                  WK-DTFMT.
+           MOVE    ZEROS    TO    WK-YY4
+                                  IDX-1
+                                  IDX-2.
+       0000-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       1000-MAIN-RTN.
+           PERFORM 1100-EDIT-RTN    THRU    1100-EXIT.
+           IF    WK-ERR    =        "*"
+                 GO     TO    1000-EXIT.
+           PERFORM 1200-PREP-RTN    THRU    1200-EXIT.
+           PERFORM 1300-MTCH-RTN    THRU    1300-EXIT.
+       1000-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       1100-EDIT-RTN.
+           MOVE    IN-01        TO    WK-DATE.
+           MOVE    IN-02        TO    WK-DTFMT.
+           MOVE    IN-03        TO    WK-INVNO.
+           IF    WK-DATE    NOT    NUMERIC
+                 MOVE       "*"    TO    WK-ERR.
+           IF    WK-DTFMT   NOT =  "1"
+             AND WK-DTFMT   NOT =  "2"
+                 MOVE       "*"    TO    WK-ERR.
+           IF    WK-INVNO2  NOT NUMERIC
+                 MOVE       "*"    TO    WK-ERR.
+           IF      WK-DTFMT     =     "2"
+                   COMPUTE  WK-YY4    =     WK-YY  +  1900.
+           IF      WK-DTFMT     =     "1"
+                   COMPUTE  WK-YY4    =     WK-YY  +  1911.
+           PERFORM 1110-EDYR-RTN   THRU  1110-EXIT.
+           PERFORM 1120-EDMN-RTN   THRU  1120-EXIT.
+       1100-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       1200-PREP-RTN.
+           COMPUTE WK-YY4A  =    WK-YY4  -  1988.
+           DIVIDE  YEAR-IDX-MAX  INTO      WK-YY4A
+                                 GIVING    WK-YY4B
+                                 REMAINDER IDX-1.
+           IF      IDX-1         =     0
+                   MOVE          YEAR-IDX-MAX    TO    IDX-1.
+           MOVE    WK-MM         TO    IDX-2.
+           IF      IDX-2      >  6
+                   COMPUTE    IDX-2    =    IDX-2  -  6.
+       1200-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       1300-MTCH-RTN.
+            IF    WK-MM    >    6
+                  MOVE    YEAR-CODE2 (IDX-1)    TO    WK-INVNOA1
+               ELSE
+                  MOVE    YEAR-CODE1 (IDX-1)    TO    WK-INVNOA1.
+      *
+            MOVE  MON-CODE1 (IDX-2)             TO    WK-INVNOA2.
+            IF    WK-INVNO1     =    WK-INVNOA
+                  MOVE    "3"    TO    WK-INVFMT
+                  GO    TO    1300-EXIT.
+      *
+            MOVE  MON-CODE2 (IDX-2)             TO    WK-INVNOA2.
+            IF    WK-INVNO1     =    WK-INVNOA
+                  MOVE    "2"    TO    WK-INVFMT
+                  GO    TO    1300-EXIT.
+      *
+            MOVE  MON-CODE3 (IDX-2)             TO    WK-INVNOA2.
+            IF    WK-INVNO1     =    WK-INVNOA
+                  MOVE    "B"    TO    WK-INVFMT
+                  GO    TO    1300-EXIT.
+      *
+            MOVE  "Y"   TO    WK-ERR.
+       1300-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       1110-EDYR-RTN.
+            IF       WK-YY4  <     1989
+                OR   WK-MM   =     0
+                OR   WK-MM   >     12
+                     MOVE    "*"   TO    WK-ERR.
+      *
+            IF       WK-YY4  =     1989
+               AND   WK-MM   <     9
+                     MOVE    "*"   TO    WK-ERR.
+      *
+            IF       WK-INVNO11    =     "I"  OR  "O"
+                     MOVE    "*"   TO    WK-ERR.
+       1110-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       1120-EDMN-RTN.
+            IF       WK-INVNO12    =     "I"  OR  "O"  OR  "U"  OR  "V"
+                                     OR  "W"  OR  "X"  OR  "Y"  OR  "Z"
+                     MOVE     "*"     TO    WK-ERR.
+       1120-EXIT.    EXIT.
+      *--------------------------------------------------------------
+       8000-ENDJ-RTN.
+           MOVE    WK-ERR    TO    OU-01.
+           MOVE    WK-INVFMT TO    OU-02.
+       8000-EXIT.    EXIT.
+      *--------------------------------------------------------------
+

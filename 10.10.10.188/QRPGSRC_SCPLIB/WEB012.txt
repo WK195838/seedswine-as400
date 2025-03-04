@@ -1,0 +1,445 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : WEB012                                     *
+     A*    AUTHOR       : A1546  VINCENT                             *
+     A*    CREATE DATE  : 98/02/09                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存STORE PROCEDURE                 *
+     A*    SUBSYSTEM    :前台管理系統                              *
+     A*    REMARK       :調撥單調出產品檢核＆單據產生              *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A*00A需求單號: 1050270
+     A*00A 2016/05/20 DEREK開放前台鎖住商品(超過貨架有效迄日)
+     A*                    可調撥
+     A*00B需求單號: 1090255
+     A*00B 2020/02/03 CAROL調撥單新增修改功能
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FSCWB01PFUF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANDPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FC#EHPF  IF  E           K        DISK
+     FINTBPF  IF  E           K        DISK
+     F*INTCLF08IF  E           K        DISK
+     F*            TC0                               KRENAMETC0L8
+ 00B-F*INTCPF  O   E           K        DISK
+ 00B-F*INTDPF  O   E           K        DISK
+ 00B+FINTCPF  UF  E           K        DISK                      A
+ 00B+FINTDPF  UF  E           K        DISK                      A
+     F*
+ 00B-E*                   MSG     1  14 60               *訊息
+ 00B+E                    MSG     1  17 60               *訊息
+     E*
+     I           UDS
+     I                                      187 1920DATES
+     I                                      201 2080DATE
+     IPARM3       DS
+     I                                        1   80P3YMD
+     I                                        1   60P3YM
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PARM1   2        公司代號
+     C                     PARM           PARM2   2        通路代號
+     C                     PARM           PARM3   8        調出日期
+     C                     PARM           PARM4   5        出貨分店
+     C                     PARM           PARM5   5        收貨分店
+     C                     PARM           PARM6  10        人員代號
+     C                     PARM           PARM7  13        調撥單號
+ 00B+C                     PARM           MODE    1        MODE
+     C                     PARM           ERRRD   3        ERR RCD NO.
+     C                     PARM           RTNCD   2        RETURN CODE
+     C                     PARM           RTNDSC 60        RETURN DESC.
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C*
+     C           *LIKE     DEFN TB06      TBTT1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYND     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C           KEYNE     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C                     KFLD           PARM4
+     C           KEYNE1    KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C                     KFLD           PARM5
+     C           KEYNC     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           WB0102
+     C           KEYTB     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           EH02
+     C                     KFLD           PARM2
+     C                     KFLD           PARM4
+     C                     KFLD           WB0102
+     C           KEYTC     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C                     KFLD           PARM4
+     C                     KFLD           PARM5
+     C                     KFLD           P3YMD
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C* CHK HEADING
+     C                     EXSR RTN100
+     C* CHK DETAIL
+     C  N99                EXSR RTN200
+     C*
+     C* WRITE INTCPF,INTDPF
+     C  N99                EXSR RTN300
+     C*
+     C                     MOVE WRDNO     ERRRD
+     C  N99                MOVE '00'      RTNCD
+     C  N99                MOVE *BLANKS   RTNDSC
+ 00B-C* N99                MOVELTC05      PARM7            新調撥單號
+ 00B+C  N99      MODE      IFEQ 'A'
+ 00B+C                     MOVELTC05      PARM7            新調撥單號
+ 00B+C                     ENDIF
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....CHECK HEADING
+      *==============================================================*
+01===C           RTN100    BEGSR
+|     *
+|    C                     Z-ADD0         WRDNO   30
+ 00B+ * CHK MODE
+ 00B+C           MODE      IFNE 'A'
+ 00B+C           MODE      ANDNE'U'
+ 00B+C                     MOVEL'15'      RTNCD
+ 00B+C                     MOVELMSG,15    RTNDSC
+ 00B+C                     SETON                     99
+ 00B+C                     END
+ 00B+C   99                GOTO END100
+ 00B+C*
+|     * CHK公司代號
+|    C           PARM1     CHAIN#B0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL'01'      RTNCD
+|   C                     MOVELMSG,1     RTNDSC
+|   C                     SETON                     99
+| 01-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+|     * CHK通路代號
+|    C           KEYND     CHAINND0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL'02'      RTNCD
+|   C                     MOVELMSG,2     RTNDSC
+|   C                     SETON                     99
+| 02-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+|    C* CHK公司參數檔
+|    C           PARM1     CHAINEH0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL'03'      RTNCD
+|   C                     MOVELMSG,3     RTNDSC
+|   C                     SETON                     99
+| 03-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+ 00B+C           MODE      IFEQ 'A'
+ 00B+C           MODE      OREQ 'U'
+|    C* CHK 調出日期
+|    C                     CALL 'P30'
+|    C                     PARM P3YMD     P3001I  80
+|    C                     PARM '2'       P3002I  1
+|    C                     PARM '1'       P3003I  1
+|    C                     PARM           P3011O  1
+| 04-C           P3011O    IFEQ 'N'
+|   C                     MOVEL'04'      RTNCD
+|   C                     MOVELMSG,4     RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C*調出日期年月不得小於月結年月
+| 05-C           P3YMD     IFLT EH07
+|   C                     MOVEL'05'      RTNCD
+|   C                     MOVELMSG,5     RTNDSC
+|   C                     SETON                     99
+| 05-C                     ENDIF
+|    C   99                GOTO END100
+ 00B+C                     ENDIF                           IF MODE A/U
+|     *
+|    C* CHK 出貨分店
+|    C           KEYNE     CHAINNE0                  40
+| 06-C           *IN40     IFEQ '1'
+|   C                     MOVEL'06'      RTNCD
+|   C                     MOVELMSG,6     RTNDSC
+|   C                     SETON                     99
+| 06-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+|    C* CHK 收貨分店
+|    C           KEYNE1    CHAINNE0                  40
+| 07-C           *IN40     IFEQ '1'
+|   C                     MOVEL'07'      RTNCD
+|   C                     MOVELMSG,7     RTNDSC
+|   C                     SETON                     99
+| 07-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C*出貨分店不可相同於收貨分店
+| 08-C           PARM4     IFEQ PARM5
+|   C                     MOVEL'08'      RTNCD
+|   C                     MOVELMSG,8     RTNDSC
+|   C                     SETON                     99
+| 08-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+|    C*限定同出收貨分店及調出日期只有一張單
+|    C* (暫不限定，因調出完成即轉待驗收狀態，可能需同一天補單）
+|    C*          KEYTC     CHAINTC0L8                40
+|    C*          *IN40     IFEQ '0'
+|    C*                    MOVEL'13'      RTNCD
+|    C*                    MOVELMSG,13    RTNDSC
+|    C*                    SETON                     99
+|    C*                    ENDIF
+|    C*  99                GOTO END100
+|    C*
+ 00B+C*更新模式
+ 00B+C           MODE      IFEQ 'U'
+ 00B+C*先LOCK調出單
+ 00B+C           PARM7     CHAINTC0                  4020
+ 00B+C                     SELEC
+ 00B+C* CHK調出單LOCK
+ 00B+C           *IN20     WHEQ '1'
+ 00B+C                     MOVEL'16'      RTNCD
+ 00B+C                     MOVELMSG,16    RTNDSC
+ 00B+C                     SETON                     99
+ 00B+C* CHK調出單不存在
+ 00B+C           *IN40     WHEQ '1'
+ 00B+C                     MOVEL'17'      RTNCD
+ 00B+C                     MOVELMSG,17    RTNDSC
+ 00B+C                     SETON                     99
+ 00B+C                     ENDSL
+ 00B+C   99                GOTO END100
+ 00B+C                     ENDIF                           IF MODE U/D
+ 00B+C*
+01===C           END100    ENDSR
+      *==============================================================*
+      *          RTN200....CHECK DETAIL
+      *==============================================================*
+02===CSR         RTN200    BEGSR
+|    C*
+ 00B+C           MODE      IFEQ 'A'
+ 00B+C           MODE      OREQ 'U'
+ 00B+C*
+|    C* READ工作檔
+|    C           *LOVAL    SETLLWB01
+|    C                     READ WB01                N    44
+| 01-C           *IN44     DOWEQ'0'
+|   C                     ADD  1         WRDNO
+|   C* CHK產品主檔
+|   C           KEYNC     CHAINNC0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL'09'      RTNCD
+|   C                     MOVELMSG,9     RTNDSC
+|   C                     SETON                     99
+| 02-C                     END
+|   C   99                GOTO END200
+|   C*
+|   C* CHK現場庫存量
+|   C           KEYTB     CHAINTB0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL'10'      RTNCD
+|   C                     MOVELMSG,10    RTNDSC
+|   C                     SETON                     99
+| 03*C                     ELSE
+|   C           TB06      ADD  TB08      TBTT1            期初＋進貨
+|   C                     SUB  TB09      TBTT1            退出
+|   C                     ADD  TB10      TBTT1            調整入庫
+|   C                     SUB  TB11      TBTT1            調整出庫
+|   C                     ADD  TB12      TBTT1            銷售入庫
+|   C                     SUB  TB13      TBTT1            銷售出庫
+|   C                     ADD  TB14      TBTT1            調撥入在途
+|   C                     SUB  TB15      TBTT1            調撥出在途
+|   C                     ADD  TB16      TBTT1            陳列異動量
+|   C                     ADD  TB17      TBTT1            陳列期初量
+     C                     SUB  TB18      TBTT1            陳列借貨量
+| 04-C           WB0103    IFGT TBTT1
+|   C                     MOVEL'11'      RTNCD
+|   C                     MOVELMSG,11    RTNDSC
+|00B+C                     MOVE WB0102    RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+| 03-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+     C* 調入分店產品貨架規則
+|   C*00A-                CALL 'BCM002'
+|00A+C                     CALL 'BCM003'
+|   C                     PARM PARM1     M002I1  2        公司別
+|   C                     PARM PARM2     M002I2  2        通路別
+|   C                     PARM PARM5     M002I3  5        調入分店
+|   C                     PARM P3YMD     M002I4  80       調入日期
+|   C                     PARM WB0102    M002I5  9        產品代號
+|   C                     PARM           M002O3  1        檢核值
+| 12-C           M002O3    IFEQ 'N'
+|   C                     MOVEL'14'      RTNCD
+|   C                     MOVELMSG,14    RTNDSC
+|   C                     SETON                     99
+| 12-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+|   C*
+|   C                     READ WB01                N    44
+| 01-C                     ENDDO
+|    C*
+| 05-C           WRDNO     IFEQ 0
+|   C                     MOVEL'12'      RTNCD
+|   C                     MOVELMSG,12    RTNDSC
+|   C                     SETON                     99
+| 05-C                     ENDIF
+|    C   99                GOTO END200
+|    C*
+ 00B+C                     ENDIF                           IF MODE A/U
+ 00B+C*
+02===C           END200    ENDSR
+      *==============================================================*
+      *          RTN300....WRITE INTCPF,INTDPF
+      *==============================================================*
+03===CSR         RTN300    BEGSR
+|    C*
+ 00B+C                     SELEC
+|    C* GET 調撥單號
+ 00B+C           MODE      WHEQ 'A'
+|    C                     CALL 'GET001'
+|    C                     PARM PARM1     T001I1  2
+|    C                     PARM 'M1'      T001I2  2
+|    C                     PARM DATES     T001I3  60       西元YYMMDD
+|    C           TD01      PARM           T001O1 13
+|    C*
+ 00B+C           MODE      WHEQ 'U'
+ 00B+C*刪除原訂貨單明細
+ 00B+C           PARM7     SETLLTD0
+ 00B+C           PARM7     READETD0                      40
+ 00B+C           *IN40     DOWEQ'0'
+ 00B+C                     DELETTD0
+ 00B+C           PARM7     READETD0                      40
+ 00B+C                     ENDDO
+ 00B+C                     MOVELPARM7     TD01
+ 00B+C                     ENDSL
+ 00B+C*
+|    C* WRITE INTDPF
+ 00B+C           MODE      IFEQ 'A'
+ 00B+C           MODE      OREQ 'U'
+|    C                     SETOF                         50
+|    C           *LOVAL    SETLLWB01
+|    C                     READ WB01                N    40
+| 01-C           *IN40     DOWEQ'0'
+|   C                     EXSR RTN301                     SCR -> FILE
+|   C                     WRITETD0
+|   C                     READ WB01                N    40
+| 01-C                     ENDDO
+ 00B+C                     ENDIF
+|    C*
+|    C* WRITE INTCPF
+ 00B+C                     SELEC
+ 00B+C*WRITE
+ 00B+C           MODE      WHEQ 'A'
+|    C                     EXSR RTN302
+|    C                     WRITETC0
+ 00B+C*UPDATE
+ 00B+C           MODE      WHEQ 'U'
+ 00B+C                     EXSR RTN302
+ 00B+C                     UPDATTC0
+ 00B+C                     ENDSL
+|    C*
+|    C* CLEAR SCWB01PF
+|    C           *LOVAL    SETLLWB01
+|    C                     READ WB01                     40
+| 02-C           *IN40     DOWEQ'0'
+|   C                     DELETWB01
+|   C                     READ WB01                     40
+| 02-C                     ENDDO
+|    C*
+03===C           END300    ENDSR
+      *==============================================================*
+      *          RTN301....MOVE INTDPF FIELDS
+      *==============================================================*
+04===CSR         RTN301    BEGSR
+|    C*
+|    C                     MOVELWB0102    TD02             產品
+|    C                     Z-ADDWB0103    TD03
+| 01-C           *IN50     IFEQ '0'
+|   C                     Z-ADD0         TD04
+|   C                     MOVE PARM1     TD05
+|   C                     MOVE PARM2     TD06
+|   C                     MOVE PARM4     TD07
+|   C                     MOVE PARM5     TD08
+|   C                     Z-ADDP3YMD     TD09
+|   C                     Z-ADD0         TD10
+|   C                     MOVE 'O'       TD11
+|   C                     MOVE *BLANK    TD12
+|   C                     Z-ADDDATE      TDVV
+|   C                     MOVE *BLANK    TDWW
+|   C                     MOVEL'WEB012'  TDWW
+|   C                     Z-ADDDATE      TDXX
+|   C                     TIME           TDYY
+|   C                     MOVELPARM6     TDZZ
+|   C                     SETON                     50
+| 01-C                     ENDIF
+|    C*
+04===C           END301    ENDSR
+     C*==============================================================*
+     C*          RTN302....MOVE INTCPF FIELDS
+     C*==============================================================*
+05===C           RTN302    BEGSR
+|    C*
+ 00B+C           MODE      IFEQ 'A'
+|    C                     MOVE PARM1     TC01
+|    C                     MOVE PARM2     TC02
+|    C                     Z-ADDP3YMD     TC03
+|    C                     MOVE PARM4     TC04
+|    C                     MOVE TD01      TC05
+|    C                     Z-ADD0         TC06
+|    C                     MOVE PARM5     TC07
+|    C                     MOVE 'F'       TC08
+|    C                     MOVE 'O'       TC09
+|    C                     MOVE *BLANK    TC10
+|    C                     MOVE DATE      TCVV
+ 00B+C                     ENDIF
+ 00B+C*
+|    C                     MOVEL*BLANK    TCWW
+|    C                     MOVEL'WEB012'  TCWW
+|    C                     Z-ADDDATE      TCXX
+|    C                     TIME           TCYY
+|    C                     MOVELPARM6     TCZZ
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+** /MSG
+公司代號不存在。
+通路代號不存在。
+公司參數檔無該公司記錄。
+調出日期錯誤。
+調出日期年月份不得小於月結年月份。
+出貨分店代號不存在。
+收貨分店代號不存在。
+出貨分店不可相同於收貨分店
+產品代號不存在。
+出貨分店無此產品庫存。
+庫存量不足！（調出數量大於現場庫存量）
+無調撥單產品明細!
+同出收貨分店及日期之單據已經存在。
+產品代號不存在於收貨分店及日期的貨架規則。
+處理模式代碼錯誤MODE(A/U)。
+調出單主檔正被其它人使用中，請聯絡總公司。
+此調出單不存於調出單檔案。
+

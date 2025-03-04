@@ -1,0 +1,161 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : MTR0441                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/01/24                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :主檔                                         *
+      * REMARK       :客戶明細表                                   *
+      ****************************************************************
+     FMTMDPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTR044P O   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 605 DMD01S
+     I                                      606 610 DMD01E
+     I                                      611 611 DMD07S
+     I                                      612 612 DMD07E
+     I                                      613 614 DME07S
+     I                                      615 616 DME07E
+     I                                      621 626 DME15S
+     I                                      631 636 DME15E
+     I                                      641 644 DMC03S
+     I                                      647 650 DMC03E
+      *往來狀態
+     I                                      797 797 DME20
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C                     EXSR RTN100
+     C           DMD01S    SETLLMD0
+     C                     READ MD0                      46
+  01-C           *IN46     DOWEQ'0'
+    C           MD01      ANDLEDMD01E
+  02-C           MD07      IFGE DMD07S
+    C           MD07      ANDLEDMD07E
+    C           MD01      CHAINME0                  41
+  03-C           *IN41     IFEQ '0'
+  04-C           ME15      IFGE DME15S
+    C           ME15      ANDLEDME15E
+    C           ME15      CHAINMC0                  42
+  05-C           *IN42     IFEQ '0'
+    C           MC03      ANDGEDMC03S
+    C           MC03      ANDLEDMC03E
+    C*
+    C   39                EXSR RTN900                     *OVRFLW
+    C                     EXSR RTN200
+    C  N45                WRITEPD1
+    C  N45                SETON                         10
+  05-C                     END
+  04-C                     END
+  03-C                     END
+  02-C                     END
+    C*
+    C                     READ MD0                      46
+  01-C                     END
+     C*
+     C  N10                WRITEPE9
+     C                     WRITEPE2
+     C                     SETON                         LR
+     C*================================================================
+     C*          RTN010....SET INIT
+     C*== =============================================================
+01===C           RTN010    BEGSR
+|    C*種類
+|    C                     MOVEL*BLANKS   STATUS
+| 06-C           DME20     IFEQ 'A'
+|   C                     MOVEL'往　來'STATUS
+| 06*C                     ELSE
+| 07-C           DME20     IFEQ 'I'
+|   C                     MOVEL'不往來'STATUS
+| 07*C                     ELSE
+|   C                     MOVEL'全部'  STATUS
+| 07-C                     END
+| 06-C                     END
+|    C*
+|    C                     SETON                         10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....CHECK HEADING
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C                     WRITEPH1
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....CHECK DETAIL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C                     SETOF                     45
+|    C*客戶簡稱
+|    C           MD01      CHAINME0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C           ME07      ANDGEDME07S
+|   C           ME07      ANDLEDME07E
+|   C           ME15      ANDGEDME15S
+|   C           ME15      ANDLEDME15E
+|   C*判斷往來狀態
+| 02-C           DME20     IFNE *BLANK
+|   C           ME20      ANDNEDME20
+     C                     SETON                         45
+| 02*C                     ELSE
+| 02-C                     END
+|   C*信用額度
+|   C           MD22      DIV  1000      PMD22
+|   C*信用期限
+| 03-C           MD23      CASEQ'C'       RTN10
+|   C           MD23      CASEQ'D'       RTN20
+|   C           MD23      CASEQ'M'       RTN30
+| 03-C                     END
+|   C*業務人員
+|   C           ME15      CHAINMC0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MC02
+| 04-C                     END
+| 01*C                     ELSE
+|   C                     SETON                     45
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN10 ....C---現金
+      *==============================================================*
+04===C           RTN10     BEGSR
+|    C                     MOVE '現金'  PMD23
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN20 ....D---交貨
+      *==============================================================*
+05===C           RTN20     BEGSR
+|    C                     MOVE '交貨'  PMD23
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN30 ....M---月結
+      *==============================================================*
+06===C           RTN30     BEGSR
+|    C                     MOVE '月結'  PMD23
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+07===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+07===C                     ENDSR
+

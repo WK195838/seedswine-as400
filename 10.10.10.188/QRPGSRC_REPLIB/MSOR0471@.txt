@@ -1,0 +1,340 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : MSOR0471                                      *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 03/03/95                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :月存貨週轉統計年報　　                       *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /*                                                          */
+     /*=============================================================*/
+      ****************************************************************
+     FREWFB7  IF  E           K        DISK
+     FIMIXPF  IF  E           K        DISK
+     FIMIXLF01IF  E           K        DISK
+     F            IX0                               KRENAMEIX0L
+     FPOPEPF  IF  E           K        DISK
+     FPOPCPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FREWFB6  UF  E           K        DISK                      A
+     FRES18WF IF  E           K        DISK                           UC
+     IIX0L
+     I              IX06                            IX06L
+     I              IX07                            IX07L
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *日期
+     I                                      600 608 DCD04S
+     I                                      610 618 DCD04E
+     I*MM/YY
+     I                                      620 6230DCD01
+     I                                      620 6210CD01M
+     I                                      622 6230CD01Y
+     I*YY/MM
+     I                                      624 6270DATEE
+     I                                      624 6250YYE
+     I                                      626 6270MME
+     I                                      628 6310DATES
+     I                                      628 6290YYS
+     I                                      630 6310MMS
+      *產品組別
+     I                                      797 797 DMA11
+     I                                      798 798 DMA11S
+     I                                      799 799 DMA11E
+     I            DS
+B2MODI                                        1   60IX11
+B2MODI                                        1   40IX11Y
+B2MODI                                        5   60IX11M
+     I            DS
+B2MODI                                        1   60LAST
+B2MODI                                        1   40LASTYR
+B2MODI                                        5   60LASTMN
+     I            DS
+B2MODI                                        1   80PE05
+B2MODI                                        1   60PE05A
+     I            DS
+     I                                        1   2 MA11
+     I                                        1   1 MA11A
+     I*
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C*          *LIKE     DEFN WF1528    WORK28
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WFB601
+     C                     KFLD           WFB602
+     C           KEYIX     KLIST
+     C                     KFLD           LAST
+     C                     KFLD           IX01
+     C           KEYPC     KLIST
+     C                     KFLD           PE03
+     C                     KFLD           PE04
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN100                     *SOCDPF
+     C                     EXSR RTN200                     *IMIXPF
+     C                     EXSR RTN300                     *POPEPF
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....SOCDPF
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C                     READ CD0                      46
+| 01-C           *IN46     DOWEQ'0'
+B2000C                     Z-ADDCD01      WFB602
+|   C                     Z-ADDCD16      WORK3   60
+|   C                     ADD  CD17      WORK3
+|   C                     ADD  CD18      WORK3
+|   C                     ADD  CD19      WORK3
+|   C                     SUB  CD20      WORK3
+|   C                     SUB  CD21      WORK3
+|   C                     SUB  CD23      WORK3
+     C           CD27      IFEQ ' '
+|   C                     MOVELCD04      WFB601
+|   C                     EXSR RTN10B
+     C                     ELSE
+     C                     EXSR RTN10X
+     C                     END
+      *
+|   C                     READ CD0                      46
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN10B....WRITE OR UPDATE REWFB6
+      *==============================================================*
+02===C           RTN10B    BEGSR
+|    C*
+|    C           KEYWF     CHAINWFB60                40
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK3     WFB605
+|   C                     UPDATWFB60
+| 01*C                     ELSE
+|   C                     Z-ADDWORK3     WFB605
+|   C                     Z-ADD0         WFB603
+|   C                     Z-ADD0         WFB604
+|   C                     Z-ADD0         WFB606
+|   C                     WRITEWFB60
+| 01-C                     END
+|    C*
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN10X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+07===C           RTN10X    BEGSR
+      *
+|    C                     EXSR RTN10Y
+|    C                     OPEN RES18WF
+|    C                     EXSR RTN10Z
+|    C                     CLOSERES18WF
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN10Y....禮盒單瓶成本
+      *==============================================================*
+08===C           RTN10Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM CD04      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM           S08I2  12        訂單號碼
+|    C                     PARM 0         S08I3   60       牌價判斷日
+|    C                     PARM WORK3     S08I4   60       禮盒訂購數量
+|    C                     PARM 0         S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   82       禮盒成本FOB
+|    C                     PARM 0         S08I8   82       禮盒成本FHI
+|    C                     PARM 0         S08I9   82       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   82       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   82       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   82       禮盒轉帳成本DUTY
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN10Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+09===C           RTN10Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181      WFB601
+|   C                     Z-ADDR182      WORK3
+|   C                     EXSR RTN10B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN200....IMIXPF
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C                     READ IX0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C           IX01      CHAINMA0                  40
+| 02-C           MA11A     IFGE DMA11S
+|   C           MA11A     ANDLEDMA11E
+B2000C                     Z-ADDIX11      WFB602
+     C           IX06      ADD  IX07      WORK2   60       *期末
+     C           MA54      IFNE 'Y'
+|   C                     MOVELIX01      WFB601
+     C                     EXSR RTN20D
+|   C                     EXSR RTN20B
+     C                     ELSE
+     C                     EXSR RTN20D
+     C                     EXSR RTN20X
+| 02-C                     END
+| 02-C                     END
+      *
+|   C                     READ IX0                      46
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN20B....WRITE OR UPDATE REWFB6
+      *==============================================================*
+04===C           RTN20B    BEGSR
+     C*
+|    C           KEYWF     CHAINWFB60                40
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK1     WFB603
+|   C                     ADD  WORK2     WFB606
+|   C                     UPDATWFB60
+| 01*C                     ELSE
+|   C                     Z-ADDWORK1     WFB603
+|   C                     Z-ADDWORK2     WFB606
+|   C                     Z-ADD0         WFB604
+|   C                     Z-ADD0         WFB605
+|   C                     WRITEWFB60
+| 01-C                     END
+|    C*
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN20D....IMIXLF1
+      *==============================================================*
+07===C           RTN20D    BEGSR
+|    C*
+|    C*GET LASTMONTH AND LASTYEAR
+|    C           IX11M     SUB  1         LASTMN
+| 01-C           LASTMN    IFEQ 0
+|   C                     Z-ADD12        LASTMN
+B2000C           IX11Y     SUB  1         LASTYR
+| 01*C                     ELSE
+B2000C                     Z-ADDIX11Y     LASTYR
+| 01-C                     END
+B2000C           KEYIX     CHAINIX0L                 45
+     C           *IN45     IFEQ '0'
+|    C           IX06L     ADD  IX07L     WORK1   60
+     C                     ELSE
+     C                     Z-ADD0         WORK1   60
+     C                     END
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN20X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+07===C           RTN20X    BEGSR
+      *
+|    C                     EXSR RTN20Y
+|    C                     OPEN RES18WF
+|    C                     EXSR RTN20Z
+|    C                     CLOSERES18WF
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN20Y....禮盒單瓶成本
+      *==============================================================*
+08===C           RTN20Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM IX01      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM           S08I2  12        訂單號碼
+|    C                     PARM 0         S08I3   60       牌價判斷日
+|    C                     PARM WORK1     S08I4   60       禮盒期初　量
+|    C                     PARM WORK2     S08I5   60       禮盒期末　量
+|    C                     PARM 0         S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   82       禮盒成本FOB
+|    C                     PARM 0         S08I8   82       禮盒成本FHI
+|    C                     PARM 0         S08I9   82       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   82       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   82       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   82       禮盒轉帳成本DUTY
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN20Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+09===C           RTN20Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181      WFB601
+|   C                     Z-ADDR182      WORK1
+|   C                     Z-ADDR183      WORK2
+|   C                     EXSR RTN20B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN300....POPEPF
+      *==============================================================*
+13===C           RTN300    BEGSR
+|    C*
+|    C                     READ PE0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C           PE04      CHAINMA0                  42
+| 02-C           MA11A     IFGE DMA11S
+|   C           MA11A     ANDLEDMA11E
+|   C                     MOVE PE04      WFB601
+B2000C                     MOVELPE05A     WFB602
+|   C           KEYPC     CHAINPC0                  45
+|   C           PE06      MULT PC10      WORK4   90
+|   C           KEYWF     CHAINWFB60                40
+|   C*當期
+| 03-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK4     WFB604
+|   C                     UPDATWFB60
+| 03*C                     ELSE
+|   C                     Z-ADDWORK4     WFB604
+|   C                     Z-ADD0         WFB603
+|   C                     Z-ADD0         WFB605
+|   C                     Z-ADD0         WFB606
+|   C                     WRITEWFB60
+| 03-C                     END
+| 02-C                     END
+      *
+|   C                     READ PE0                      46
+| 01-C                     END
+|    C*
+13===C                     ENDSR
+

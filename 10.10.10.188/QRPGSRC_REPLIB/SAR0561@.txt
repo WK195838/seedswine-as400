@@ -1,0 +1,276 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : SAR0561                                       *
+      * AUTHER       : A1084  CHARLES                                *
+      * CREATE DATE  : 81/05/04                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :產品專櫃達成率分析表                         *
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FRES18WF IF  E           K        DISK                           UC
+     FREWF27  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *YY/MM/DD
+B2MODI                                      615 6200WSC39
+B2MODI                                      615 6180WSC39Y
+B2MODI                                      619 6200WSC39M
+B2MODI                                      629 629 DSEL
+     I            DS
+B2MODI                                        1   80SC39
+B2MODI                                        1   60SC39YM
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF2704    WORK04
+     C           *LIKE     DEFN WF2705    WORK05
+     C           *LIKE     DEFN WF2706    WORK06
+     C           *LIKE     DEFN WF2707    WORK07
+     C           *LIKE     DEFN WF2708    WORK08
+     C           *LIKE     DEFN WF2709    WORK09
+     C           *LIKE     DEFN MA41      WAMT
+B2000C           *LIKE     DEFN SC08      WSC08
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF2701
+     C                     KFLD           WF2702
+     C                     KFLD           WF2703
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *分析方式－禮盒(A)
+  01-C           DSEL      IFEQ 'A'
+    C                     EXSR RTN200
+  01-C                     END
+      *
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+  02-C           DSEL      IFEQ 'B'
+    C                     EXSR RTN400
+  02-C                     END
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN200....月銷售數量及金額
+      *==============================================================*
+01===C           RTN200    BEGSR
+      *
+|    C                     READ SC0                      45
+| 03-C           *IN45     DOWEQ'0'
+|   C           SC02      SETLLSD0
+|   C           SC02      READESD0                      46
+| 04-C           *IN46     DOWEQ'0'
+|   C                     MOVELSD03      WF2701
+|   C                     MOVELSD03      WF2702
+|   C                     MOVELSC04      WF2703
+|   C           KEYWF     CHAINWF270                40
+|   C                     EXSR RTN300
+|   C           SC02      READESD0                      46
+| 04-C                     END
+      *
+|   C                     READ SC0                      45
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE OR UPDATE REWF27
+      *==============================================================*
+02===C           RTN300    BEGSR
+      *
+|    C                     Z-ADD0         WORK04
+|    C                     Z-ADD0         WORK05
+|    C                     Z-ADD0         WORK06
+|    C                     Z-ADD0         WORK07
+|    C                     Z-ADD0         WORK08
+|    C                     Z-ADD0         WORK09
+|    C                     Z-ADD0         WORK
+|    C                     Z-ADD0         WORK1
+      *訂購＋搭贈WORK1
+|    C           SD04      ADD  SD05      WORK   174
+      *單位成本WORK1
+|    C           SD10      ADD  SD11      WORK1  174
+|    C                     ADD  SD12      WORK1
+      *當月
+B2000C           WSC39     IFEQ SC39YM
+      *累計數量
+|   C                     Z-ADDSD04      WORK04
+      *累計金額
+|   C                     Z-ADDSD07      WORK05
+|   C           WORK      MULT WORK1     WORK06    H
+| 01-C                     END
+      *年累計
+      *累計數量
+|    C                     Z-ADDSD04      WORK07
+      *累計金額
+|    C                     Z-ADDSD07      WORK08
+|    C           WORK      MULT WORK1     WORK09    H
+      *
+| 02-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK04    WF2704
+|   C                     ADD  WORK05    WF2705
+|   C                     ADD  WORK06    WF2706
+|   C                     ADD  WORK07    WF2707
+|   C                     ADD  WORK08    WF2708
+|   C                     ADD  WORK09    WF2709
+      *
+|   C                     UPDATWF270
+| 02*C                     ELSE
+|   C                     Z-ADDWORK04    WF2704
+|   C                     Z-ADDWORK05    WF2705
+|   C                     Z-ADDWORK06    WF2706
+|   C                     Z-ADDWORK07    WF2707
+|   C                     Z-ADDWORK08    WF2708
+|   C                     Z-ADDWORK09    WF2709
+|   C                     WRITEWF270
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN400....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+03===C           RTN400    BEGSR
+      *
+|    C                     READ SC0                      45
+| 01-C           *IN45     DOWEQ'0'
+B2CHKC           SC08      IFNE 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2000C                     Z-ADDSC08      WSC08
+| 02*C                     ELSE
+B2000C                     Z-ADDSC07      WSC08
+| 02-C                     END
+      *
+|   C           SC02      SETLLSD0
+|   C           SC02      READESD0                      46
+| 03-C           *IN46     DOWEQ'0'
+|   C           SD03      CHAINMA0                  40
+      *禮盒碼
+| 04-C           MA54      IFEQ 'Y'
+|   C                     EXSR RTN500
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN600
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL='A'
+| 04*C                     ELSE
+|   C                     MOVELSD03      WF2701
+|   C                     MOVELSD03      WF2702
+|   C                     MOVELSC04      WF2703
+|   C           KEYWF     CHAINWF270                40
+|   C                     EXSR RTN300
+      *
+| 04-C                     END
+      *
+|   C           SC02      READESD0                      46
+| 03-C                     END
+      *
+|   C                     READ SC0                      45
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN500....禮盒單瓶成本
+      *==============================================================*
+04===C           RTN500    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SD02      S08I2  12        訂單號碼
+B2MODC                     PARM SC07      S08I3   80       牌價判斷日
+|    C                     PARM SD04      S08I4   60       禮盒訂購數量
+|    C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|    C                     PARM SD06      S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM SD10      S08I7   82       禮盒成本FOB
+|    C                     PARM SD11      S08I8   82       禮盒成本FHI
+|    C                     PARM SD12      S08I9   82       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM SD22      S08IA   82       禮盒轉帳成本FOB
+|    C                     PARM SD23      S08IB   82       禮盒轉帳成本FHI
+|    C                     PARM SD24      S08IC   82       禮盒轉帳成本DUTY
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE OR UPDATE REWF27
+      *==============================================================*
+05===C           RTN600    BEGSR
+|    C*
+|    C                     MOVELSC04      WF2703
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVELR181      WF2701
+|   C                     MOVELR181      WF2702
+|   C*TOTAL FOB,FHI,DUTY
+|   C           KEYWF     CHAINWF270                40
+| 02-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN700
+| 02*C                     ELSE                              修改
+|   C                     EXSR RTN800
+| 02-C                     END
+|   C                     READ RE18R                    46
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN700....WRITE OR UPDATE REWF27
+      *==============================================================*
+06===C           RTN700    BEGSR
+      *
+|    C*
+B2000C           WSC39     IFEQ SC39YM
+|    C                     Z-ADDR182      WF2704
+|    C                     Z-ADDR184      WF2705
+|    C                     Z-ADDR185      WF2706
+     C                     ELSE
+     C                     Z-ADD0         WF2704
+     C                     Z-ADD0         WF2705
+     C                     Z-ADD0         WF2706
+     C                     END
+|    C                     ADD  R186      WF2706
+|    C                     ADD  R187      WF2706
+|    C                     ADD  R188      WF2706
+|    C                     ADD  R189      WF2706
+|    C                     ADD  R18A      WF2706
+|    C                     Z-ADDR182      WF2707
+|    C                     Z-ADDR184      WF2708
+|    C                     Z-ADDWF2706    WF2709
+|    C                     WRITEWF270
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN800....WRITE OR UPDATE REWF27
+      *==============================================================*
+07===C           RTN800    BEGSR
+|    C*
+B2000C           WSC39     IFEQ SC39YM
+|    C                     ADD  R182      WF2704
+|    C                     ADD  R184      WF2705
+|    C                     ADD  R185      WF2706
+     C                     END
+|    C                     ADD  R186      WF2706
+|    C                     ADD  R187      WF2706
+|    C                     ADD  R188      WF2706
+|    C                     ADD  R189      WF2706
+|    C                     ADD  R18A      WF2706
+|    C                     ADD  R182      WF2707
+|    C                     ADD  R184      WF2708
+|    C                     ADD  R185      WF2709
+|    C                     ADD  R186      WF2709
+|    C                     ADD  R187      WF2709
+|    C                     ADD  R188      WF2709
+|    C                     ADD  R189      WF2709
+|    C                     ADD  R18A      WF2709
+|    C                     UPDATWF270
+|    C*
+07===C                     ENDSR
+

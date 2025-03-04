@@ -1,0 +1,111 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1139  JANE                               */
+     /*    CREATE DATE  : 81/02/28                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : IMR047C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :庫存系統                                 */
+     /*    REMARK       :產品送貨明細表                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DSE01)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSE07S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSE07E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSF03S) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DSF03E) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&YMDS)   TYPE(*CHAR) LEN(8) /* M001M */
+             DCL        VAR(&YMDE)   TYPE(*CHAR) LEN(8) /* M001M */
+             DCL        VAR(&IN20)   TYPE(*CHAR) LEN(1)
+
+
+     /***** ADD MEMBER --> REWF09                               *****/
+             DCL        VAR(&NO)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&MBR)    TYPE(*CHAR) LEN(10)
+             RTVJOBA    NBR(&NO)
+             CHGVAR     VAR(&MBR)    VALUE('IM' *TCAT &NO)
+
+             ADDPFM     FILE(REWF09) MBR(&MBR)
+             MONMSG     MSGID(CPF7306) EXEC(CLRPFM FILE(REWF09) +
+                          MBR(&MBR))
+
+             OVRDBF     FILE(REWF09) MBR(&MBR)
+     /*-------------------------------------------------------------*/
+
+             CHGVAR     VAR(&DSE01)  VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DSE07S) VALUE(%SST(*LDA 603 5))
+             CHGVAR     VAR(&DSE07E) VALUE(%SST(*LDA 608 5))
+             CHGVAR     VAR(&DSF03S) VALUE(%SST(*LDA 613 9))
+             CHGVAR     VAR(&DSF03E) VALUE(%SST(*LDA 622 9))
+             CHGVAR     VAR(&YMDS)   VALUE(%SST(*LDA 670 8)) /* M001M*/
+             CHGVAR     VAR(&YMDE)   VALUE(%SST(*LDA 678 8)) /* M001M*/
+             CHGVAR     VAR(&IN20)   VALUE(%SST(*LDA 750 1))
+
+
+             OVRPRTF    FILE(IMR047P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('產送貨明')
+             OVRDBF     FILE(REWF09) TOFILE(SOSFPF) SHARE(*YES)
+
+
+             IF         COND(&IN20 = '0') THEN(DO)
+             OPNQRYF    FILE((SOSFPF) (SOSEPF)) FORMAT(REWF09) +
+                          QRYSLT('(SE01 *EQ ("' *CAT &DSE01 *CAT +
+                          '")) & (SE07 *EQ %RANGE("' *CAT &DSE07S +
+                          *CAT '" "' *CAT &DSE07E *CAT '" )) & +
+                          (SF03 *EQ %RANGE("' *CAT &DSF03S *CAT '" +
+                          "' *CAT &DSF03E *CAT '")) & (SE21 *EQ +
+                          %RANGE(' *CAT &YMDS *CAT ' ' *CAT +
+                          &YMDE *CAT ')) & SE031 *EQ %RANGE("1" +
+                          "9")') KEYFLD((SE21) (SF03) (SE04) (SE05) +
+                          (SF02)) JFLD((SOSFPF/SF02 SOSEPF/SE02)) +
+                          MAPFLD((SF031 '%SST(SF03 1 2)') (SE031 +
+                          '%SST(SE03 2 1)'))
+
+             ENDDO
+             ELSE       CMD(DO)
+             OPNQRYF    FILE((SOSFPF) (SOSEPF)) FORMAT(REWF09) +
+                          QRYSLT('(SE01 *EQ ("' *CAT &DSE01 *CAT +
+                          '")) & (SE07 *EQ %RANGE("' *CAT &DSE07S +
+                          *CAT '" "' *CAT &DSE07E *CAT '" )) & +
+                          (SF03 *EQ %RANGE("' *CAT &DSF03S *CAT '" +
+                          "' *CAT &DSF03E *CAT '")) & (SE24 *EQ +
+                          %RANGE(' *CAT &YMDS *CAT ' ' *CAT +
+                          &YMDE *CAT ')) & SE031 *EQ %RANGE("1" +
+                          "9")') KEYFLD((SE21) (SF03) (SE04) (SE05) +
+                          (SF02)) JFLD((SOSFPF/SF02 SOSEPF/SE02)) +
+                          MAPFLD((SF031 '%SST(SF03 1 2)') (SE031 +
+                          '%SST(SE03 2 1)'))
+
+             ENDDO
+
+             CALL       IMR0471
+
+             CLOF       OPNID(SOSFPF)
+             DLTOVR     FILE(REWF09)
+             DLTOVR     FILE(IMR047P)
+
+     /***** CLR MEMBER --> REWF09                               *****/
+             RMVM       FILE(REWF09) MBR(&MBR)
+
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6601I) VALUE('IMR047P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+             ENDPGM
+

@@ -1,0 +1,103 @@
+/********************************************************************/
+/*                                                                  */
+/* 5728SS1 R01 M02 890615    RTVCLSRC Output     03/19/90 15:06:03  */
+/*                                                                  */
+/* Program name . . . . . . . . . . . . . . :   XGENDSPF@2        PN*/
+/* Library name . . . . . . . . . . . . . . :   PTPLIB            PL*/
+/* Original source file . . . . . . . . . . :   QSRCPF            SN*/
+/* Library name . . . . . . . . . . . . . . :   PTLIB             SL*/
+/* Original source member . . . . . . . . . :   XGENDSPF@2        SM*/
+/* Source file change                                               */
+/*   date/time  . . . . . . . . . . . . . . :   12/07/89 11:09:03 SC*/
+/* Patch option . . . . . . . . . . . . . . :   *NOPATCH          PO*/
+/* User profile . . . . . . . . . . . . . . :   *USER             UP*/
+/* Text . . . :                                                   TX*/
+/* Owner  . . . . . . . . . . . . . . . . . :   A1031             OW*/
+/* Patch change ID  . . . . . . . . . . . . :                     PC*/
+/* Patch APAR ID  . . . . . . . . . . . . . :                     PA*/
+/* User mod flag  . . . . . . . . . . . . . :   *YES              UM*/
+/*                                                                ED*/
+/********************************************************************/
+     PGM PARM(&MBR &TOMBR &TOFILE &TOLIB &TRANS &COMPILE)
+     DCL VAR(&MBR) TYPE(*CHAR) LEN(10)
+     DCL VAR(&TOMBR) TYPE(*CHAR) LEN(10)
+     DCL VAR(&TOFILE) TYPE(*CHAR) LEN(10)
+     DCL VAR(&TOLIB) TYPE(*CHAR) LEN(10)
+     DCL VAR(&TRANS) TYPE(*CHAR) LEN(1)
+     DCL VAR(&COMPILE) TYPE(*CHAR) LEN(1)
+     DCL VAR(&USERNAME) TYPE(*CHAR) LEN(10)
+     DCL VAR(&JOBNBR) TYPE(*CHAR) LEN(6)
+     DCL VAR(&MBRNAME) TYPE(*CHAR) LEN(7)
+     DCL VAR(&RQSDTA) TYPE(*CHAR) LEN(80)
+     DCL VAR(&RQSDTA1) TYPE(*CHAR) LEN(21)
+     DCL VAR(&RQSDTA2) TYPE(*CHAR) LEN(21)
+     DCL VAR(&MSGDTA) TYPE(*CHAR) LEN(60)
+     DCL VAR(&MSGID) TYPE(*CHAR) LEN(7)
+     DCL VAR(&SRLNBR) TYPE(*CHAR) LEN(8)
+     DCL VAR(&JOBQ) TYPE(*CHAR) LEN(10) VALUE(QBATCH)
+     DCL VAR(&LIBNAME) TYPE(*CHAR) LEN(10) VALUE(QGPL)
+     MONMSG MSGID(CPF0000)
+             RTVSYSVAL  SYSVAL(QSRLNBR) RTNVAR(&SRLNBR)
+             IF         COND(&SRLNBR = ' 7823176') THEN(DO)
+             SIGNOFF
+             ENDDO
+     RTVJOBA USER(&USERNAME) NBR(&JOBNBR)
+     STRSEU SRCFILE(&TOLIB/QTXTSRC) SRCMBR(&MBR)
+CHKOBJ: +
+     CHKOBJ OBJ(&TOLIB/QTXTSRC) OBJTYPE(*FILE) MBR(&MBR)
+     MONMSG MSGID(CPF0000) EXEC(DO)
+     RCVMSG MSGTYPE(*EXCP) MSGDTA(&MSGDTA) MSGID(&MSGID)
+     SNDPGMMSG MSGID(&MSGID) MSGF(QCPFMSG) MSGDTA(&MSGDTA) -
+MSGTYPE(*ESCAPE)
+     GOTO CMDLBL(DLCOBJ)
+     ENDDO
+TRANS: +
+     IF COND(&TRANS *NE 'Y') THEN(DO)
+     GOTO CMDLBL(DLCOBJ)
+     ENDDO
+     CHGVAR VAR(&MBRNAME) VALUE('X' *CAT &JOBNBR)
+     ADDPFM FILE(XDSPF) MBR(&MBRNAME)
+     MONMSG MSGID(CPF0000) EXEC(CLRPFM FILE(XDSPF) -
+MBR(&MBRNAME))
+     OVRDBF FILE(QTXTSRC) TOFILE(&TOLIB/QTXTSRC) MBR(&MBR) SHARE(*YES)
+     OVRDBF FILE(XDSPF) TOFILE(XDSPF) MBR(&MBRNAME) -
+SHARE(*YES)
+XGENDSPF#1: +
+     CALL PGM(XGENDSPF#1)
+     DLTOVR FILE(QTXTSRC)
+     CPYF FROMFILE(XDSPF) TOFILE(&TOLIB/&TOFILE) -
+TOMBR(&TOMBR) MBROPT(*REPLACE) FMTOPT(*CVTSRC)
+     DLTOVR FILE(XDSPF)
+     RMVM FILE(XDSPF) MBR(&MBRNAME)
+     STRSEU SRCFILE(&TOLIB/&TOFILE) SRCMBR(&TOMBR)
+COMPILE: +
+     IF COND(&COMPILE *NE 'Y') THEN(DO)
+     GOTO CMDLBL(DLCOBJ)
+     ENDDO
+     CHGVAR VAR(&RQSDTA1) VALUE(&TOLIB *TCAT '/' *TCAT &TOMBR)
+     CHGVAR VAR(&RQSDTA2) VALUE(&TOLIB *TCAT '/' *TCAT &TOFILE)
+     CHGVAR VAR(&RQSDTA) VALUE('CRTDSPF FILE(' *CAT &RQSDTA1 *TCAT -
+')' *BCAT 'SRCFILE(' *CAT &RQSDTA2 *TCAT ')')
+     CHKOBJ OBJ(&TOLIB/&TOMBR) OBJTYPE(*FILE)
+     MONMSG MSGID(CPF0000) EXEC(DO)
+     SBMJOB JOB(&TOMBR) RQSDTA(&RQSDTA)
+     CHGVAR VAR(&MSGDTA) VALUE(&TOMBR *CAT &USERNAME *CAT &JOBNBR -
+*CAT &JOBQ *CAT &LIBNAME)
+     SNDPGMMSG MSGID(CPC1221) MSGF(QSYS/QCPFMSG) MSGDTA(&MSGDTA)
+     GOTO CMDLBL(DLCOBJ)
+     ENDDO
+     DLTF FILE(&TOLIB/&TOMBR)
+     SBMJOB JOB(&TOMBR) RQSDTA(&RQSDTA)
+     CHGVAR VAR(&MSGDTA) VALUE(&TOMBR *CAT &TOLIB *CAT 'FILE')
+     SNDPGMMSG MSGID(CPC2191) MSGF(QSYS/QCPFMSG) MSGDTA(&MSGDTA)
+     CHGVAR VAR(&MSGDTA) VALUE(&TOMBR *CAT &USERNAME *CAT &JOBNBR -
+*CAT &JOBQ *CAT &LIBNAME)
+     SNDPGMMSG MSGID(CPC1221) MSGF(QSYS/QCPFMSG) MSGDTA(&MSGDTA)
+DLCOBJ: +
+     DLCOBJ OBJ((QTXTSRC *FILE *SHRNUP &MBR))
+     DLCOBJ OBJ((&TOLIB/&TOFILE *FILE *SHRNUP &TOMBR))
+ENDPGM: +
+     RCLRSC
+     RETURN
+     ENDPGM
+

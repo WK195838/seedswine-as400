@@ -1,0 +1,78 @@
+     /***************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266   */
+     /*                                                             */
+     /*    AUTHOR       : AN MING HSIA                              */
+     /*    CREATE DATE  : 05/04/93                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : ARR0701                                   */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款子系統                           */
+     /*    REMARK       :寄賣產品明細表                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DSE01A) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSE01B) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSE01S) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSE01E) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YSE24S) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&YSE24E) TYPE(*CHAR) LEN(8) /*M001M*/
+
+             CPYF       FROMFILE(REWF71) TOFILE(QTEMP/REWF71) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF71))
+             OVRDBF     FILE(REWF71) TOFILE(QTEMP/REWF71) SHARE(*YES)
+     /*-------------------------------------------------------------*/
+
+     /*  禮盒拆單瓶 */
+             CPYF       FROMFILE(RES18WF) TOFILE(QTEMP/RES18WF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/RES18WF))
+             OVRDBF     FILE(RES18WF) TOFILE(QTEMP/RES18WF) SHARE(*YES)
+
+             CHGVAR     VAR(&DSE01A) VALUE(%SST(*LDA 601 1))
+             CHGVAR     VAR(&DSE01B) VALUE(%SST(*LDA 602 1))
+             CHGVAR     VAR(&DSE01S) VALUE(%SST(*LDA 627 1))
+             CHGVAR     VAR(&DSE01E) VALUE(%SST(*LDA 628 1))
+    /*M001M  CHGVAR     VAR(&YSE24S) VALUE(%SST(*LDA 615 6))  +
+             CHGVAR     VAR(&YSE24E) VALUE(%SST(*LDA 621 6))  */
+    /*M001M*/CHGVAR     VAR(&YSE24S) VALUE(%SST(*LDA 641 8))
+    /*M001M*/CHGVAR     VAR(&YSE24E) VALUE(%SST(*LDA 651 8))
+
+             OVRPRTF    FILE(ARR070P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('寄賣成本')
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSEPF)) QRYSLT('(SE01A *EQ "' *CAT +
+                          &DSE01A *CAT '") & SE01B *EQ %RANGE("' +
+                          *CAT &DSE01S *CAT '" "' *CAT &DSE01E *CAT +
+                          '") & SE24 *EQ %RANGE(' *CAT &YSE24S *CAT +
+                          ' ' *CAT &YSE24E *CAT ') & (SE09 *EQ "V") +
+                          & (SE03 *EQ "D2" *OR SE03 *EQ "D3" *OR +
+                          SE03 *EQ "D5" *OR SE03 *EQ "DB" *OR SE03 +
+                          *EQ "DC" *OR SE03 *EQ "DE" ) ') +
+                          KEYFLD(*FILE) MAPFLD((SE01A '%SST(SE01 1 +
+                          1)' *CHAR 1) (SE01B '%SST(SE01 2 1)' +
+                          *CHAR 1))
+
+             CALL       ARR0701
+             CALL       ARR0702
+             CLOF       OPNID(SOSEPF)
+             DLTOVR     FILE(*ALL)
+
+             CHGVAR     VAR(&P6601I) VALUE('ARR070P')
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

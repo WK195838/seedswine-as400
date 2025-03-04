@@ -1,0 +1,182 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     A*                                                              *
+     A*    PROGRAM-ID   : WEB001                                     *
+     A*    PROGRAM NAME :人員登錄                                  *
+     A*    AUTHOR       : VINCENT                                    *
+     A*    CREATE DATE  : 98/01/22                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :                                            *
+     A****************************************************************
+     FMANFPF  UF  E           K        DISK
+     F*
+     E                    GRA     1   3 10               *職級
+     E                    MSG     1   7 60               *訊息
+     I*LOCAL DATA AREA
+     I           UDS
+     I                                      101 110 $USER
+     I                                      201 2080$A8YMD
+     I                                      152 161 $USERN
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           MODE    1        MODE
+     C                     PARM           PARM1  10        人員帳號
+     C                     PARM           PARM2  10        密碼
+     C                     PARM           PARM3  10        新密碼
+     C                     PARM           PARM4  10        姓名
+     C                     PARM           PARM5   1        職級
+     C                     PARM           PARM6  18        職級名稱
+     C                     PARM           RTNCD   1        RETURN CODE
+     C                     PARM           RTNDSC 60        RETURN DESC.
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C                     EXSR RTN010
+     C                     EXSR RTN100
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          ROUTINE 010 INIT
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+     C                     MOVEL*BLANKS   PARM4
+     C                     MOVEL*BLANKS   PARM5
+     C                     MOVEL*BLANKS   PARM6
+|    C                     MOVEL*BLANKS   RTNCD
+|    C                     MOVEL*BLANKS   RTNDSC
+|    C*
+01===C           END010    ENDSR
+     C*==============================================================*
+     C*          ROUTINE 100 人員登錄審核
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C* CHK帳號
+|    C           PARM1     CHAINNF0                  4020
+| 01-C           *IN20     IFEQ '1'                        REC LOCK
+|   C                     MOVEL'6'       RTNCD
+|   C                     MOVELMSG,6     RTNDSC
+|   C                     SETON                     99
+| 01*C                     ELSE
+| 02-C           *IN40     IFEQ '1'                        帳號不存在
+|   C                     MOVEL'1'       RTNCD
+|   C                     MOVELMSG,1     RTNDSC
+|   C                     SETON                     99
+| 02-C                     ENDIF
+| 01-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C* MODE='1'登入, MODE='2'密碼變更,MODE='3'登出
+|    C*
+| 03-C           MODE      IFEQ '1'
+|   C           MODE      OREQ '2'
+|   C*
+|   C* CHK重覆登入
+     C           MODE      IFEQ '1'
+| 04-C           NF08      ANDEQ'Y'                        已登入
+|   C                     MOVEL'7'       RTNCD
+|   C                     MOVELMSG,7     RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|   C   99                GOTO END100
+|   C*
+|   C* CHK密碼
+| 04-C           PARM2     IFNE NF04                       密碼錯誤
+|   C                     MOVEL'2'       RTNCD
+|   C                     MOVELMSG,2     RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|   C   99                GOTO END100
+|   C*
+|   C*取得系統日期
+|   C                     Z-ADD0         SDATE   80
+|   C                     CALL 'P31'
+|   C                     PARM UDATE     P31I1   80
+|   C                     PARM '3'       P3112   1
+|   C                     PARM '1'       P31I3   1
+|   C                     PARM '2'       P31I4   1
+|   C                     PARM '1'       P31I5   1
+|   C           SDATE     PARM           P31IO   80
+|   C*
+|   C* CHK有效起日
+| 05-C           SDATE     IFLT NF05
+|   C                     MOVEL'3'       RTNCD
+|   C                     MOVELMSG,3     RTNDSC
+|   C                     SETON                     99
+| 05-C                     ENDIF
+|   C   99                GOTO END100
+|   C*
+|   C* CHK有效訖日
+| 06-C           NF06      IFNE 0
+|   C           SDATE     ANDGTNF06
+|   C                     MOVEL'4'       RTNCD
+|   C                     MOVELMSG,4     RTNDSC
+|   C                     SETON                     99
+| 06-C                     ENDIF
+|   C   99                GOTO END100
+|   C*
+| 07-C                     SELEC
+|   C           MODE      WHEQ '1'
+|   C*登入
+|   C                     MOVELNF03      PARM4            姓名
+|   C                     MOVELNF02      PARM5            職級
+|   C* CHK職級
+| 08-C                     SELEC
+|   C           NF02      WHEQ '1'
+|   C                     MOVELGRA,1     PARM6            職級名稱
+|   C           NF02      WHEQ '2'
+|   C                     MOVELGRA,2     PARM6
+|   C           NF02      WHEQ '3'
+|   C                     MOVELGRA,3     PARM6
+|   C                     OTHER
+|   C                     MOVEL'5'       RTNCD
+|   C                     MOVELMSG,5     RTNDSC
+|   C                     SETON                     99
+| 08-C                     ENDSL
+|   C   99                GOTO END100
+|   C*
+|   C                     MOVEL'Y'       NF08             成功登入
+|   C                     UPDATNF0
+|   C*
+|   C           MODE      WHEQ '2'
+|   C*密碼變更
+|   C                     MOVELPARM3     NF04
+|   C                     UPDATNF0
+|   C*
+| 07-C                     ENDSL
+|   C   99                GOTO END100
+| 03-C                     ENDIF
+|    C* 登出
+| 09-C           MODE      IFEQ '3'
+|   C                     MOVEL*BLANKS   NF08             成功登出
+|   C                     UPDATNF0
+| 09-C                     ENDIF
+|    C* 正確完成
+|    C                     MOVEL'0'       RTNCD
+|    C                     MOVEL*BLANKS   RTNDSC
+|    C*
+02===C           END100    ENDSR
+     C****************************************************************
+** /GRA
+駐店人員
+區長
+總公司
+** /MSG
+帳號不存在
+登錄密碼錯誤
+帳號尚未生效
+帳號已經失效
+職級資料有誤
+登錄資料被鎖定，請聯絡總公司
+不可重覆登入系統
+

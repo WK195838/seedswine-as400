@@ -1,0 +1,236 @@
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.19  Y2K MODIFY                    */
+     /*=============================================================*/
+     FREWFA9  IP  E           K        DISK
+     FSOSOPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOR064APO   E             39     PRINTER
+     ISN0
+     I                                              SN01  L3
+     I                                              SN05  L2
+     I                                              SN02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      609 6140DSN06S
+     I                                      615 6200DSN06E
+M001MI*                                     621 6260YSN06S
+M001MI*                                     627 6320YSN06E
+M001MI                                      621 6280YSN06S
+M001MI                                      631 6380YSN06E
+     I                                      671 671 COMPS
+     I                                      672 672 COMPE
+     I                                      673 673 DSEL
+     I                                      701 7060DSN05S
+     I                                      707 7120DSN05E
+     I                                      713 717 DSN03S
+     I                                      718 722 DSN03E
+     I                                      731 739 DSO03S
+     I                                      741 749 DSO03E
+     I                                      750 750 IN20
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           SN03
+     C           KEYSO     KLIST
+     C                     KFLD           SN02
+     C           KEYMA     KLIST
+     C                     KFLD           SO03
+     C           *LIKE     DEFN SO05      SO05WW
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *INIT ENVIRM
+  01*C                     ELSE
+  02-C           *INL3     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010                     *INIT ENVIRM
+  02-C                     END
+  01-C                     END
+     C*
+     C   L1                EXSR RTN100
+     C*
+     C                     EXSR RTN110
+     C*
+     CL1 10                EXSR RTN200
+     CL2 10                EXSR RTN300
+     CL3 10                EXSR RTN400
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+      *
+| 03-C           DSEL      IFEQ 'Y'
+|   C                     MOVEL'轉　帳'DSELC
+| 03*C                     ELSE
+|   C                     MOVEL'非轉帳'DSELC
+| 03-C                     END
+|    C* GET 公司代號
+|    C           SN01      CHAIN#B0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #B03
+| 04-C                     END
+|    C                     WRITEPH1
+|    C*
+|    C                     SETON                     10
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C* GET客戶簡稱
+|    C           KEYME     CHAINME0                  40
+|    C   40                MOVE *BLANKS   ME04
+|    C*
+|    C* GET轉換日期
+M001AC                     Z-ADDSN05      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SN05      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           PSN05     PARM           S001O1  60
+|    C*
+|    C* GET轉換日期
+M001AC                     Z-ADDSN06      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SN06      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           PSN06     PARM           S001O1  60
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     SETON                     3020
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN110....DETAIL
+     C*==============================================================*
+03===C           RTN110    BEGSR
+|    C* GET產品簡稱／單位
+|    C           KEYMA     CHAINMA0                  40
+|    C   40                MOVE *BLANKS   MA03
+|    C* GET訂購數量及搭贈數量
+|    C           SO05      SUB  SO06      SO05WW
+| 01-C           SO05WW    IFGE 0
+|   C                     Z-ADDSO06      SO05W
+|   C                     Z-ADDSO05WW    SO07W
+| 01*C                     ELSE
+|   C                     Z-ADDSO05      SO05W
+|   C                     Z-ADD0         SO07W
+| 01-C                     END
+|    C* GET金額
+|    C********** SO05W     MULT SO12      SOSM
+|    C           SO05W     MULT SO12      SOSM      H
+|    C**
+|    C   39                EXSR RTN900
+|    C                     WRITEPD2
+|    C*
+|    C                     EXSR RTN120                     SUBTOT
+|    C*
+|    C           KEYSO     READESO0                      44
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN120....SUBTOT
+     C*==============================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C                     ADD  SO05W     SO06S
+|    C                     ADD  SO07W     SO07S
+|    C*******************  ADD  SO12      SO12S
+|    C                     ADD  SO12      SO12S     H
+|    C                     ADD  SOSM      SOSMS
+|    C*
+|    C                     ADD  SO05W     SO06D
+|    C                     ADD  SO07W     SO07D
+|    C******************   ADD  SO12      SO12D
+|    C                     ADD  SO12      SO12D     H
+|    C                     ADD  SOSM      SOSMD
+|    C*
+|    C                     ADD  SO05W     SO06C
+|    C                     ADD  SO07W     SO07C
+|    C*******************  ADD  SO12      SO12C
+|    C                     ADD  SO12      SO12C     H
+|    C                     ADD  SOSM      SOSMC
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....SUBTOT1
+     C*==============================================================*
+05===C           RTN200    BEGSR
+      *
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C*
+|    C                     Z-ADD0         SO06S
+|    C                     Z-ADD0         SO07S
+|    C                     Z-ADD0         SO12S
+|    C                     Z-ADD0         SOSMS
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN300....SUBTOT2
+     C*==============================================================*
+06===C           RTN300    BEGSR
+      *
+|    C   39                EXSR RTN900
+|    C                     WRITEPT2
+|    C*
+|    C                     Z-ADD0         SO06D
+|    C                     Z-ADD0         SO07D
+|    C                     Z-ADD0         SO12D
+|    C                     Z-ADD0         SOSMD
+|    C                     SETOF                     30
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN400....SUBTOT2
+     C*==============================================================*
+07===C           RTN400    BEGSR
+      *
+|    C   39                EXSR RTN900
+|    C                     WRITEPT3
+|    C*
+|    C                     Z-ADD0         SO06C
+|    C                     Z-ADD0         SO07C
+|    C                     Z-ADD0         SO12C
+|    C                     Z-ADD0         SOSMC
+|    C                     SETOF                     20
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+08===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTNLR  ...LR
+      *==============================================================*
+09===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+09===C                     ENDSR
+

@@ -1,0 +1,261 @@
+      ****************************************************************
+      *    PROGRAM NAME : P35                                        *
+      *    SYSTEM ID    : PTPLIB                                     *
+      *    AUTHOR       : A1149  MAY HUANG                           *
+      *    CREATE DATE  : 1992.09.17                                 *
+      *    FUNTCTION    :轉換日期為星期                            *
+      *  ----------------------------------------------------------  *
+      *                                                              *
+      * BASIC DATE : 1989.12.31 --- (星期日)                       *
+      *                                                              *
+      * PARAMETER  : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION     *
+      *              ===  =======  ===  =====  ====  ===========     *
+      *              01   P3501I    I   *DEC    8 0 日期(中國年) *
+      *              01   P3502I    I   *CHAR   1   日期格式       *
+      *                                              '1'=00YYMMDD    *
+      *                                              '2'=YYYYMMDD    *
+      *                                              '3'=00MMDDYY    *
+      *                                              '4'=MMDDYYYY    *
+      *                                              '5'=00DDMMYY    *
+      *                                              '6'=DDMMYYYY    *
+      *              01   P3503I    I   *CHAR   1   曆別           *
+      *                                             '1':西曆       *
+      *                                             '2':國曆       *
+      *              02   P3511O    O   *DEC    1 0 週內第幾天     *
+      *                                              7:星期日      *
+      *                                                              *
+      * W-VARABLE  : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION     *
+      *              ===  =======  ===  =====  ====  ===========     *
+      *              01   P3501     N   *DEC    4 0 西元年         *
+      *              02   P3502     N   *DEC    2 0 月份           *
+      *              03   P3503     N   *DEC    2 0 日期           *
+      *              04   P3504     N   *DEC    5 0 商數           *
+      *              05   P3505     N   *DEC    4 0 餘數           *
+      *              06   P3006     N   *CHAR   1   潤年(Y/N)      *
+      *              07   P3507     N   *DEC    1   驗証結果 (Y/N) *
+      *              08   P35DAY,1  N   *DEC    2 0 DAYS PER MONTH   *
+      *                                                            *
+      *              19   P35DAY,12 N   *DEC    2 0 DAYS PER MONTH   *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P3506=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P3506=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P3506=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P3506=N  *
+      *                                                 (N)          *
+      ****************************************************************
+     E* P35DAY:每月日數
+     E* WFV   :日期格式VALUE
+     E                    P35DAY 12  12  2 0
+     E                    WFV     6   6  1
+     I            DS
+     I                                        1   80WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     I                                        7   80WD4
+     I            DS
+     I                                        1   80P35STD
+     I                                        1   40P35YY
+     I                                        5   60P35MM
+     I                                        7   80P35DD
+     I            DS
+     I                                        1   80P35SML
+     I                                        1   40P35SYY
+     I                                        5   60P35SMM
+     I                                        7   80P35SDD
+     I            DS
+     I                                        1   80P35BIG
+     I                                        1   40P35BYY
+     I                                        5   60P35BMM
+     I                                        7   80P35BDD
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3501I  80
+     C                     PARM           P3502I  1
+     C                     PARM           P3503I  1
+     C                     PARM           P3511O  10
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     Z-ADDP3501I    @DATE   80
+     C                     MOVE P3502I    @FMT    1
+     C                     MOVE P3503I    @CALD   1
+      *
+     C                     EXSR @@CHK                      *CHK中西曆
+  01-C           *IN99     IFEQ '1'
+    C                     Z-ADD0         P35WEK
+    C                     GOTO QUIT
+  01-C                     END
+     C                     EXSR @@YMD                      *GET年月日
+     C*
+     C                     Z-ADDWYYYY     P35YY
+     C                     Z-ADDWMM       P35MM
+     C                     Z-ADDWDD       P35DD
+     C*
+     C                     EXSR P35CMP
+     C                     EXSR P35CYY
+     C                     EXSR P35CMD
+     C                     EXSR P35CAL
+     C*
+     C           P35TD     DIV  7         P3504
+     C                     MVR            P35WEK  10
+  02-C           P35CCK    IFEQ 'N'                        *IND<BSD
+    C           7         SUB  P35WEK    P35WEK
+  02-C                     END
+  03-C           P35WEK    IFEQ 0
+    C                     Z-ADD7         P35WEK
+  03-C                     END
+      *
+     C           QUIT      TAG
+     C                     Z-ADDP35WEK    P3511O
+     C                     SETON                     LR
+     C/COPY QRPGSRC,@CHECK
+      *--------------------------------------------------------------*
+      *          P35CMP....COMPARE P35BSD AND INPUT DATE WHICH LARGE *
+      *                    INPUT      P35STD                         *
+      *                    OUTPUT     P35SML                         *
+      *                    OUTPUT     P35BIG                         *
+      *                    OUTPUT     P35CCK ( Y : P35BSD <= P3501I )*
+      *--------------------------------------------------------------*
+01===C           P35CMP    BEGSR
+|    C                     Z-ADD19891231  P35BSD  80
+| 04-C           P35BSD    IFLE P35STD
+|   C                     MOVE 'Y'       P35CCK  1
+|   C                     Z-ADDP35BSD    P35SML  80
+|   C                     Z-ADDP35STD    P35BIG  80
+| 04*C                     ELSE
+|   C                     MOVE 'N'       P35CCK
+|   C                     Z-ADDP35STD    P35SML
+|   C                     Z-ADDP35BSD    P35BIG
+| 04-C                     END
+01===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P35CYY....CACULATE YEARS DAY                        *
+      *                    INPUT      P35SC  小日期西元年          *
+      *                    INPUT      P35BC  大日期西元年          *
+      *                    OUTPUT     P35YDA 相距年度天數          *
+      *--------------------------------------------------------------*
+02===C           P35CYY    BEGSR
+|    C                     Z-ADD0         P35YDA  90
+     C                     Z-ADDP35SYY    WYEAR   40
+| 01-C           WYEAR     DOWNEP35BYY
+|   C*
+|   C                     Z-ADDWYEAR     P3501   40
+|   C                     EXSR P35LEP
+|   C*
+| 02-C           P3506     IFEQ 'Y'
+|   C                     ADD  366       P35YDA
+| 02*C                     ELSE
+|   C                     ADD  365       P35YDA
+| 02-C                     END
+|   C*
+|   C                     ADD  1         WYEAR
+| 01-C                     END
+02===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P35LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P3501 西元年                 *
+      *                    OUTPUT     P3506  (Y=潤年:N=平年)     *
+      *--------------------------------------------------------------*
+03===C           P35LEP    BEGSR
+|    C           P3501     DIV  400       P3504   50
+|    C                     MVR            P3505   40
+| 01-C           P3505     IFEQ 0
+|   C                     MOVE 'Y'       P3506   1
+| 01*C                     ELSE
+|   C*
+|   C           P3501     DIV  100       P3504
+|   C                     MVR            P3505
+   2-C           P3505     IFEQ 0
+|   C                     MOVE 'N'       P3506
+| 02*C                     ELSE
+|   C*
+|   C           P3501     DIV  4         P3504
+|   C                     MVR            P3505
+| 03-C           P3505     IFEQ 0
+|   C                     MOVE 'Y'       P3506
+| 03*C                     ELSE
+|   C                     MOVE 'N'       P3506
+| 03-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 01-C                     END
+03===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P35CMD....CALCULATE YEAR DAYS OF P35SML AND P35BIG  *
+      *                    INPUT    P35SML ......                    *
+      *                                    P35SYY                    *
+      *                                    P35SMM                    *
+      *                                    P35SDD                    *
+      *                             P35BIG ......                    *
+      *                                    P35BYY                    *
+      *                                    P35BMM                    *
+      *                                    P35BDD                    *
+      *                    OUTPUT   P35SDA(YEAR DAYS OF P35SML)      *
+      *                             P35BDA(YEAR DAYS OF P35BIG)      *
+      *--------------------------------------------------------------*
+04===C           P35CMD    BEGSR
+      *-------------------------------------*
+      *        CALCULATE   P35SDA           *
+      *-------------------------------------*
+|    C                     Z-ADD0         P35SDA  90
+|    C                     Z-ADD1         PMM     20
+| 01-C           PMM       DOWLTP35SMM
+|   C                     ADD  P35DAY,PMMP35SDA
+|   C                     ADD  1         PMM
+| 01-C                     END
+|    C                     ADD  P35SDD    P35SDA
+|    C*
+|    C                     Z-ADDP35SYY    P3501
+|    C                     EXSR P35LEP
+| 02-C           P3506     IFEQ 'Y'
+|   C           P35SMM    ANDGT2
+|   C                     ADD  1         P35SDA
+| 02-C                     END
+      *-------------------------------------*
+      *        CALCULATE   P35BDA           *
+      *-------------------------------------*
+|    C                     Z-ADD0         P35BDA  90
+|    C                     Z-ADD1         PMM
+| 03-C           PMM       DOWLTP35BMM
+|   C                     ADD  P35DAY,PMMP35BDA
+|   C                     ADD  1         PMM
+| 03-C                     END
+|    C                     ADD  P35BDD    P35BDA
+|    C*
+|    C                     Z-ADDP35BYY    P3501
+|    C                     EXSR P35LEP
+| 04-C           P3506     IFEQ 'Y'
+|   C           P35BMM    ANDGT2
+|   C                     ADD  1         P35BDA
+| 04-C                     END
+|    C*
+04===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P35CAL....CACULATE DAYS BETWEEN P35SML & P35BIG     *
+      *                    INPUT      P35SDA  (YEAR DAYS OF P35SML)  *
+      *                    INPUT      P35BDA  (YEAR DAYS OF P35BIG)  *
+      *                    INPUT      P35YDA 相距年度天數          *
+      *                    OUTPUT     P35RST 相距天數              *
+      *--------------------------------------------------------------*
+05===C           P35CAL    BEGSR
+|    C                     Z-ADD0         P35TD   90
+|    C           P35YDA    ADD  P35BDA    P35TD
+|    C                     SUB  P35SDA    P35TD
+05===C                     ENDSR
+** <<每月日數>>
+312831303130313130313031
+** <<日期格式>>VALUE
+123456
+

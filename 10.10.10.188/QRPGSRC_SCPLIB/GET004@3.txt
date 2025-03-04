@@ -1,0 +1,248 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : GET004                                     *
+     A*    AUTHOR       : A1491  EASON                               *
+     A*    DATE WRITTEN : 97/09/03                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :                                          *
+     A*    SUBSYSTEM    :共用資料維護子系統                        *
+     A*    PROCEDURE    :取得訂貨單預計到分店日                    *
+     A****************************************************************
+     FUTL4PF  IF  E           K        DISK
+     F*
+     E                    @L4        31  1
+     I*
+     I            DS
+     I                                        1   80DATE1
+     I                                        1   60D1YM
+     I                                        7   80D1DAY
+     I            DS
+     I                                        1   80TDATE
+     I                                        1   60TDYM
+     I                                        7   80TDDAY
+     I           UDS
+     I                                      201 2080$EG8
+     I                                      201 2060$EGYM
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C* T004I1 '1'-前台單, '2'-後台單, '3'-後台客訂直送單
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           T004I1  1        需求代碼
+     C                     PARM           T004I2  2        公司代號
+     C                     PARM           T004I3  2        通路代號
+     C                     PARM           T004I4  5        分店代號
+     C                     PARM           T004O1  80       訂單日期
+     C                     PARM           T004O2  80       到運貨日
+     C                     PARM           T004O3  80       到分店日
+     C                     PARM           T004O4  1        狀態碼
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C                     MOVEL'Y'       T004O4
+     C*                    CALL 'P63'                      RESET DATE
+     C                     Z-ADD$EG8      DATE1
+     C*
+     C*前台需求且已過中午１２點，則加１日。
+  01-C           T004I1    IFEQ '1'
+    C                     TIME           WTIME   60
+  02-C           WTIME     IFGE 120000
+    C                     CALL 'P37'
+    C                     PARM DATE1     P3701I  80
+    C                     PARM '2'       P3702I  1
+    C                     PARM '1'       P3703I  1
+    C                     PARM 1         P3704I  40
+    C           DATE1     PARM           P3711O  80
+  02-C                     ENDIF
+  01-C                     ENDIF
+     C*
+     C*檢核系統日是否有休假日檔資料
+     C                     Z-ADDD1YM      WYM     60
+     C                     EXSR RTN010
+     C   99                GOTO ENDMAN
+     C*
+     C*計算訂貨日
+  03-C           @L4,D1DAY IFEQ ' '
+    C                     Z-ADDDATE1     T004O1
+  03*C                     ELSE
+    C                     Z-ADD0         TDATE   80
+    C                     Z-ADD1         I       10
+    C                     Z-ADD1         J       10
+    C                     Z-ADDDATE1     SDATE
+  04-C           J         DOWLE1
+    C                     EXSR RTN020
+    C   99                GOTO ENDMAN
+  04-C                     ENDDO
+    C                     Z-ADDTDATE     T004O1
+    C                     Z-ADDTDATE     DATE1
+  03-C                     ENDIF
+     C*
+     C* 直送客訂單，訂貨單日直接加１天即為到分店日
+  05-C           T004I1    IFEQ '3'
+    C                     EXSR RTN050
+    C                     GOTO ENDMAN                     結束程式
+  05-C                     ENDIF
+     C*
+      *計算到貨運日
+     C                     Z-ADD0         TDATE   80
+     C                     Z-ADD1         I       10
+     C                     Z-ADD1         J       10
+     C                     Z-ADDDATE1     SDATE   80
+     C*
+  06-C           J         DOWLE2
+    C                     EXSR RTN030
+    C   99                GOTO ENDMAN
+  06-C                     ENDDO
+     C*
+     C                     Z-ADDTDATE     T004O2
+     C                     Z-ADDTDATE     DATE1
+      *計算到分店日
+     C                     Z-ADD0         TDATE   80
+     C                     Z-ADD1         I       10
+     C                     Z-ADD1         J       10
+     C                     Z-ADD1         K       10       到分店間距
+     C                     Z-ADDDATE1     SDATE
+     C*
+     C* 西祺S1家樂福C1台東店C054到分店日多加1日
+     C*  99/04/28變更貨運公司改成花蓮店多加1日
+     C*  99/07/05變更(宜蘭/花蓮到分店日改為到貨運日+1)
+     C*  99/07/05變更(台東到分店日改為到貨運日+2)
+     C           T004I2    IFEQ 'S1'
+     C           T004I3    ANDEQ'C1'
+     C           T004I4    ANDEQ'C054'
+     C*          T004I2    OREQ 'S1'
+     C*          T004I3    ANDEQ'C1'
+     C*          T004I4    ANDEQ'C022'
+     C                     ADD  1         K
+     C                     ENDIF
+     C*
+  07-C           J         DOWLEK
+    C                     EXSR RTN040
+    C   99                GOTO ENDMAN
+  07-C                     ENDDO
+     C*
+     C                     Z-ADDTDATE     T004O3
+      *
+     C           ENDMAN    TAG
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010    CHECK休假日檔
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           WYM       CHAINL40                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEAL402      @L4
+| 01*C                     ELSE
+|   C                     SETON                     99
+|   C                     MOVEL'N'       T004O4
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN020   計算訂貨日期
+     C*==============================================================*
+02===C           RTN020    BEGSR
+|    C*
+|    C                     CALL 'P37'
+|    C                     PARM SDATE     P3701I  80
+|    C                     PARM '2'       P3702I  1
+|    C                     PARM '1'       P3703I  1
+|    C                     PARM I         P3704I  40
+|    C           TDATE     PARM           P3711O  80
+|    C*
+|    C* CHECK月份變更
+| 01-C           D1YM      IFNE TDYM
+|   C                     Z-ADDTDYM      WYM
+|   C                     EXSR RTN010                     CHK休假檔
+|   C   99                GOTO END020
+| 01-C                     ENDIF
+|     *
+|    C                     ADD  1         I
+|     *
+| 02-C           @L4,TDDAY IFEQ ' '
+|   C                     ADD  1         J
+| 02-C                     ENDIF
+|     *
+02===C           END020    ENDSR
+     C*==============================================================*
+     C*          RTN030   計算到貨運日
+     C*==============================================================*
+03===C           RTN030    BEGSR
+|    C*
+|    C                     CALL 'P37'
+|    C                     PARM SDATE     P3701I  80
+|    C                     PARM '2'       P3702I  1
+|    C                     PARM '1'       P3703I  1
+|    C                     PARM I         P3704I  40
+|    C           TDATE     PARM           P3711O  80
+|    C*
+|    C* CHECK月份變更
+| 01-C           D1YM      IFNE TDYM
+|   C                     Z-ADDTDYM      WYM
+|   C                     EXSR RTN010                     CHK休假檔
+|   C   99                GOTO END030
+| 01-C                     ENDIF
+|     *
+|    C                     ADD  1         I
+|     *
+| 02-C           @L4,TDDAY IFEQ ' '
+|   C           @L4,TDDAY OREQ 'B'
+|   C                     ADD  1         J
+| 02-C                     ENDIF
+|     *
+03===C           END030    ENDSR
+     C*==============================================================*
+     C*          RTN040   計算到分店日
+     C*==============================================================*
+04===C           RTN040    BEGSR
+|    C*
+|    C                     CALL 'P37'
+|    C                     PARM SDATE     P3701I  80
+|    C                     PARM '2'       P3702I  1
+|    C                     PARM '1'       P3703I  1
+|    C                     PARM I         P3704I  40
+|    C           TDATE     PARM           P3711O  80
+|    C*
+|    C* CHECK月份變更
+| 01-C           D1YM      IFNE TDYM
+|   C                     Z-ADDTDYM      WYM
+|   C                     EXSR RTN010                     CHK休假檔
+|   C   99                GOTO END040
+| 01-C                     ENDIF
+|     *
+|    C                     ADD  1         I
+|     *
+| 02-C           @L4,TDDAY IFEQ ' '
+|   C           @L4,TDDAY OREQ 'A'
+|   C           @L4,TDDAY OREQ 'B'
+|   C                     ADD  1         J
+| 02-C                     ENDIF
+|     *
+04===C           END040    ENDSR
+     C*==============================================================*
+     C*          RTN050   計算後台客訂直送單的到分店日
+     C*==============================================================*
+05===C           RTN050    BEGSR
+|    C*
+|    C                     CALL 'P37'
+|    C                     PARM DATE1     P3701I  80
+|    C                     PARM '2'       P3702I  1
+|    C                     PARM '1'       P3703I  1
+|    C                     PARM 1         P3704I  40
+|    C           T004O3    PARM           P3711O  80
+|    C*
+|    C                     Z-ADD0         T004O2
+|    C*
+05===C           END050    ENDSR
+

@@ -1,0 +1,233 @@
+     FJLBCHKD CF  E                    WORKSTN      KINFDS DSPFDS
+     E*---------------------------------------------------------------*
+     I*CURSOR POSTITON
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I*LOCAL DATA AREA
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      111 1160$CHYMD
+     I                                      119 1240$ADMDY
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      152 161 $USERN
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+      *確認年月
+      *YMD FORMAT
+     I                                      601 6040D01
+     I                                      601 6020D01M
+     I                                      603 6040D01Y
+      *選擇年月日
+      *YMD FORMAT
+B2MODI                                      605 6180D01S
+B2MODI                                      619 6320D01E
+     I            DS
+B2MODI                                        1  140WD01
+B2MODI                                        1   40WD01M
+B2MODI                                        5  100WD01D
+B2MODI                                        9  120WD01Y
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *NAMVAR   DEFN *LDA      LDA
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN14     PARM *IN14     IN14    1
+     C           *IN10     PARM *IN10     IN10    1
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C   10                EXSR R0200                      *INIT MSG.
+     C  N10                EXSR R0100                      *INIT VALUE
+     C*
+     C                     MOVEL*BLANK    @PRT    1        *PRINT
+  01-C           *IN03     DOUEQ'1'
+    C           @PRT      OREQ 'Y'
+    C                     EXSR R1000                      *SCRN
+  01-C                     END
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+     C*==============================================================*
+     C*          R0100 ....SCREEN INIT VALUE SET
+     C*==============================================================*
+01===CSR         R0100     BEGSR
+|    C                     SETON                     10
+|    C* SCREEN INIT VALUE SET *+++++++++++++++++++++++++++++++++++++++
+B2000C                     Z-ADD*ZEROS    D01
+B2INF *CVR3012 sev.30 Field D01 contains more than one year
+B2000C                     Z-ADD*ZEROS    D01S
+B2INF *CVR3012 sev.30 Field D01S contains more than one year
+B2000C                     Z-ADD*ZEROS    D01E
+B2INF *CVR3012 sev.30 Field D01E contains more than one year
+|    C*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R0200 ....INITIAL VALUE
+     C*==============================================================*
+02===CSR         R0200     BEGSR
+|    C*
+|    C                     SETON                       99  報表格式MESSAGE
+|    C*
+| 01-C           $EVR      IFEQ 1                          ON-LINE
+|   C                     MOVEL'UPT2142' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+| 01-C                     END
+|    C*
+| 02-C           $EVR      IFEQ 2                          BATCH
+|   C                     MOVEL'UPT2111' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+     C*===============================================================*
+     C*          R1000  ...SCREEN MAIN PROCESS
+     C*===============================================================*
+03===C           R1000     BEGSR
+|    C*
+|    C                     EXFMTDSPD1
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+| 01-C           *IN03     IFEQ '1'
+|   C                     GOTO E1000
+| 01-C                     END
+|    C*
+| 02-C           *IN04     IFEQ '1'                        *WINDOW
+|   C**********************
+|   C*  F4 PROMPT PROCESS *
+|   C**********************
+|   C                     EXSR RTNF4
+|   C                     GOTO E1000
+| 02-C                     END
+      *
+|    C                     EXSR R1B00                      .CHECK      ?
+|    C*
+| 03-C           *IN99     IFEQ *ZERO
+|   C           *IN14     ANDEQ'1'
+|   C                     SETON                     28    .執行中
+|   C                     WRITEDSPD1
+|   C                     SETOF                     28
+|   C*
+|   C                     OUT  *NAMVAR
+|   C                     MOVEL'Y'       @PRT
+| 03-C                     END
+|    C*
+03===C           E1000     ENDSR
+     C*===============================================================*
+     C*          R1B00  ...CHECK DATA FROM SCREEN KEY-IN
+     C*===============================================================*
+04===C           R1B00     BEGSR
+|    C*
+|    C*+<<DATA CHECK>>+++++++++++++++++++++++++++++++++++++++++++++++++
+      *確認日期
+|    C*
+B2CHKC           D01       IFEQ *ZEROS
+B2INF *CVR3012 sev.30 Field D01 contains more than one year
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|   C                     MOVEL'UPT0012' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6199
+| 01*C                     ELSE
+|   C*
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADDD01Y      WD01Y
+B2NEWC                     MOVE D01Y      HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    WD01Y
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADDD01M      WD01M
+B2NEWC                     MOVE D01M      HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    WD01M
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADD1         WD01D
+B2VFYC                     Z-ADD2001      WD01D
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C*
+|   C                     CALL 'P09'
+B2MODC                     PARM WD01      P0901I  80
+|   C                     PARM           P0911O  1
+| 02-C           P0911O    IFEQ 'N'
+|   C                     MOVEL'UPT0040' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6599
+| 02-C                     END
+| 01-C                     END
+|    C   99                GOTO E1B00
+      *
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     X1      3
+B2MODC                     PARM WD01      X2      80
+B2MODC           D01S      PARM           X3      80
+      *
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADD31        WD01D
+B2VFYC                     Z-ADD2031      WD01D
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     X1      3
+B2MODC                     PARM WD01      X2      80
+B2MODC           D01E      PARM           X3      80
+|    C*
+|    C*
+04===CSR         E1B00     ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+05===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+|    C*
+| 01-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE39
+|   C           D#COL     ANDLE40
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 01-C                     END
+|    C*
+05===C           ENDF4     ENDSR
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2NEWC/COPY HBP2CVTR
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+

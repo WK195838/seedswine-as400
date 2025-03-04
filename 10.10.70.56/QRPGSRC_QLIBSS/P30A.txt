@@ -1,0 +1,264 @@
+      ****************************************************************
+      * PROGRAM ID : P30                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :驗証日期（中西曆）                             *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3001I    I   *DEC    8 0  輸入年月YYYYMMDD
+      *             01   P3002I    I   *CHAR   1    日期格式       *
+      *                                              '1'=00YYMMDD    *
+      *                                              '2'=YYYYMMDD    *
+      *                                              '3'=00MMDDYY    *
+      *                                              '4'=MMDDYYYY    *
+      *                                              '5'=00DDMMYY    *
+      *                                              '6'=DDMMYYYY    *
+      *             01   P3003I    I   *CHAR   1    曆別           *
+      *                                             '1':西曆       *
+      *                                             '2':國曆       *
+      *             02   P3011O    O   *CHAR   1   驗証結果...     *
+      *                                             Y=OK , N =ERROR  *
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3001     N   *DEC    4 0 西元年          *
+      *             02   P3002     N   *DEC    2 0 月份            *
+      *             03   P3003     N   *DEC    2 0 日期            *
+      *             04   P3004     N   *DEC    5 0 商數            *
+      *             05   P3005     N   *DEC    4 0 餘數            *
+      *             06   P3006     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P3007     N   *CHAR   1   驗証(Y/N)       *
+      *             08   P30DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P30DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P3006=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P3006=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P3006=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P3006=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E* P30DAY:每月日數
+     E* WFV   :日期格式VALUE
+     E                    P30DAY 12  12  2 0
+     E                    WFV     6   6  1
+      *
+     I            DS
+     I                                        1   80WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     I                                        7   80WD4
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3001I  80
+     C                     PARM           P3002I  1
+     C                     PARM           P3003I  1
+     C                     PARM           P3011O  1
+      *最高機密
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     EXSR P30CHK                     *CHK中西曆
+     C                     EXSR P30YMD                     *GET年月日
+      *
+     C                     Z-ADDWYYYY     P3001   40
+     C                     Z-ADDWMM       P3002   20
+     C                     Z-ADDWDD       P3003   20
+      *
+     C                     EXSR P30LEP                     *CHK潤年
+     C                     EXSR P30CKD                     *CHK MM,DD
+      *
+     C                     MOVE P3007     P3011O
+     C                     SETON                     LR
+      *--------------------------------------------------------------*
+      *                 P30CHK....CHECK中西曆
+      *--------------------------------------------------------------*
+01===C           P30CHK    BEGSR
+      *
+|     *CHECK曆別:"1"為西曆,"2"國曆,不可為其它,
+|     *且國曆之FORMAT只可為2:YYYYMMDD
+|     *
+| 01-C           P3003I    IFNE '1'
+|   C           P3003I    ANDNE'2'
+|   C                     SETON                     99
+| 01-C                     END
+|     *
+| 02-C           P3003I    IFEQ '1'                        *西曆
+|   C                     Z-ADD1         I       10
+|   C           P3002I    LOKUPWFV,I                    40
+| 03-C           *IN40     IFEQ '0'
+|   C                     SETON                     99
+| 03-C                     END
+| 02*C                     ELSE
+|     *
+| 04-C           P3002I    IFNE '2'
+|   C                     SETON                     99
+| 04-C                     END
+| 02-C                     END
+|     *
+| 05-C           *IN99     IFEQ '1'
+|   C                     MOVE 'N'       P3007
+| 05-C                     END
+|     *
+01===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P30YMD....取出年．月．日．
+      *--------------------------------------------------------------*
+02===C           P30YMD    BEGSR
+|     *
+|    C                     Z-ADDP3001I    WDATE
+|     *
+| 01-C           P3003I    IFEQ '1'                        *西曆
+|     *
+| 02-C           P3002I    IFEQ '1'                        *00YYMMDD
+|   C                     Z-ADDWD2       WYY     20
+|   C                     Z-ADDWD3       WMM     20
+|   C                     Z-ADDWD4       WDD     20
+|   C                     EXSR P30PYY
+| 02-C                     END
+|   C*
+| 03-C           P3002I    IFEQ '2'                        *YYYYMMDD
+|   C                     MOVELWD1       WYYYY   40
+|   C                     MOVE WD2       WYYYY
+|   C                     Z-ADDWD3       WMM
+|   C                     Z-ADDWD4       WDD
+| 03-C                     END
+|   C*
+| 04-C           P3002I    IFEQ '3'                        *00MMDDYY
+|   C                     Z-ADDWD4       WYY
+|   C                     Z-ADDWD2       WMM
+|   C                     Z-ADDWD3       WDD
+|   C                     EXSR P30PYY
+| 04-C                     END
+|   C*
+| 05-C           P3002I    IFEQ '4'                        *MMDDYYYY
+|   C                     MOVELWD3       WYYYY
+|   C                     MOVE WD4       WYYYY
+|   C                     Z-ADDWD1       WMM
+|   C                     Z-ADDWD2       WDD
+| 05-C                     END
+|   C*
+| 06-C           P3002I    IFEQ '5'                        *00DDMMYY
+|   C                     Z-ADDWD4       WYY
+|   C                     Z-ADDWD3       WMM
+|   C                     Z-ADDWD2       WDD
+|   C                     EXSR P30PYY
+| 06-C                     END
+|   C*
+| 07-C           P3002I    IFEQ '6'                        *DDMMYYYY
+|   C                     MOVELWD3       WYYYY
+|   C                     MOVE WD4       WYYYY
+|   C                     Z-ADDWD2       WMM
+|   C                     Z-ADDWD1       WDD
+| 07-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 08-C           P3003I    IFEQ '2'                        *中曆
+|   C           P3002I    ANDEQ'2'                        *YYYYMMDD
+|   C                     MOVELWD1       WYYYY
+|   C                     MOVE WD2       WYYYY
+|   C                     Z-ADDWD3       WMM
+|   C                     Z-ADDWD4       WDD
+|   C                     EXSR P30PYY
+| 08-C                     END
+|    C*
+02===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P30PYY....產生西元年份
+      *--------------------------------------------------------------*
+03===C           P30PYY    BEGSR
+|     *
+|     *適用年份為西元1980～2079年:
+|     *
+      * 1.西曆
+|     * 2000～2079 "輸入年度+2000年
+|     * 1980～1999 "輸入年度+1900年
+|     *
+| 01-C           P3003I    IFEQ '1'                        *西曆
+| 02-C           WYY       IFLT 80
+|   C           WYY       ADD  2000      WYYYY
+| 02*C                     ELSE
+|   C           WYY       ADD  1900      WYYYY
+| 02-C                     END
+|   C*
+|   C* 2.國曆
+|   C*
+| 01*C                     ELSE
+|   C                     ADD  1911      WYYYY
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P30LEP....VERIFY LEAP YEAR                          *
+      *--------------------------------------------------------------*
+04===C           P30LEP    BEGSR
+|    C           P3001     DIV  400       P3004   50
+|    C                     MVR            P3005   40
+| 01-C           P3005     IFEQ 0
+|   C                     MOVE 'Y'       P3006   1
+| 01*C                     ELSE
+|    *
+|   C           P3001     DIV  100       P3004
+|   C                     MVR            P3005
+| 02-C           P3005     IFEQ 0
+|   C                     MOVE 'N'       P3006
+| 02*C                     ELSE
+|    *
+|   C           P3001     DIV  4         P3004
+|   C                     MVR            P3005
+| 03-C           P3005     IFEQ 0
+|   C                     MOVE 'Y'       P3006
+| 03*C                     ELSE
+|   C                     MOVE 'N'       P3006
+| 03-C                     END
+|    *
+| 02-C                     END
+|    *
+| 01-C                     END
+04===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P30CKD....CHECK MONTH & DATE                        *
+      *--------------------------------------------------------------*
+05===C           P30CKD    BEGSR
+|     *
+| 01-C           P3002     IFGT 12
+|   C           P3002     OREQ 0
+|   C           P3003     OREQ 0
+|   C                     MOVE 'N'       P3007   1
+| 01*C                     ELSE
+|    *
+|   C                     Z-ADDP3002     P30     20
+| 02-C           P3003     IFGT P30DAY,P30
+|   C                     MOVE 'N'       P3007
+| 02*C                     ELSE
+|   C                     MOVE 'Y'       P3007
+| 02-C                     END
+|    *
+| 03-C           P3002     IFEQ 2
+|   C           P3006     ANDEQ'Y'
+|   C           P3003     ANDLE29
+|   C                     MOVE 'Y'       P3007
+| 03*C                     ELSE
+| 03-C                     END
+|    *
+| 01-C                     END
+05===C                     ENDSR
+      *--------------------------------------------------------------*
+** <<每月日數>>
+312831303130313130313031
+** <<日期格式>>VALUE
+123456
+

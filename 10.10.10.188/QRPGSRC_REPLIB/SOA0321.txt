@@ -1,0 +1,382 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : SOA0321                                    *
+     A*    AUTHOR       :                                            *
+     A*    DATE WRITTEN : 11/26/96                                   *
+     A*    UPDATE DATE  : 81/03/11                                   *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :                                            *
+     A*    PROCEDURE    :退貨無發票資料維護 (A/U/D/I)              *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.05 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FSOSIPF  UF  E           K        DISK                      A
+     FPA#BPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOA0321DCF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     E*: FUNCTION DATA :
+     E                    WFUN    5   5  6
+     IPTDA01      DS
+     I                                        1   1 $FMT
+     I                                        2   2 $TYPE
+     I*
+     ISDS        SDS
+     I                                     *PROGRAM APPPGM
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+B2MODI                                      201 2080$A8YMD
+     I*           DS
+     I*                                       1  20 WF08
+     I            DS
+     I                                        1   1 DSI02A
+     I                                        2  10 DSI02B
+     I                                        1  10 DSI02
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *NAMVAR   DEFN           PTDA01           TRAN DATE
+     C                     IN   PTDA01
+     C*
+     C* FOR F4 PARM
+     C*                    MOVE *BLANKS   APPSCR  6
+     C*                    MOVE *BLANK    PARMI1 10
+     C*                    MOVE *BLANK    PARMO1 10
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PSI01   2          CUST ID
+     C                     PARM           PSI02  10          CUST ID
+     C                     PARM           FUNID   10         FUN  ID
+     C                     PARM           RTNID   2          RETURN ID
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYSI     KLIST
+     C                     KFLD           DSI01
+     C                     KFLD           DSI02
+     C           KEY       KLIST
+     C                     KFLD           PSI01
+     C                     KFLD           PSI02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT FIELD ENT
+     C*
+  01-C           FUNID     IFNE 1
+    C                     EXSR RTN011                     *FILE->SCRN
+  01-C                     END
+     C*
+     C                     EXSR RTN200                     *MAIN RTN
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVEL'SC02'    SCID    4
+|    C                     MOVELWFUN,FUNIDDFUN
+|    C*
+|    C                     SETON                     3031
+|    C*
+|    C* 新增固定搬 4/30/96  TO  SI29
+| 02-C           FUNID     IFEQ 1
+B2CHKC                     Z-ADD43096     DSI29
+| 02-C                     END
+|    C*
+| 03-C           FUNID     IFEQ 2
+|   C                     SETOF                     30
+| 03-C                     END
+|    C*
+| 04-C           FUNID     IFEQ 4
+|   C           FUNID     OREQ 5
+|   C                     SETOF                     3031
+| 04-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....'SC02' SCREEN MAIN ROUTINE
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+| 01-C           SCID      DOWEQ'SC02'
+|   C*
+|   C                     EXFMTDSPD1
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C*
+| 02-C           *IN03     IFEQ '1'
+|   C                     MOVEL'EXIT'    SCID
+|   C                     MOVEL'03'      RTNID
+|   C                     GOTO E200
+| 02-C                     END
+|   C*
+| 03-C           *IN12     IFEQ '1'
+|   C                     MOVEL'EXIT'    SCID
+|   C                     MOVEL'12'      RTNID
+|   C                     GOTO E200
+| 03-C                     END
+|   C*
+| 04-C*          *IN04     IFEQ '1'
+|   C*                    EXSR RTNF4
+|   C*                    GOTO E200
+| 04-C*                    END
+|   C*
+| 05-C           FUNID     IFNE 5
+|   C                     EXSR RTN280                     *CHECK SCRN
+| 05-C                     END
+|   C**
+| 06-C           *IN99     IFEQ '0'
+|   C           *IN05     ANDEQ'0'
+|   C*
+| 07-C           FUNID     IFNE 4
+|   C           FUNID     ANDNE5
+|   C                     EXSR RTN253                     *SCRN-->FILE
+| 07-C                     END
+|   C*
+|   C                     EXSR RTN254                     *ADD UPD DEL
+|   C                     MOVEL'EXIT'    SCID
+|   C                     MOVEL'00'      RTNID
+| 06-C                     END
+|   C*
+|   C           E200      TAG
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN011....MOVE DATA TO SCREEN
+      *==============================================================*
+03===CSR         RTN011    BEGSR
+|    C*
+|    C           KEY       CHAINSI0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C*
+|   C                     MOVELSI01      DSI01
+|   C                     MOVELSI02      DSI02
+|   C                     MOVELSI08      DSI08
+|   C                     Z-ADDSI25      DSI25
+|   C                     Z-ADDSI26      DSI26
+B2TRCC                     Z-ADDSI29      DSI29
+|   C*公司名稱
+|   C           SI01      CHAIN#B0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVEL#B03      D#B03
+| 02*C                     ELSE
+|   C                     MOVEL*BLANK    D#B03
+| 02-C                     END
+|   C*客戶名稱
+|   C           SI08      CHAINME0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVE ME04      DME04
+| 03*C                     ELSE
+|   C                     MOVE *BLANK    DME04
+| 03-C                     END
+| 01-C                     END
+|    C*
+03===CSR                   ENDSR
+      *==============================================================*
+      *          RTN253....MOVE SCREEN DATA TO FILE
+      *==============================================================*
+04===CSR         RTN253    BEGSR
+|    C* SOSIPF
+| 01-C           FUNID     IFEQ 2
+|   C                     Z-ADDDSI25     SI25
+|   C                     Z-ADDDSI25     SI23
+|   C                     Z-ADDWSI30     SI30             *CHANGE
+B2000C                     MOVEL$A8YMD    SIXX
+B2000C                     TIME           SIYY
+|   C                     MOVEL$USER     SIZZ
+|   C*
+| 01*C                     ELSE                            *FUNID = 1
+|   C                     MOVELDSI01     SI01
+|   C                     MOVELDSI02     SI02
+|   C                     MOVELDSI08     SI08
+|   C                     MOVELDSI08     SI12
+|   C                     MOVELDSI08     SI14
+|   C                     MOVE 'B'       SI22
+|   C                     Z-ADDDSI25     SI25
+|   C                     Z-ADDDSI25     SI23
+|   C                     Z-ADDDSI25     SI30             *ADD
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADD920430    SI29
+B2VFYC                     Z-ADD19920430  SI29
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADD920430    SI21
+B2VFYC                     Z-ADD19920430  SI21
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2000C                     Z-ADD$A8YMD    SIXX
+B2000C                     TIME           SIYY
+|   C                     MOVEL$USER     SIZZ
+|   C*
+|   C           DSI08     CHAINMD0                  40
+|   C                     MOVELMD07      SI03
+|   C                     MOVELMD08      SI04
+|   C                     Z-ADDMD18      SI17
+|   C*
+|   C           DSI08     CHAINME0                  40
+|   C                     MOVELME15      SI31
+|   C*
+|   C           SI31      CHAINMC0                  40
+|   C                     MOVELMC03      SI32
+| 01-C                     END
+      *
+04===CSR                   ENDSR
+      *==============================================================*
+      *          RTN254....ADD UPDATE DELETE . . .
+      *==============================================================*
+05===CSR         RTN254    BEGSR
+     C*
+| 01-C           FUNID     IFEQ 1
+|   C                     MOVELSI01      PSI01
+|   C                     MOVELSI02      PSI02
+|   C                     WRITESI0
+|   C*
+| 01-C                     END
+|    C*
+| 02-C           FUNID     IFEQ 2
+|   C                     UPDATSI0
+| 02-C                     END
+|    C*
+| 03-C           FUNID     IFEQ 4
+|   C                     CALL 'WDS000'
+|   C                     PARM 'N'       DLTFLG  1
+| 04-C           DLTFLG    IFEQ 'Y'
+|   C           KEYSI     CHAINSI0                  40
+|   C                     DELETSI0
+| 04-C                     END
+| 03-C                     END
+|    C*
+05===CSR                   ENDSR
+      *==============================================================*
+      *          RTN280....CHECK 'SC02' SCREEN
+      *==============================================================*
+06===CSR         RTN280    BEGSR
+|    C*
+| 01-C           FUNID     IFEQ 1                          *新增CHECK
+|   C*公司檢查
+| 02-C           DSI01     IFEQ *BLANK
+|   C                     MOVEL'UPT1001' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6199
+| 02-C                     END
+|   C   99                GOTO END280
+|   C*　　　　
+|   C           DSI01     CHAIN#B0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL'UPT0030' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6199
+|   C   99                GOTO END280
+| 03*C                     ELSE
+|   C*公司名稱
+|   C                     MOVEL#B03      D#B03
+| 03-C                     END
+|   C*客戶檢查
+| 04-C           DSI08     IFEQ *BLANK
+|   C                     MOVEL'UPT1001' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6399
+| 04-C                     END
+|   C   99                GOTO END280
+|   C*　　　　
+|   C           DSI08     CHAINME0                  40
+| 05-C           *IN40     IFEQ '1'
+|   C                     MOVEL'UPT0030' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6399
+| 05*C                     ELSE
+|   C*客戶名稱
+|   C                     MOVE ME04      DME04
+| 05-C                     END
+|   C*新增重複檢查
+|   C                     MOVE '@'       DSI02A
+|   C                     MOVELDSI08     DSI02B
+|   C           KEYSI     CHAINSI0                  40
+| 06-C           *IN40     IFEQ '0'
+|   C                     MOVEL'UPT0140' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     616399
+| 06-C                     END
+| 01-C                     END
+|    C*發票金額
+| 07-C           DSI25     IFEQ 0
+|   C                     MOVEL'UPT1001' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6499
+| 07-C                     END
+|    C   99                GOTO END280
+|    C*
+|    C*發票金額不可小於原來的值
+| 08-C           FUNID     IFEQ 2
+| 09-C           DSI25     IFLT SI25
+|   C                     MOVEL'UPT1007' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     SETON                     6499
+| 09*C                     ELSE
+|   C           DSI25     SUB  SI25      WSI30   90       末沖金額
+|   C                     ADD  SI30      WSI30
+| 09-C                     END
+| 08-C                     END
+|    C   99                GOTO END280
+|    C*
+06===CSR         END280    ENDSR
+     C*==============================================================*
+     C*          R9100 ....DATE TYPE CHANGE 2.(SCREEN TO FILE)
+     C*==============================================================*
+07===C*          R9100     BEGSR
+|    C*
+|    C*                    CALL 'P31'
+|    C*                    PARM DATE      P3101I  80
+|    C*                    PARM $FMT      P3102I  1
+|    C*                    PARM $TYPE     P3103I  1
+|    C*                    PARM '2'       P3104I  1
+|    C*                    PARM '1'       P3105I  1
+|    C*                    PARM           P3111O  80
+|    C*
+07===C*                    ENDSR
+      *==============================================================*
+      *          R9200 ....DATE TYPE CHANGE 2.(FILE TO SCREEN)
+      *==============================================================*
+08===C*          R9200     BEGSR
+|    C*
+|    C*                    CALL 'P31'
+|    C*                    PARM FDATE     P3101I  80
+|    C*                    PARM '2'       P3102I  1
+|    C*                    PARM '1'       P3103I  1
+|    C*                    PARM $FMT      P3104I  1
+|    C*                    PARM $TYPE     P3105I  1
+|    C*                    PARM           P3111O  80
+|    C*
+08===C*                    ENDSR
+     C*==============================================================*
+**
+新增修改拷備刪除查詢
+

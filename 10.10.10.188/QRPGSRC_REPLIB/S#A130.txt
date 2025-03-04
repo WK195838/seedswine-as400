@@ -1,0 +1,502 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM NAME : S#A130                                     *
+     H*    AUTHOR       : A1062   JEANNY LIN                         *
+     H*    CREATE DATE  : 79/06/29                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :程式安全管制系統                          *
+     H*    PURPOSE      :程式管制資料維護                          *
+     H****************************************************************
+     FS#SDLF  UF  E           K        DISK                      A
+     FS#SPPF  IF  E           K        DISK
+     FS#SUPF  IF  E           K        DISK
+     FS#A130D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     E                    WFUN    5   5  6               *OPTION
+     E                    A03     3   3  8               *PROGRAM TYPE
+     E                    WARY    1   1 10               *DSD012 INTVAL
+     IS#DA01      DS
+     I                                        1  10 CENTER
+     I           UDS
+     I                                      101 110 USER
+     I                                      111 1160DDATE
+     C*==============================================================*
+     C*                    KEY LIST FOR SDLF
+     C*==============================================================*
+     C           KEYSD1    KLIST
+     C                     KFLD           WSD02  10
+     C                     KFLD           WSD01  10
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INITIAL
+     C           *IN03     DOWEQ'0'
+     C*
+     C           SCID      CASEQ'SC01'    RTN100
+     C           SCID      CASEQ'SC02'    RTN200
+     C                     END
+     C*
+     C                     END
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+     C           RTN010    BEGSR
+     C           *NAMVAR   DEFN           S#DA01
+     C                     IN   *NAMVAR
+     C*
+     C           USER      CHAINSU0                  40    *NF
+     C   40                MOVE *BLANK    DUSER
+     C  N40                MOVE SU02      DUSER
+     C*
+     C                     MOVE 'SC01'    SCID    4
+     C                     MOVE *BLANK    DSD02
+     C                     MOVE *BLANK    DSD011
+     C                     MOVE WARY,1    DSD012
+     C                     MOVE '1'       DOPT
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....'SC01' SCREEN MAIN ROUTINE
+     C*==============================================================*
+     C           RTN100    BEGSR
+     C                     EXFMTDSPC1
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN03     IFEQ '0'                        *03 OFF
+     C*
+     C           *IN18     IFEQ '1'                        *18 OFF
+     C                     CALL 'S#I310'
+     C           DSD02     PARM DSD02     S3101I 10
+     C           *IN03     PARM *IN03     S3101O  1
+     C                     END                             *18 END
+     C*
+     C                     EXSR RTN110                     *CHK SRC
+     C  N99                MOVE 'SC02'    SCID
+     C                     END                             *03 END
+     C*
+     C           END100    ENDSR
+     C*==============================================================*
+     C*          RTN110....CHECK SCR1
+     C*==============================================================*
+     C           RTN110    BEGSR
+     C*執行者基本資料須存在
+     C           USER      IFNE CENTER
+     C           USER      CHAINSU0                  40
+     C   40                SETON                     9799
+     C   99                GOTO END110
+     C                     END
+     C*須輸入資料
+     C           DSD02     IFEQ *BLANK
+     C                     SETON                     609899
+     C                     END
+     C   99                GOTO END110
+     C*程式基本資料須存在
+     C           DSD02     CHAINSP0                  40    *NF
+     C   40                SETON                     609399
+     C   99                GOTO END110
+     C*執行者須能使用此程式
+     C           USER      IFNE CENTER                     ******
+     C                     MOVE DSD02     WSD02
+     C                     MOVE USER      WSD01
+     C           KEYSD1    SETLLSDL1
+     C           DSD02     READESDL1                     44*EOF
+     C           *LOVAL    SETLLSDL1
+     C   44                SETON                     609499
+     C                     END
+     C   99                GOTO END110
+     C*檢查使用者範圍值
+     C           DSD012    IFEQ *BLANK
+     C                     MOVE *HIVAL    DSD012
+     C                     END
+     C*
+     C           DSD011    IFGT DSD012
+     C                     SETON                     616295
+     C                     SETON                     99
+     C                     END
+     C   99                GOTO END110
+     C*異動時，執行者須為授權人
+     C           USER      IFNE CENTER                     *<>CENTER
+     C           DOPT      ANDNE'1'
+     C                     SETOF                     3637
+     C*
+     C           DSD011    SETLLSU0
+     C                     READ SU0                      46*EOF
+     C           *IN46     DOWEQ'0'
+     C           SU01      ANDLEDSD012
+     C           SU03      IFEQ USER                       *USER=授權
+     C                     SETON                     36
+     C                     END
+     C           SU01      IFEQ USER                       *USER=本人
+     C                     SETON                     37
+     C                     END
+     C                     READ SU0                      46*EOF
+     C                     END
+     C*
+     C  N36N37             SETON                     9299  *CAN'T USE
+     C  N36 37   DOPT      IFNE '5'
+     C                     SETON                     9199  *CAN'T UPD
+     C                     END
+     C*
+     C                     END                             *<>CENTER
+     C*
+     C           END110    ENDSR
+     C*==============================================================*
+     C*                    SUBFILE MAIN ROUTINE
+     C*==============================================================*
+     C           RTN200    BEGSR
+     C                     EXSR RTN210                     *INIT SFL
+     C           *IN03     DOWEQ'0'                        *03 LOOP
+     C           SCID      ANDEQ'SC02'
+     C*
+     C                     EXSR RTN220                     *EXFMTSFLCR
+     C*
+     C           DOPT      IFLE '2'
+     C   05                EXSR RTN210
+     C                     END
+     C*
+     C           *IN25     IFEQ '1'                        *25 ON
+     C                     SETON                     9799  *LAST PAGE
+     C                     Z-ADDRRN       DRRN
+     C                     END
+     C*
+     C           *IN26     IFEQ '1'                        *26 ON
+     C                     SETON                     9899  *FIRST PAGE
+     C                     Z-ADD1         DRRN
+     C                     END                             *26 OFF
+     C*
+     C           *IN99     IFEQ '0'
+     C  N03N05N12          EXSR RTN300                     *CHK & SAVE
+     C                     END
+     C   12                MOVE 'SC01'    SCID
+     C*
+     C                     END                             *03 LOOP
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN210....INITIAL
+     C*==============================================================*
+     CSR         RTN210    BEGSR
+     C                     MOVE DOPT      WNUM    10
+     C                     MOVE WFUN,WNUM DFUN
+     C*
+     C                     Z-ADD0         RRN
+     C                     Z-ADD1         DRRN
+     C*
+     C                     SETON                     52
+     C                     WRITESFLCR
+     C                     SETOF                     5253
+     C*
+     C           DOPT      IFLE '2'
+     C                     SETON                     31    *CAN INPUT
+     C                     ELSE
+     C                     SETOF                     31    *CAN'T INPUT
+     C                     END
+     C                     SETON                     505154*SFLDSP,CTL
+     C                     EXSR RTN211
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN211....ADD SUBFILE DATA
+     C*==============================================================*
+     CSR         RTN211    BEGSR
+     C*帶出程式基本資料
+     C                     MOVE *BLANK    SP02
+     C                     MOVE *BLANK    DSP03
+     C           DSD02     CHAINSP0                  40    *NF
+     C  N40      SP03      IFEQ 'M'
+     C                     MOVE A03,1     DSP03
+     C                     ELSE
+     C           SP03      IFEQ 'P'
+     C                     MOVE A03,2     DSP03
+     C                     ELSE
+     C                     MOVE A03,3     DSP03
+     C                     END
+     C                     END
+     C*帶出程式管制資料
+     C* 0. *IN05 = '1'
+     C   05                EXSR RTN213
+     C   05                GOTO END211
+     C* 1.執行者為管制中心且新增
+     C           USER      IFEQ CENTER                     *1
+     C           DOPT      ANDEQ'1'
+     C                     MOVE 'Y'       DUSE
+     C           DSD011    SETLLSU0
+     C                     READ SU0                      46*EOF
+     C           *IN46     DOWEQ'0'
+     C           SU01      ANDLEDSD012
+     C                     MOVE DSD02     WSD02
+     C                     MOVE SU01      WSD01
+     C           KEYSD1    CHAINSDL1                 40    *NF
+     C           *IN40     IFEQ '1'
+     C*
+     C                     MOVE SU01      SD01
+     C                     MOVE 'Y'       SD03
+     C                     MOVE 'Y'       SD04
+     C                     MOVE 'Y'       SD05
+     C                     MOVE 'Y'       SD06
+     C                     MOVE 'Y'       SD07
+     C                     MOVE 'Y'       SD08
+     C                     MOVE 'Y'       SD09
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C*
+     C                     END                             *40
+     C                     READ SU0                      46*EOF
+     C                     END                             *46
+     C                     END                             *1
+     C* 2.執行者非管制中心且新增
+     C           USER      IFNE CENTER                     *2
+     C           DOPT      ANDEQ'1'
+     C                     MOVE DSD02     WSD02
+     C                     MOVE USER      WSD01
+     C           KEYSD1    SETLLSDL1
+     C                     READ SDL1                     46*EOF
+     C  N46                MOVE 'Y'       DUSE             *取授權值
+     C*
+     C           DSD011    SETLLSU0
+     C                     READ SU0                      46*EOF
+     C           *IN46     DOWEQ'0'                        *46
+     C           SU01      ANDLEDSD012
+     C           USER      IFEQ SU03                       *03
+     C                     MOVE DSD02     WSD02
+     C                     MOVE SU01      WSD01
+     C           KEYSD1    CHAINSDL1                 40    *NF
+     C           *IN40     IFEQ '1'                        *40
+     C*
+     C                     ADD  1         RRN
+     C                     MOVE SU01      SD01
+     C                     EXSR RTN212                     *->PR *BLANK
+     C                     WRITESFLSR
+     C*
+     C                     END                             *40
+     C                     END                             *03
+     C                     READ SU0                      46*EOF
+     C                     END                             *46
+     C                     END                             *2
+     C* 3.異動
+     C           DOPT      IFNE '1'                        *3
+     C                     MOVE DSD02     WSD02
+     C                     MOVE DSD011    WSD01
+     C           KEYSD1    SETLLSDL1
+     C           DSD02     READESDL1                     44*EOF
+     C*
+     C           *IN44     DOWEQ'0'                        *44
+     C           SD01      ANDLEDSD012
+     C*(36:使用者為授權人,38:CAN'T WRITE)
+     C                     SETOF                     38
+     C           SD01      CHAINSU0                  40    *NF
+     C   40                SETON                     38
+     C*
+     C           USER      IFNE CENTER                     *CENTER
+     C           *IN38     ANDEQ'0'
+     C*--------->執行者非授權人時，只能查詢
+     C  N40      *IN36     IFEQ '0'                        *N36
+     C           DOPT      IFNE '5'
+     C           SU01      ORNE USER
+     C                     SETON                     38
+     C                     END
+     C                     ELSE                            *36
+     C*--------->執行者為授權人，異動時，只能改所屬被授權人資料
+     C           DOPT      IFLE '4'                        *<=4
+     C           SU03      IFNE USER
+     C                     SETON                     38    *CAN'T USE
+     C                     END
+     C                     ELSE                            *>4
+     C*--------->執行者為授權人，查詢時，只能看本人及所屬授權人資料
+     C           SU01      IFNE USER
+     C           SU03      ANDNEUSER
+     C                     SETON                     38    *CAN'T USE
+     C                     END
+     C                     END                             *4
+     C                     END                             *N36
+     C                     END                             *CENTER
+     C*WRITE SFL
+     C           *IN38     IFEQ '0'                        *38
+     C                     ADD  1         RRN
+     C                     MOVE 'Y'       DUSE
+     C           DOPT      IFLE '2'                        *DOPT=1,2
+     C                     EXSR RTN212                     *->PR *BLANK
+     C                     END                             *DOPT END
+     C                     WRITESFLSR
+     C                     MOVEA*ALL'0'   *IN,60
+     C                     END                             *38
+     C*
+     C           DSD02     READESDL1                     44*EOF
+     C                     END                             *44
+     C*
+     C                     END                             *3
+     C******
+     C           END211    TAG
+     C           *LOVAL    SETLLSDL1
+     C                     SETON                     53
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN212....PROTECE SUBFILE DATA
+     C*==============================================================*
+     CSR         RTN212    BEGSR
+     C           SD03      IFEQ ' '
+     C                     SETON                     60
+     C                     END
+     C*
+     C           SD04      IFEQ ' '
+     C                     SETON                     61
+     C                     END
+     C*
+     C           SD05      IFEQ ' '
+     C                     SETON                     62
+     C                     END
+     C*
+     C           SD06      IFEQ ' '
+     C                     SETON                     63
+     C                     END
+     C*
+     C           SD07      IFEQ ' '
+     C                     SETON                     64
+     C                     END
+     C*
+     C           SD08      IFEQ ' '
+     C                     SETON                     65
+     C                     END
+     C*
+     C           SD09      IFEQ ' '
+     C                     SETON                     66
+     C                     END
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN213....*IN05 ON
+     C*==============================================================*
+     CSR         RTN213    BEGSR
+     C                     SETON                     32
+     C*1.執行者為管制中心
+     C           USER      IFEQ CENTER                     *CENTER
+     C           DSD011    SETLLSU0
+     C                     READ SU0                      46*EOF
+     C                     MOVE 'Y'       DUSE
+     C                     MOVE 'Y'       SD03
+     C                     MOVE 'Y'       SD04
+     C                     MOVE 'Y'       SD05
+     C                     MOVE 'Y'       SD06
+     C                     MOVE 'Y'       SD07
+     C                     MOVE 'Y'       SD08
+     C                     MOVE 'Y'       SD09
+     C           *IN46     DOWEQ'0'
+     C           SU01      ANDLEDSD012
+     C                     MOVE SU01      SD01
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C                     READ SU0                      46*EOF
+     C                     END
+     C*2.執行者非管制中心
+     C                     ELSE
+     C                     MOVE DSD02     WSD02
+     C                     MOVE USER      WSD01
+     C           KEYSD1    SETLLSDL1
+     C                     READ SDL1                     46*EOF
+     C  N46                MOVE 'Y'       DUSE
+     C*
+     C           DSD011    SETLLSU0
+     C                     READ SU0                      46*EOF
+     C           *IN46     DOWEQ'0'                        *46
+     C           SU01      ANDLEDSD012
+     C           USER      IFEQ SU03                       *03
+     C                     ADD  1         RRN
+     C                     MOVE SU01      SD01
+     C                     EXSR RTN212                     *->PR *BLANK
+     C                     WRITESFLSR
+     C                     END                             *03
+     C                     READ SU0                      46*EOF
+     C                     END                             *46
+     C******
+     C                     END                             *CENTER
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN220    EXFMT SFL
+     C*==============================================================*
+     C           RTN220    BEGSR
+     C*
+     C                     SETOF                     5051
+     C           RRN       IFGT *ZEROS
+     C                     SETON                     50    *SFLDSP
+     C                     ELSE
+     C                     SETON                     9699
+     C                     END
+     C*
+     C                     SETON                     51    *SFLDSPCTL
+     C                     WRITEDSPC2
+     C                     EXFMTSFLCR
+     C*
+     C                     SETOF                     5051
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN300....CHK & SAVE  DATA MAIN ROTUINE
+     C*==============================================================*
+     CSR         RTN300    BEGSR
+     C*
+     C           DOPT      CASEQ'1'       RTN310
+     C           DOPT      CASEQ'2'       RTN320
+     C  N05      DOPT      CASEQ'4'       RTN340
+     C                     END
+     C*
+     C  N05      DOPT      IFEQ '5'
+     C                     MOVE 'SC01'    SCID
+     C                     END
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN310....SAVE DATA -- ADD MODE
+     C*==============================================================*
+     C           RTN310    BEGSR
+     C   32                EXSR RTN340
+     C                     SETOF                     32
+     C*
+     C                     MOVE DSD02     SD02             *SFL->PF
+     C                     READCSFLSR                    57
+     C           *IN57     DOWEQ'0'                        *57 DO
+     C                     UPDATSFLSR
+     C*WRITE SDL1
+     C           DUSE      IFEQ 'Y'                        *'Y'
+     C                     WRITESDL1
+     C                     END
+     C*
+     C                     READCSFLSR                    57
+     C                     END                             *57 END
+     C           *LOVAL    SETLLSDL1
+     C                     MOVE 'SC01'    SCID
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN320....SAVE DATA -- UPD MODE
+     C*==============================================================*
+     C           RTN320    BEGSR
+     C                     EXSR RTN340                     *SAVE - DLT
+     C                     EXSR RTN310                     *SAVE - ADD
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN340....SAVE DATA --DLT MODE
+     C*==============================================================*
+     CSR         RTN340    BEGSR
+     C*DELETE SDL1
+     C                     MOVE DSD02     WSD02
+     C                     MOVE DSD011    WSD01
+     C           KEYSD1    SETLLSDL1
+     C           DSD02     READESDL1                     44
+     C           *IN44     DOWEQ'0'                        *44
+     C           SD01      ANDLEDSD012
+     C           SD01      CHAINSU0                  40    *NF
+     C  N40      USER      IFEQ CENTER                     *IF
+     C           USER      OREQ SU03
+     C                     DELETSDL1
+     C                     END                             *IF
+     C           DSD02     READESDL1                     44
+     C                     END                             *44
+     C*
+     C                     MOVE 'SC01'    SCID
+     C                     ENDSR
+**
+新增修改      刪除查詢
+**
+主畫面主程式副程式
+**
+9999999999
+

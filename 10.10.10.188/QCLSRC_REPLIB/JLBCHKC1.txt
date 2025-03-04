@@ -1,0 +1,110 @@
+             PGM
+
+             DCL        VAR(&D01S)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&D01E)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             CHGVAR     VAR(&D01S)   VALUE(%SST(*LDA 605 6))
+             CHGVAR     VAR(&D01E)   VALUE(%SST(*LDA 611 6))
+
+             OVRDBF     FILE(SOSCPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSCPF)) QRYSLT(' SC39 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01E *CAT ') & +
+                          (SC35 *EQ "T" *OR SC35 *EQ "V" *OR SC35 +
+                          *EQ "N") & ((SC03 *NE "S4" & SC03 *NE +
+                          "SD" & SC03 *NE "S9") *OR ( SC03 *EQ "S4" +
+                          & SC01L *NE "W" )) ') KEYFLD(*FILE) +
+                          MAPFLD((SC01L '%SST(SC01 1 1)' *CHAR 1))
+
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSEPF)) QRYSLT(' SE24 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01E *CAT ') & +
+                          (SE36 *EQ "T" *OR SE36 *EQ "V" *OR SE36 +
+                          *EQ "N") & ((SE01L *NE "W" & (SE03 *EQ +
+                          "DB" *OR SE03 *EQ "DC" *OR SE03 *EQ "DE" +
+                          *OR SE03 *EQ "D2" *OR SE03 *EQ "D3" *OR +
+                          SE03 *EQ "D5")) *OR (SE03 *EQ "D8" *OR +
+                          SE03 *EQ "DH"))') KEYFLD(*FILE) +
+                          MAPFLD((SE01L '%SST(SE01 1 1)' *CHAR 1) +
+                          (SE01R '%SST(SE01 2 1)' *CHAR 1))
+
+             OVRDBF     FILE(SOSSPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSSPF)) OPTION(*ALL) QRYSLT(' SS35 +
+                          *EQ %RANGE(' *CAT &D01S *CAT ' ' *CAT +
+                          &D01E *CAT ') & SS16 *EQ "S01" ') +
+                          KEYFLD(*FILE) MAPFLD((SS01L '%SST(SS01 1 +
+                          1)' *CHAR 1) (SS01R '%SST(SS01 2 1)' +
+                          *CHAR 1))
+
+             OVRDBF     FILE(SOSGPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSGPF)) QRYSLT(' SG26 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01S *CAT ') & +
+                          (SG14 *EQ "V" *OR SG14 *EQ "A" *OR SG14 +
+                          *EQ "N")') KEYFLD(*FILE)
+
+             OVRDBF     FILE(IMIBPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIBPF)) QRYSLT(' IB04 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01S *CAT ')') +
+                          KEYFLD(*FILE)
+ /*良壞轉換  */
+             OVRDBF     FILE(IMICPF) SHARE(*YES)
+             OPNQRYF    FILE((IMICPF)) QRYSLT(' IC05 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01E *CAT ')') +
+                          KEYFLD(*FILE)
+
+
+ /*產品報廢  */
+             OVRDBF     FILE(IMIEPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIEPF)) QRYSLT(' IE05 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01E *CAT ')') +
+                          KEYFLD(*FILE)
+
+ /*存貨調整  */
+             OVRDBF     FILE(IMIGPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIGPF)) QRYSLT(' IG05 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01E *CAT ') & +
+                          IG04 *EQ "1" ') KEYFLD(*FILE)
+
+ /*盤點  */
+             OVRDBF     FILE(IMIUPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIUPF)) QRYSLT(' IU04 *EQ %RANGE(' +
+                          *CAT &D01S *CAT ' ' *CAT &D01E *CAT ')') +
+                          KEYFLD(*FILE)
+             CALL       JLBCHK2
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CALL       LOG
+             CHGVAR     VAR(&P6601I) VALUE('LOGP')
+             CHGVAR     VAR(&P6602I) VALUE('2')
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE('00')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             CLOF       OPNID(SOSCPF)
+             CLOF       OPNID(SOSEPF)
+             CLOF       OPNID(SOSSPF)
+             CLOF       OPNID(SOSGPF)
+             CLOF       OPNID(IMIBPF)
+             CLOF       OPNID(IMICPF)
+             CLOF       OPNID(IMIEPF)
+             CLOF       OPNID(IMIGPF)
+             CLOF       OPNID(IMIUPF)
+   /*檢核報表*/
+             CHGVAR     VAR(&P6601I) VALUE('JLBCHKP')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

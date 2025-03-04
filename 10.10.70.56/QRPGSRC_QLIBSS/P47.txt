@@ -1,0 +1,166 @@
+      ****************************************************************
+      *泛太資訊科技開發股份有限公司－版權所有    TEL:7313250       *
+      *                                                              *
+      * PROGRAM ID : P47                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * UPDATE DATE: 79/06/22     A1062  JEANNY LIN                  *
+      *                                                              *
+      * FUN CTION  : CONVERT A NUMBER INTO CHINSE DBCS WITH UNIT     *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P0471I    I   *DEC    9 0 待轉金額        *
+      *             02   P0471O    O   *CHAR  72   中文金額        *
+      *                                                              *
+      * 共19字 : Ｘ億Ｘ仟Ｘ佰Ｘ拾Ｘ萬Ｘ仟Ｘ佰Ｘ拾Ｘ圓整        *
+      *                                                              *
+      ****************************************************************
+     E                    P4701  10  10  4               數字ARRAY
+     E                    P4702  10  10  4               單位ARRAY
+     E                    P473       19  4               數字中文(*) R
+     E                    P474        9  1               待轉金額
+     E                    P475       19  4               數字中文
+     E                    P476       72  1               中文金額
+     E                    OEOF    2   2  1               OE/OF字元
+     I            DS
+     I                                        1   90P47N
+     I                                        1   9 P47C
+     I                                        2   50P47B
+     I            DS
+     I                                        1   4 CHAR
+     I                                        1   1 OE
+     I                                        2   2 CHAR1
+     I                                        3   3 CHAR2
+     I                                        4   4 OF
+     C*--------------------------------------------------------------*
+     C*                    PROGRAM PARAMETERS                        *
+     C*--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C           P47N      PARM           P4701I  90
+     C                     PARM           P4701O 72
+     C*--------------------------------------------------------------*
+     C*                    MAIN PROGRAM                              *
+     C*--------------------------------------------------------------*
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+     C*
+     C                     MOVE *BLANK    P4701O
+     C           P4701I    IFEQ *ZERO
+     C                     MOVEL'零圓整'P4701O
+     C                     ELSE
+     C                     MOVEAP47C      P474
+     C                     EXSR RTN100
+     C                     EXSR RTN200
+     C                     EXSR RTN300
+     C                     MOVEAP476      P4701O
+     C                     END
+     C                     SETON                     LR
+     C                     RETRN
+     C*--------------------------------------------------------------*
+     C*          RTN100....CONVERT NUMBER INTO CHINESE DBCS          *
+     C*--------------------------------------------------------------*
+     C           RTN100    BEGSR
+     C                     Z-ADD0         J       20
+     C                     Z-ADD1         K       20
+     C*將數字前之零轉成'*'
+     C           P474,K    DOWEQ'0'
+     C           K         ANDLE8
+     C                     MOVE '*'       P474,K
+     C                     ADD  1         K
+     C                     END
+     C*將數字轉成も及中文放入P473 ARRAY
+     C** I :處理數字之所在位數(TOTAL : 09)
+     C** J :處理文字之所在位數(TOTAL : 19)
+     C                     Z-ADD1         I       20
+     C                     DO   9         I       20
+     C                     ADD  1         J
+     C*1.數字轉為中文
+     C           P474,I    IFEQ '*'
+     C                     MOVE '****'    P473,J
+     C                     ELSE
+     C                     MOVE P474,I    X       10
+     C           X         IFEQ 0
+     C                     MOVE P4701,10  P473,J
+     C                     ELSE
+     C                     MOVE P4701,X   P473,J
+     C                     END
+     C                     END
+     C*2.產生數字單位
+     C           P473,J    IFNE '****'
+     C           P473,J    IFEQ P4701,10
+     C           I         ANDNE5                          萬
+     C           I         ANDNE9                          圓
+     C                     ADD  1         J
+     C                     MOVE P4701,10  P473,J           零
+     C                     ELSE
+     C*
+     C           I         IFEQ 5                          有萬值
+     C           P47B      ANDEQ0
+     C                     ELSE
+     C                     ADD  1         J
+     C                     MOVE P4702,I   P473,J           單位
+     C                     END
+     C*
+     C                     END
+     C                     ELSE
+     C                     ADD  1         J
+     C                     MOVE '****'    P473,J           *數字前も
+     C                     END
+     C*
+     C                     END
+     C                     ADD  1         J
+     C                     MOVE P4702,10  P473,J
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*          RTN200    P473 -> P475 (去除P473 ARRAY之'****') *
+     C*--------------------------------------------------------------*
+     C           RTN200    BEGSR
+     C                     MOVEA*BLANK    P475
+     C                     Z-ADD1         I       20
+     C                     Z-ADD1         J       20
+     C                     SETON                     25    非零數字
+     C                     DO   19        I       20
+     C           P473,I    IFNE '****'
+     C*
+     C           P473,I    IFEQ P4701,10                   零
+     C                     SETOF                     25
+     C                     ELSE
+     C           *IN25     IFEQ '0'                        加�牊s�浀r
+     C           P473,I    ANDNEP4702,5                    萬
+     C           P473,I    ANDNEP4702,9                    圓
+     C                     MOVE P4701,10  P475,J
+     C                     ADD  1         J
+     C                     END
+     C                     SETON                     25
+     C                     MOVE P473,I    P475,J
+     C                     ADD  1         J
+     C                     END
+     C*
+     C                     END
+     C                     END
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*          RTN300    P475 -> P476 (去除字元間之OE/OF記號)  *
+     C*--------------------------------------------------------------*
+     C           RTN300    BEGSR
+     C                     MOVEA*BLANK    P476
+     C                     MOVE OEOF,1    P476,1
+     C                     Z-ADD1         I       20
+     C                     Z-ADD2         J       20
+     C                     DO   19        I       20
+     C                     MOVE P475,I    CHAR
+     C                     MOVE CHAR1     P476,J
+     C                     ADD  1         J
+     C                     MOVE CHAR2     P476,J
+     C                     ADD  1         J
+     C                     END
+     C                     MOVE OEOF,2    P476,J
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+**
+壹貳參肆伍陸柒捌玖零
+**
+億仟佰拾萬仟佰拾圓整
+**
+
+

@@ -1,0 +1,336 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARR0602                                    *
+     A*    AUTHOR       : A1118  PHILIP                              *
+     A*    DATE WRITTEN : 81/04/29                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收帳款子系統                            *
+     A*    REMARK       :統一發票申報表列印                        *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M004      | 00.06.07 |菸酒稅法實施
+      *---------------------------------------------------------------
+      *  M005     | MICHELLE |02.01.04|讀取發票檔得非營業人稅額
+     A*================================================================
+     A****************************************************************
+     FSOSILF97IF  E           K        DISK
+     FSOSSPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FREWF41  IF  E           K        DISK
+     FREWF42  IF  E           K        DISK
+     FARR060P O   E             39     PRINTER
+     I*
+     I            DS
+     I                                        1  10 SI02S
+     I                                        9  100SEQ1
+     I            DS
+     I                                        1  10 SI02E
+     I                                        9  100SEQ2
+     I            DS
+B2MODI                                        1   60WF4202
+B2MODI                                        5   60WF422M
+     I            DS
+     I                                        1   8 WF4203
+     I                                        1   2 WF4231
+     I                                        3   8 WF4232
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 602 DSI01
+     I*                                     603 604 DSI01E
+     I                                      613 6160DSI21S
+     I                                      617 6200DSI21E
+B2MODI                                      621 6240WSI21S
+B2MODI                                      625 6280WSI21E
+B2MODI                                      680 680 ERRCD
+M001AI                                      850 8550YMD8S
+B2MODI                                      858 8630YMD8E
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF422M    MONCHK
+B2000C           *LIKE     DEFN WF4202    WF422S
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYWF1    KLIST
+     C                     KFLD           WF4201
+     C                     KFLD           WF4202
+     C           KEYWF2    KLIST
+     C                     KFLD           WF4201
+     C                     KFLD           WF422S
+     C           KEYWF3    KLIST
+     C                     KFLD           WF4201
+     C                     KFLD           WF4202
+     C                     KFLD           WF4203
+     C                     KFLD           WF4213
+     C           KEYME     KLIST
+     C                     KFLD           SI08
+     C                     KFLD           SI09
+     C           KEYSIS    KLIST
+     C                     KFLD           SI02S
+     C           KEYSIE    KLIST
+     C                     KFLD           SI02E
+     C           KEYSS     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+      *==============================================================*
+      *                    MWF41N ROUTINE
+      *==============================================================*
+     C*
+     C                     MOVE DSI01     WF4201
+M001AC                     Z-ADDYMD8S     WF422S
+B2000C           KEYWF2    SETLLWF420
+B2000C           KEYWF2    READEWF420                    41
+     C*每月 BEGIN
+     C**         DSI01     READEWF420                      41
+     C*每月 END
+     C*檢查申報年月是否大於螢幕值
+B2000C           *IN41     IFEQ '0'
+M001DC*          WF4202    ANDGTWSI21E
+M001AC           WF4202    ANDGTYMD8E
+    C                     SETON                     41
+  01*C                     ELSE
+    C*每月 BEGIN
+    C**                   MOVE *BLANK    MONCHK
+    C*每月 END
+    C*本期合計只列印於第一頁SETON 30
+    C                     SETON                     30
+  01-C                     END
+     C*PAGE
+     C                     Z-ADD0         PAGEM
+     C*******
+  02-C           *IN41     DOWEQ'0'
+    C                     ADD  1         PAGEM
+    C*新增資料
+    C                     EXSR RTN100                     *DATA->FILE
+    C                     EXSR RTN200                     *DATA->FILE
+    C                     EXSR RTN300                     *DATA->FILE
+B2000C           KEYWF2    READEWF420                    41
+    C*
+M001DC*          WF4202    IFGT WSI21E
+M001AC           WF4202    IFGT YMD8E
+    C                     SETON                     41
+  03-C                     END
+    C*
+  02-C                     END
+     C   41                SETON                     LR
+     C*
+     CLR                   RETRN
+      *=========================================================*
+      *          RTN100....WRITE HEADER                         *
+      *=========================================================*
+01===C           RTN100    BEGSR
+|    C*明細表年月
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC                     MOVELWF4202    XF422Y  40
+M001AC*                    MOVELWF4202    HB2@Y4  4
+M001AC*                    MOVE HB2@Y4    WF422Y  20
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+M001AC           XF422Y    SUB  11        WF422Y
+|    C**GET統一編號，營業人名稱，稅籍
+|    C           WF4201    CHAIN#B0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #B12
+|   C                     MOVE *BLANK    #B02
+|   C                     MOVE *BLANK    #B13
+| 04-C                     END
+|    C                     WRITEPH1
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN200....GET DATA                             *
+      *=========================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE WF4201    SI01
+|    C                     MOVELWF4203    SI02S
+|    C                     MOVELWF4203    SI02E
+|    C                     Z-ADD1         I       20
+|    C                     Z-ADDWF4213    SEQ1    20
+|    C           WF4213    ADD  25        SEQ2    20
+|    C**
+| 01-C           I         DOWLE25
+|   C**左列資料
+|   C                     MOVE *BLANK    MD171
+|   C           KEYSIS    CHAINSI0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE '空白'  MD171
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     Z-ADD0         SI231
+|   C                     Z-ADD0         SI241
+| 02*C                     ELSE
+|   C           KEYSS     SETLLSS0                      41
+| 03-C           SI19      IFEQ 'V'
+|   C           *IN41     OREQ '1'
+|   C                     MOVE '作廢'  MD171
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     Z-ADD0         SI231
+|   C                     Z-ADD0         SI241
+| 03*C                     ELSE
+|   C*買受人統一編號
+| 04-C           SI17      IFEQ 3
+|   C           SI12      CHAINMD0                  40
+|   C   40                MOVE *BLANK    MD171
+|   C  N40                MOVE MD17      MD171
+| 04-C                     END
+|   C*營業稅
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C                     MOVE 'V'       SI2211
+|   C           SI22      WHEQ 'Z'
+|   C                     MOVE 'V'       SI2221
+|   C           SI22      WHEQ 'B'
+|   C                     MOVE 'V'       SI2231
+|   C                     OTHER
+|   C                     MOVE *BLANK    SI2211
+|   C                     MOVE *BLANK    SI2221
+|   C                     MOVE *BLANK    SI2231
+|   C                     ENDSL
+|   C                     Z-ADDSI23      SI231
+M005DC*                    Z-ADDSI25      SI231
+M004AC           SI17      IFEQ 2
+M004AC           SI22      ANDEQ'D'
+M005AC                     Z-ADDSI25      SI231
+M004AC                     Z-ADD0         SI241
+M004AC                     ELSE
+|   C                     Z-ADDSI24      SI241
+M004AC                     END
+| 03-C                     END
+| 02-C                     END
+|   C**右列資料
+|   C                     MOVE *BLANK    MD172
+|   C           KEYSIE    CHAINSI0                  40
+| 05-C           *IN40     IFEQ '1'
+|   C                     MOVE '空白'  MD172
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     Z-ADD0         SI232
+|   C                     Z-ADD0         SI242
+| 05*C                     ELSE
+|   C           KEYSS     SETLLSS0                      41
+| 06-C           SI19      IFEQ 'V'
+|   C           *IN41     OREQ '1'
+|   C                     MOVE '作廢'  MD172
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     Z-ADD0         SI232
+|   C                     Z-ADD0         SI242
+| 06*C                     ELSE
+|   C*買受人統一編號
+| 07-C           SI17      IFEQ 3
+|   C           SI12      CHAINMD0                  40
+|   C   40                MOVE *BLANK    MD172
+|   C  N40                MOVE MD17      MD172
+| 07-C                     END
+|   C*營業稅
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C                     MOVE 'V'       SI2212
+|   C           SI22      WHEQ 'Z'
+|   C                     MOVE 'V'       SI2222
+|   C           SI22      WHEQ 'B'
+|   C                     MOVE 'V'       SI2232
+|   C                     OTHER
+|   C                     MOVE *BLANK    SI2212
+|   C                     MOVE *BLANK    SI2222
+|   C                     MOVE *BLANK    SI2232
+|   C                     ENDSL
+|   C                     Z-ADDSI23      SI232
+M005MC*                    Z-ADDSI25      SI232
+M004AC           SI17      IFEQ 2
+M004AC           SI22      ANDEQ'D'
+M005AC                     Z-ADDSI25      SI232
+M004AC                     Z-ADD0         SI242
+M004AC                     ELSE
+|   C                     Z-ADDSI24      SI242
+M004AC                     END
+| 06-C                     END
+| 05-C                     END
+|   C*WRITE DETWF41L FILE
+|   C                     WRITEPD1
+|   C*
+|   C                     ADD  1         SEQ1
+|   C                     ADD  1         SEQ2
+|   C                     ADD  1         I
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN300....WRITE FOOT                           *
+      *=========================================================*
+03===C           RTN300    BEGSR
+|    C*本表合計資料
+|    C*計算空白張數
+|    C                     Z-ADD0         BKTMP   40
+|    C                     ADD  WF4204    BKTMP
+|    C                     ADD  WF4205    BKTMP
+|    C                     ADD  WF4206    BKTMP
+|    C                     ADD  WF4207    BKTMP
+|    C           50        SUB  BKTMP     WF42BK
+M005AC                     Z-ADD0         WF1014
+M005AC           WF4210    SUB  WF4214    WF1014
+      *
+|    C*本月合計資料
+B2000C           KEYWF1    CHAINWF410                40
+| 01-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         WF4103
+|   C                     Z-ADD0         WF4104
+|   C                     Z-ADD0         WF4105
+|   C                     Z-ADD0         WF4106
+|   C                     Z-ADD0         WF41BK
+|   C                     Z-ADD0         WF4107
+|   C                     Z-ADD0         WF4108
+|   C                     Z-ADD0         WF4109
+|   C                     Z-ADD0         WF419C
+|   C*M005D               Z-ADD0         WF419X
+|   C                     Z-ADD0         WF4110
+|   C                     Z-ADD0         WF4111
+M005AC                     Z-ADD0         WF4113
+| 01*C                     ELSE
+|   C*計算空白張數
+|   C                     Z-ADD0         BKTMP   40
+|   C                     ADD  WF4103    BKTMP
+|   C                     ADD  WF4104    BKTMP
+|   C                     ADD  WF4105    BKTMP
+|   C                     ADD  WF4106    BKTMP
+|   C           50        MULT WF4112    TOT     40
+|   C           TOT       SUB  BKTMP     WF41BK
+|   C*應稅非營業人銷售額
+M005MC*          WF4109    MULT 100       WF419P 110
+M005MC*          WF419P    DIV  105       WF419C    H
+M005MC           WF4109    SUB  WF4113    WF419C
+|   C*應稅非營業人稅額
+M005DC*          WF419C    MULT 0.05      WF419X    H
+| 01-C                     END
+|    C*
+|    C*WRITE DETWF41L FILE
+|    C                     WRITEPE1
+|    C                     SETOF                     30
+|    C*
+03===C                     ENDSR
+

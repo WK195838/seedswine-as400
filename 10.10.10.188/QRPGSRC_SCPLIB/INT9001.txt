@@ -1,0 +1,353 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INT9001                                       *
+      * AUTHER       : A1010  JOHN CHIOU                             *
+      * CREATE DATE  : 97/10/14                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存調整數量重算                             *
+      ****************************************************************
+     FC#EHPF  IF  E           K        DISK
+     FINTDLF90IF  E           K        DISK
+     FINTJLF90IF  E           K        DISK
+     FINTNLF07IF  E           K        DISK
+     FPOCMLF90IF  E           K        DISK
+     FINTHLF90IF  E           K        DISK
+     FINTLLF90IF  E           K        DISK
+     FINTPLF90IF  E           K        DISK
+     FINTBPF  UF  E           K        DISK
+     E*
+     E*: FUNCTION DATA :
+     I*
+     I            DS
+     I                                        1   6 W1YYMM
+     I                                        1   60W2YYMM
+     I            DS
+     I                                        1   80WSTRDT
+     I                                        1   8 STRDT
+     I                                        1   6 STRYM
+     I                                        1   40STRYY
+     I                                        5   60STRMM
+     I                                        7   8 STRDD
+     I            DS
+     I                                        1   80WENDDT
+     I                                        1   8 ENDDT
+     I                                        1   6 ENDYM
+     I                                        7   8 ENDDD
+     I            DS
+     I                                        1   6 INYYMM
+     I                                        1   60DYYMM
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+     C*                    PARM           INYYMM  6
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYEH     KLIST
+     C                     KFLD           INCOMP
+     C*
+     C           KEYTD     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYTJ     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYTH     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYTL     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYTNX    KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYCMX    KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYTP     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           WSTRDT
+     C*
+     C           KEYTB0    KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           W2YYMM
+     C*
+     C           KEYTB1    KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           W2YYMM
+     C                     KFLD           WTB03   2
+     C                     KFLD           WTB04   5
+     C                     KFLD           WTB05   9
+     C*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN000                     GET DATE FROM C#EHPF
+     C                     EXSR RTN100                     GET DATE RANGE BY YM
+     C                     EXSR RTN200                     RESET TB10 TB11
+     C                     EXSR RTN300                     PROCESS INTDPF
+     C                     EXSR RTN400                     PROCESS INTJPF
+     C                     EXSR RTN500                     INTN陳列調撥
+     C                     EXSR RTN600                     陳列進貨
+     C                     EXSR RTN700                     陳列轉進貨
+     C                     EXSR RTN800                     陳列品退出
+     C                     EXSR RTN900                     陳列借貨
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN000....GET DATE FROM C#EHPF
+      *===============================================================*
+01===C           RTN000    BEGSR
+|    C*
+|    C           KEYEH     CHAINEH0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     SETON                     LR
+| 01-C                     ENDIF
+|    C*
+|    C                     Z-ADDEH02      DYYMM
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....GET DATE RANGE BY YM
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     MOVELINYYMM    W1YYMM
+|    C                     MOVELINYYMM    STRDT
+|    C                     MOVELINYYMM    ENDDT
+|    C                     MOVEL'25'      ENDDD
+|    C                     MOVEL'26'      STRDD
+| 01-C           STRMM     IFEQ 1
+|   C                     Z-ADD12        STRMM
+|   C                     SUB  1         STRYY
+| 01*C                     ELSE
+|   C                     SUB  1         STRMM
+| 01-C                     ENDIF
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN200.... RESET TB10 TB11  TB16
+      *===============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C           KEYTB0    SETLLTB0
+|    C           KEYTB0    READETB0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C                     Z-ADD0         TB10             調整入庫量
+|   C                     Z-ADD0         TB11             調整入庫量
+|   C                     Z-ADD0         TB16             陳列異動
+|   C                     Z-ADD0         TB18             陳列借貨
+|   C                     UPDATTB0
+|   C*
+|   C           KEYTB0    READETB0                      41
+| 01-C                     ENDDO
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+     C*          RTN300....PROCESS INTDPF
+      *===============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C           KEYTD     SETLLTD0
+|    C                     READ TD0                      42
+| 01-C           *IN42     DOWEQ'0'
+|   C           TD10      ANDLEWENDDT
+|   C*  更新調出
+|   C                     MOVELTD02      WTB05
+|   C                     MOVELTD07      WTB04
+|   C                     MOVELTD06      WTB03
+|   C*
+|   C           KEYTB1    CHAINTB0                  43
+|   C                     ADD  TD04      TB11
+|   C                     UPDATTB0
+|   C*
+|   C*  更新調入
+|   C                     MOVELTD08      WTB04
+|   C           KEYTB1    CHAINTB0                  43
+|   C                     ADD  TD04      TB10
+|   C                     UPDATTB0
+|   C*
+|   C                     READ TD0                      42
+|   C*
+| 01-C                     ENDDO
+|    C*
+04===C                     ENDSR
+      *===============================================================*
+     C*          RTN400....PROCESS INTJPF
+      *===============================================================*
+05===C           RTN400    BEGSR
+|    C*
+|    C           KEYTJ     SETLLTJ0X
+|    C                     READ TJ0X                     42
+|    C*
+| 01-C           *IN42     DOWEQ'0'
+|   C           TJ07      ANDLEWENDDT
+|   C*  更新調整
+|   C                     MOVELTJ05      WTB03
+|   C                     MOVELTJ06      WTB04
+|   C                     MOVELTJ02      WTB05
+|   C           KEYTB1    CHAINTB0                  43
+|   C*
+| 02-C           TJ03      IFGT 0
+|   C                     ADD  TJ03      TB10
+| 02*C                     ELSE
+| 03-C           TI06      IFEQ '98'
+|   C                     ADD  TJ03      TB16             陳列異動
+|   C                     SUB  TJ03      TB10             調整入庫量
+|   C                     SUB  TJ03      TB11             調整出庫量
+| 03*C                     ELSE
+|   C                     SUB  TJ03      TB11
+| 03-C                     ENDIF
+| 02-C                     ENDIF
+|   C*
+|   C                     UPDATTB0
+|   C*
+|   C                     READ TJ0X                     42
+|   C*
+| 01-C                     ENDDO
+|    C*
+05===C                     ENDSR
+      *===============================================================*
+     C*          RTN500....陳列調撥 INTN (M1)
+      *===============================================================*
+06===C           RTN500    BEGSR
+|    C*
+|    C           KEYTNX    SETLLTN0X
+|    C                     READ TN0X                     42
+| 01-C           *IN42     DOWEQ'0'
+|   C           TN08      ANDLEWENDDT
+|   C*
+|   C*  更新調出
+|   C                     MOVELTN02      WTB03            通路代號
+|   C                     MOVELTD07      WTB04            調出分店
+|   C                     MOVELTN05      WTB05            產品代號
+|   C*
+|   C           KEYTB1    CHAINTB0                  43
+|   C                     SUB  TN14      TB11
+|   C                     SUB  TN14      TB16
+|   C                     UPDATTB0
+|   C*
+|   C*  更新調入
+|   C                     MOVELTN04      WTB04            調入分店
+|   C           KEYTB1    CHAINTB0                  43
+|   C                     SUB  TN14      TB10
+|   C                     ADD  TN14      TB16
+|   C                     UPDATTB0
+|   C*
+|   C                     READ TN0X                     42
+|   C*
+| 01-C                     ENDDO
+|    C*
+06===C                     ENDSR
+      *===============================================================*
+     C*          RTN600....陳列進貨 POCM (C3)
+      *===============================================================*
+07===C           RTN600    BEGSR
+|    C*
+|    C           KEYCMX    SETLLCM0X
+|    C                     READ CM0X                     42
+| 01-C           *IN42     DOWEQ'0'
+|   C           CM16      ANDLEWENDDT
+|   C*
+|   C                     MOVELCM12      WTB03            通路代號
+|   C                     MOVELCM13      WTB04            調出分店
+|   C                     MOVELCM03      WTB05            產品代號
+|   C*
+|   C           KEYTB1    CHAINTB0                  43
+| 02-C           *IN43     IFEQ '0'
+|   C                     ADD  CM06      TB16
+|   C                     UPDATTB0
+| 02-C                     ENDIF
+|   C*
+|   C                     READ CM0X                     42
+|   C*
+| 01-C                     ENDDO
+|    C*
+07===C                     ENDSR
+      *===============================================================*
+     C*          RTN700....陳列轉進貨INTHPF
+      *===============================================================*
+08===C           RTN700    BEGSR
+|    C*
+|    C           KEYTH     SETLLTH0
+|    C                     READ TH0                      42
+| 01-C           *IN42     DOWEQ'0'
+|   C           TH09      ANDLEWENDDT
+|   C                     MOVELTH07      WTB03            通路代號
+|   C                     MOVELTH08      WTB04            調出分店
+|   C                     MOVELTH02      WTB05            產品代號
+|   C*
+|   C           KEYTB1    CHAINTB0                  43
+| 02-C           *IN43     IFEQ '0'
+|   C                     SUB  TH03      TB16
+|   C                     UPDATTB0
+| 02-C                     ENDIF
+|   C*
+|   C                     READ TH0                      42
+|   C*
+| 01-C                     ENDDO
+|    C*
+08===C                     ENDSR
+      *===============================================================*
+     C*          RTN800....陳列品退出INTLPF
+      *===============================================================*
+09===C           RTN800    BEGSR
+|    C*
+|    C           KEYTL     SETLLTL0
+|    C                     READ TL0                      42
+| 01-C           *IN42     DOWEQ'0'
+|   C           TL08      ANDLEWENDDT
+|   C                     MOVELTL06      WTB03            通路代號
+|   C                     MOVELTL07      WTB04            調出分店
+|   C                     MOVELTL02      WTB05            產品代號
+|   C*
+|   C           KEYTB1    CHAINTB0                  43
+| 02-C           *IN43     IFEQ '0'
+|   C                     SUB  TL03      TB16
+|   C                     UPDATTB0
+| 02-C                     ENDIF
+|   C*
+|   C                     READ TL0                      42
+|   C*
+| 01-C                     ENDDO
+|    C*
+09===C                     ENDSR
+      *===============================================================*
+     C*          RTN900....陳列借貨  INTPPF
+      *===============================================================*
+09===C           RTN900    BEGSR
+|    C*
+|    C           KEYTP     SETLLTP0
+|    C                     READ TP0                      42
+| 01-C           *IN42     DOWEQ'0'
+|   C           TP03      ANDLEWENDDT
+|   C                     MOVELTP02      WTB03            通路代號
+|   C                     MOVELTP04      WTB04            調出分店
+|   C                     MOVELTP05      WTB05            產品代號
+|   C*
+|   C           KEYTB1    CHAINTB0                  43
+| 02-C           *IN43     IFEQ '0'
+|   C                     ADD  TP06      TB18
+|   C                     UPDATTB0
+| 02-C                     ENDIF
+|   C*
+|   C                     READ TP0                      42
+|   C*
+| 01-C                     ENDDO
+|    C*
+09===C                     ENDSR
+      *===============================================================*
+

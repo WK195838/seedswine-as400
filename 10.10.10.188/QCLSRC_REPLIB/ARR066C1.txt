@@ -1,0 +1,100 @@
+     /***************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266   */
+     /*                                                             */
+     /*    AUTHOR       : AN MING HSIA                              */
+     /*    CREATE DATE  : 81/12/28                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : ARR066C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :銷售分析系統                             */
+     /*    REMARK       :發票作廢排行榜                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&COMPS) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&COMPE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSI08S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSI08E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSI31S) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DSI31E) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMDS) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&YMDE) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&DSEL) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSORT)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&NO)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&MBR)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&IN20) TYPE(*CHAR) LEN(1)
+
+             CHGVAR     VAR(&COMPS)  VALUE(%SST(*LDA 602 1))
+             CHGVAR     VAR(&COMPE)  VALUE(%SST(*LDA 603 1))
+             CHGVAR     VAR(&DSI08S) VALUE(%SST(*LDA 604 5))
+             CHGVAR     VAR(&DSI08E) VALUE(%SST(*LDA 609 5))
+             CHGVAR     VAR(&DSI31S) VALUE(%SST(*LDA 640 6))
+             CHGVAR     VAR(&DSI31E) VALUE(%SST(*LDA 646 6))
+  /*M001M    CHGVAR     VAR(&YMDS)   VALUE(%SST(*LDA 627 6))  +
+             CHGVAR     VAR(&YMDE)   VALUE(%SST(*LDA 633 6))  */
+  /*M001M*/  CHGVAR     VAR(&YMDS)   VALUE(%SST(*LDA 661 8))
+  /*M001M*/  CHGVAR     VAR(&YMDE)   VALUE(%SST(*LDA 671 8))
+             CHGVAR     VAR(&DSEL)   VALUE(%SST(*LDA 652 1))
+             CHGVAR     VAR(&DSORT)  VALUE(%SST(*LDA 653 4))
+
+             CPYF       FROMFILE(REWF60) TOFILE(QTEMP/REWF60) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF60))
+             OVRDBF     FILE(REWF60) TOFILE(QTEMP/REWF60) SHARE(*YES)
+
+             OVRPRTF    FILE(ARR066P) USRDTA('發票作廢')
+             OVRDBF     FILE(SOSIPF) SHARE(*YES)
+             IF         COND(&DSEL = 'A') THEN(DO)
+             OPNQRYF    FILE((SOSIPF)) QRYSLT('SI01A *EQ %RANGE("' +
+                          *CAT &COMPS *CAT '" "' *CAT &COMPE *CAT +
+                          '") & SI08 *EQ %RANGE("' *CAT &DSI08S +
+                          *CAT '" "' *CAT &DSI08E *CAT '") & SI31 +
+                          *EQ %RANGE("' *CAT &DSI31S *CAT '" "' +
+                          *CAT &DSI31E *CAT '") & SI21 *EQ %RANGE(' +
+                          *CAT &YMDS *CAT ' ' *CAT &YMDE *CAT ') & +
+                          SI16 *NE "Y" & (SI19 *EQ "V" | SI33 *GT 1 +
+                          ) & SI08 *NE "A0002" ') KEYFLD((SI31)) +
+                          MAPFLD((SI01A '%SST(SI01 2 1)' *CHAR 1))
+
+             CALL       ARR0661
+             ENDDO
+             ELSE       CMD(DO)
+             OPNQRYF    FILE((SOSIPF)) QRYSLT('SI01A *EQ %RANGE("' +
+                          *CAT &COMPS *CAT '" "' *CAT &COMPE *CAT +
+                          '") & SI08 *EQ %RANGE("' *CAT &DSI08S +
+                          *CAT '" "' *CAT &DSI08E *CAT '") & SI31 +
+                          *EQ %RANGE("' *CAT &DSI31S *CAT '" "' +
+                          *CAT &DSI31E *CAT '") & SI21 *EQ %RANGE(' +
+                          *CAT &YMDS *CAT ' ' *CAT &YMDE *CAT ') & +
+                          SI16 *NE "Y" & (SI19 *EQ "V" | SI33 *GT 1 +
+                          ) & SI08 *NE "A0002" ') KEYFLD((SI08)) +
+                          MAPFLD((SI01A '%SST(SI01 2 1)' *CHAR 1))
+
+             CALL       ARR0662
+             ENDDO
+
+             CALL       ARR0663
+             CLOF       OPNID(SOSIPF)
+
+             DLTOVR     FILE(*ALL)
+
+             CHGVAR     VAR(&P6601I) VALUE('ARR066P')
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+             ENDPGM
+

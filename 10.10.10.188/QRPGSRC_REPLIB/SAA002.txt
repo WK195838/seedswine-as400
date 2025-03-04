@@ -1,0 +1,976 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : SAA002                                     *
+     A*    AUTHOR       : A1084  CHARLES                             *
+     A*    DATE WRITTEN : 81/05/01                                   *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :銷售資料建檔子系統                        *
+     A*    PROCEDURE    :                                            *
+     A*    REMARK       :專櫃目標達成率設定 (A/U/D/I)              *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.08  Y2K MODIFY                    */
+     /*=============================================================*/
+     A****************************************************************
+     FSOSLPF  UF  E           K        DISK                      A
+     F                                              KINFSR ERRSR
+     FSOSLLF  IF  E           K        DISK
+     F            SL0                               KRENAMESL0L
+     FPA#APF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+B2CHKFSAA002D CF  E                    WORKSTN
+B2INF *CVR3009 sev.30 DISPLAY file SAA002D must be converted, because
+B2INF *   field SL02 is shared by name with other database fields which
+B2INF *   require to be expanded. Please convert SAA002D, enlarging SL02
+B2INF *   prior to compilation, or manually insert in this source the
+B2INF *   proper RENAME and MOVE statements to avoid name-sharing.
+     F                                              KINFDS DSPFDS
+     F                                        RRN1  KSFILE SFLSR1
+     E*: FUNCTION DATA :
+     E                    WFUN    6   6  6
+     E*: A/U/D/I AUT
+     E                    WA01        6  1
+     ISDS        SDS
+     I                                     *PROGRAM APPPGM
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+M001AI                                      201 2080DATE
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+     I                                      513 513 $WRHTY
+     I            DS
+     I                                        1   1 DOPT1
+     I                                        1   10WNUM
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *年度
+     I            DS
+      *年度
+     I                                        1   20DSL02
+     I                                        1   20SL021
+     I                                        1   20SL022
+     I                                        1   20SL023
+     I                                        1   20SL024
+     I                                        1   20SL025
+     I                                        1   20SL026
+     I                                        1   20SL027
+     I                                        1   20SL028
+     I                                        1   20SL029
+     I            DS
+     I                                        1   20DSL021
+     I                                        1   20SL0210
+     I                                        1   20SL0211
+     I                                        1   20SL0212
+      *CHECK專櫃
+     I            DS
+     I                                        1   5 DSL01
+     I                                        1   1 DSL01L
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C                     Z-ADD0         HRRN1   40
+     C                     Z-ADD0         DSL02
+     C                     Z-ADD0         DSL021
+     C* FOR F4 PARM
+     C                     MOVE *BLANKS   APPSCR  6        *CTL
+     C                     MOVE *BLANK    PARMI1 10
+     C                     MOVE *BLANK    PARMO1 10
+     C*
+     C                     MOVE *BLANK    WQUERY  1
+     C           *LIKE     DEFN DBGN1     OBGN1            *START KEY
+B2MODC           *LIKE     DEFN DBGN2     OBGN2 + 2        *START KEY
+     C           *LIKE     DEFN DBGN3     OBGN3            *START KEY
+     C*  FOR SUBFILE (SYS+PGM CONTROL)
+     C           *LIKE     DEFN DBGN1     BBGN1            *SUBFIL BUTTOM
+B2MODC           *LIKE     DEFN DBGN2     BBGN2 + 2        *SUBFIL BUTTOM
+     C           *LIKE     DEFN DBGN3     BBGN3            *SUBFIL BUTTOM
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYSL1    KLIST
+     C                     KFLD           DSL01
+M001MC*                    KFLD           DSL02
+M001MC                     KFLD           KSL02   40
+     C                     KFLD           DSL03
+     C           KEYSL2    KLIST
+     C                     KFLD           DBGN1
+M001MC*                    KFLD           DBGN2
+M001MC                     KFLD           KBGN2   40
+     C                     KFLD           DBGN3
+     C           KEYSL3    KLIST
+     C                     KFLD           BBGN1
+     C                     KFLD           BBGN2
+     C                     KFLD           BBGN3
+     C           KEYSL4    KLIST
+     C                     KFLD           SL01
+     C                     KFLD           SL02
+     C                     KFLD           SL03
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+      *
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN06     CASEQ'1'       RTN110
+    C           *IN25     CASEQ'1'       RTN192
+    C                     CAS            RTN170
+  02-C                     END
+    C  N03                EXSR RTN195
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE $ADD      WA01,1
+|    C                     MOVE $UPD      WA01,2
+|    C                     MOVE $DLT      WA01,4
+|    C                     MOVE $INQ      WA01,5
+|    C                     MOVE $INQ      WA01,6
+|    C                     MOVE 'SCR001'  APPSCR
+|    C*CHANGE DATE MM/DD/YY
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*M001D               CALL 'RES001'
+|    C*M001D               PARM 'MDY'     S001I1  3
+|    C*M001D               PARM $EGMDY    S001I2  60
+B2MODC*M001D     DATE      PARM           S001O1  80
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN110....F6(ADD)
+      *==============================================================*
+02===C           RTN110    BEGSR
+|    C*CHECK新增權利
+|    C                     MOVE '1'       DOPT1
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     9099
+| 01*C                     ELSE
+|   C                     EXSR RTN200
+| 02-C           DRRN1     IFGT 0
+|   C           DRRN1     SUB  1         HRRN1
+| 02-C                     END
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 01-C                     END
+|    C                     SETOF                     12
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+03===C           RTN170    BEGSR
+|    C*START KEY
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          DBGN1     IFNE OBGN1
+B2OLDC*          DBGN2     ORNE OBGN2
+B2OLDC*          DBGN3     ORNE OBGN3
+B2NEWC                     MOVE DBGN2     HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    H@4N01  40
+B2NEWC           DBGN1     IFNE OBGN1
+B2NEWC           H@4N01    ORNE OBGN2
+B2NEWC           DBGN3     ORNE OBGN3
+B2INF *CVR0001 sev.00 Field DBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field OBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field DBGN3 is not a date or year
+B2INF *CVR0001 sev.00 Field OBGN3 is not a date or year
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C                     Z-ADD0         HRRN1
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+      *KEY START KEY TO OBGN1
+|   C                     MOVE DBGN1     OBGN1
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    MOVE DBGN2     OBGN2
+B2NEWC                     MOVE DBGN2     HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    OBGN2
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C                     MOVE DBGN3     OBGN3
+| 01*C                     ELSE
+| 02-C****       WRRN1     IFGT 0
+|   C                     EXSR RTN171
+| 03-C           *IN99     IFEQ '0'
+|   C                     Z-ADDRRN1      HRRN1
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 03-C                     END
+| 02-C****                 END
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN171....READC SFL
+      *==============================================================*
+04===C           RTN171    BEGSR
+|    C*
+|    C                     SETON                     54
+|    C*
+|    C                     READCSFLSR1                 5757*NF
+| 01-C           *IN57     DOWEQ'0'                        *40 LOOP
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|   C*
+|   C                     SETOF                     60    *DOP *IND
+| 02-C           *IN99     IFEQ '0'
+|   C*
+| 03-C           DOPT1     IFNE *BLANK
+|   C                     EXSR RTN180                     *CHK
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C                     Z-ADDRRN1      DRRN1
+|   C                     EXSR RTN200
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END                             *IN99
+|   C*
+|   C  N99                MOVE *BLANKS   DOPT1
+|   C                     UPDATSFLSR1
+|   C                     READCSFLSR1                   57*NF
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|   C*
+| 01-C                     END                             *40 END
+| 05-C           *IN99     IFEQ '0'
+|   C                     SETOF                     5412
+|   C                     SETON                     96
+| 05-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN180....CHECK 'SL01' SCREEN
+      *==============================================================*
+05===CSR         RTN180    BEGSR
+|    C*
+|    C* CHK AUT *
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     609099
+| 01-C                     END
+|    C   99                GOTO END180
+|    C*
+|    C           END180    TAG
+|    C   99                Z-ADDRRN1      DRRN1
+|    C*
+05===C                     ENDSR
+      *=========================================================*
+      *          RTN191....INITIAL                              *
+      *=========================================================*
+06===C           RTN191    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     Z-ADD0         DRRN1
+|    C                     Z-ADD0         RRN1
+|    C                     Z-ADD0         WRRN1   40
+|    C                     Z-ADD10        WPRCD1  30
+|    C                     Z-ADD0         DSPRC1  40
+|    C           HRRN1     DIV  WPRCD1    DSPRC1
+|    C                     MULT WPRCD1    DSPRC1
+|    C                     MOVE 'N'       WBOTM1  1
+|    C                     SETOF                     53
+|    C                     SETON                     5254
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+B2???C           KEYSL2    SETLLSL0L
+B2INF *CVR0001 sev.00 Field DBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field SL01 is not a date or year
+B2INF *CVR5006 sev.50 The converter tool cannot handle add/remove century
+B2INF *   between fields DBGN2 and SL02 for key-field usage. Please
+B2INF *   manually define a new KLIST with proper field length and use it
+B2INF *   instead
+B2INF *CVR0001 sev.00 Field DBGN3 is not a date or year
+B2INF *CVR0001 sev.00 Field SL03 is not a date or year
+|    C                     MOVE DBGN1     BBGN1
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    MOVE DBGN2     BBGN2
+B2NEWC                     MOVE DBGN2     HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    BBGN2
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|    C                     MOVE DBGN3     BBGN3
+|    C*
+06===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+07===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTM1    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN1      DRRN1
+| 01*C                     ELSE
+|   C*SCREEN1 START KEY
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          BBGN1     IFNE DBGN1
+B2OLDC*          BBGN2     ORNE DBGN2
+B2OLDC*          BBGN3     ORNE DBGN3
+B2NEWC                     MOVE DBGN2     HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    H@4N01  40
+B2NEWC           BBGN1     IFNE DBGN1
+B2NEWC           BBGN2     ORNE H@4N01
+B2NEWC           BBGN3     ORNE DBGN3
+B2INF *CVR0001 sev.00 Field BBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field DBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field BBGN3 is not a date or year
+B2INF *CVR0001 sev.00 Field DBGN3 is not a date or year
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+B2000C           KEYSL3    SETGTSL0L
+| 02-C                     END
+|   C                     EXSR RTN193
+|   C*KEEP SCREEN1 START KEY TO BBGN1
+|   C                     MOVE SL01      BBGN1
+B2000C                     Z-ADDSL02      BBGN2
+|   C                     MOVE SL03      BBGN3
+|   C           *LOVAL    SETLLSL0L
+| 01-C                     END
+|    C*
+07===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+08===C           RTN193    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     SETOF                     54
+|    C                     Z-ADDWRRN1     RRN1
+|    C                     ADD  WPRCD1    DSPRC1
+| 01-C           RRN1      DOWLTDSPRC1
+|   C                     READ SL0L                     46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C*GET SFL DATA
+|   C                     EXSR RTN194                     *GET DATA
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+| 02*C                     ELSE
+|   C                     Z-ADDRRN1      DSPRC1
+|   C                     MOVE 'Y'       WBOTM1
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN1      DRRN1      50
+|    C                     Z-ADDRRN1      WRRN1
+|    C*
+08===C                     ENDSR
+      *=========================================================*
+      *          RTN194 .. GET DATA
+      *=========================================================*
+09===C           RTN194    BEGSR
+|    C* GET 客戶專櫃
+|    C                     MOVE *BLANKS   ME04
+|    C                     MOVELSL01      ME01
+|    C                     MOVEL*BLANKS   ME02
+|    C           KEYME     CHAINME0                  40
+|    C* GET 產品
+|    C                     MOVE *BLANKS   D#A03
+|    C                     MOVEL'ID'      #A01
+|    C                     MOVELSL03      #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      D#A03
+| 01-C                     END
+|    C*
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+10===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN1      IFLE *ZEROS
+|   C                     SETON                     95    *NODATA
+| 01*C                     ELSE
+|   C                     SETON                     50
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     Z-ADD0         D#ROW
+|    C                     Z-ADD0         D#COL
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN200....'SC02' SCREEN MAIN ROUTINE
+      *==============================================================*
+11===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE 'SCR002'  APPSCR
+|    C                     MOVE WFUN,WNUM DFUN
+| 01-C           DOPT1     CASEQ'1'       RTN210           *ADD
+|   C           DOPT1     CASEQ'2'       RTN220           *UPD
+|   C           DOPT1     CASEQ'4'       RTN230           *DEL
+|   C           DOPT1     CASEQ'5'       RTN240           *INQ
+| 01-C                     END
+|    C*
+|    C           *LOVAL    SETLLSL0
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN210....ADD DATA
+      *==============================================================*
+12===C           RTN210    BEGSR
+|    C*
+|    C                     SETON                     3031  *ADD MSG
+|    C                     EXSR RTN261                     *CLR FIELD
+|    C*
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C                     EXFMTDSPD2
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+|   C           *IN12     ANDEQ'0'
+|   C**IN04 = WINDOW TO HELP
+| 03-C           *IN04     CASEQ'1'       RTNF4
+|   C           *IN05     CASEQ'1'       RTN270
+|   C*ENTER = PROCESS
+|   C                     CAS            RTN280
+| 03-C                     END
+|   C*
+| 04-C           *IN99     IFEQ '0'
+|   C                     EXSR RTN29S
+|   C                     WRITESL0
+|   C                     MOVE 'SCR001'  APPSCR
+| 04-C                     END
+|   C*
+| 02*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN220....UPD DATA
+      *==============================================================*
+13===C           RTN220    BEGSR
+|    C*
+|    C                     SETOF                     30
+|    C                     SETON                     31    *CAN INPUT
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+|    C           KEYSL4    CHAINSL0                  40
+     C           *LOVAL    SETLLSL0
+|    C                     EXSR RTN262                     *FILE->SCRN
+| 01-C           *IN03     DOWEQ'0'
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C*
+| 04-C           *IN04     CASEQ'1'       RTNF4
+|   C           *IN05     CASEQ'1'       RTN270
+|   C                     CAS            RTN280
+| 04-C                     END
+|   C*
+| 05-C           *IN99     IFEQ '0'
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+B2???C           KEYSL1    CHAINSL0                  41
+B2INF *CVR0001 sev.00 Field DSL01 is not a date or year
+B2INF *CVR0001 sev.00 Field SL01 is not a date or year
+B2INF *CVR5006 sev.50 The converter tool cannot handle add/remove century
+B2INF *   between fields DSL02 and SL02 for key-field usage. Please
+B2INF *   manually define a new KLIST with proper field length and use it
+B2INF *   instead
+B2INF *CVR0001 sev.00 Field DSL03 is not a date or year
+B2INF *CVR0001 sev.00 Field SL03 is not a date or year
+|   C                     EXSR RTN29S
+|   C                     UPDATSL0
+|   C                     MOVE 'SCR001'  APPSCR
+| 05-C                     END
+|   C*
+| 03*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 03-C                     END
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+13===C                     ENDSR
+      *==============================================================*
+      *          RTN230....DEL DATA
+      *==============================================================*
+14===C           RTN230    BEGSR
+|    C*
+|    C                     SETOF                     3031  *NO INPUT
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+|    C           KEYSL4    CHAINSL0                  40
+     C           *LOVAL    SETLLSL0
+|    C                     EXSR RTN262                     *FIEL->SCRN
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C                     CALL 'WDS000'
+|   C                     PARM 'N'       DLTFLG  1
+| 04-C           DLTFLG    IFEQ 'Y'
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+B2???C           KEYSL1    CHAINSL0                  41
+B2INF *CVR0001 sev.00 Field DSL01 is not a date or year
+B2INF *CVR0001 sev.00 Field SL01 is not a date or year
+B2INF *CVR5006 sev.50 The converter tool cannot handle add/remove century
+B2INF *   between fields DSL02 and SL02 for key-field usage. Please
+B2INF *   manually define a new KLIST with proper field length and use it
+B2INF *   instead
+B2INF *CVR0001 sev.00 Field DSL03 is not a date or year
+B2INF *CVR0001 sev.00 Field SL03 is not a date or year
+|   C                     DELETSL0
+|   C                     MOVE 'SCR001'  APPSCR
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 03-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+14===C                     ENDSR
+      *==============================================================*
+      *          RTN240....INQ DATA
+      *==============================================================*
+15===C           RTN240    BEGSR
+|    C*
+|    C                     SETOF                     3031  *NO INPUT
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+|    C           KEYSL4    CHAINSL0L                 40
+|    C                     EXSR RTN262                     *FIEL->SCRN
+| 01-C           *IN03     DOWEQ'0'                        *CTL LOOP
+|   C           *IN12     ANDEQ'0'
+|   C           APPSCR    ANDEQ'SCR002'
+|   C*
+|   C                     EXFMTDSPD2
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+M001AC                     MOVE X02       HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    SL02
+M001AC                     MOVE DBGN2     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KBGN2
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C                     Z-ADD0         D#ROW
+|   C                     Z-ADD0         D#COL
+|   C*
+| 02-C           *IN03     IFEQ '0'
+| 03-C           *IN12     IFEQ '0'
+|   C                     MOVE 'SCR001'  APPSCR
+| 03*C                     ELSE
+|   C                     MOVE 'SCR001'  APPSCR
+| 03-C                     END
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+15===C                     ENDSR
+      *==============================================================*
+      *          RTN261....CLEAR SCREEN DATA
+      *==============================================================*
+16===CSR         RTN261    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DSL01
+|    C                     Z-ADD0         DSL02
+|    C                     Z-ADD0         DSL021
+|    C                     MOVE *BLANK    DSL03
+|    C                     Z-ADD0         DSL04
+|    C                     Z-ADD0         DSL05
+|    C                     Z-ADD0         DSL06
+|    C                     Z-ADD0         DSL07
+|    C                     Z-ADD0         DSL08
+|    C                     Z-ADD0         DSL09
+|    C                     Z-ADD0         DSL10
+|    C                     Z-ADD0         DSL11
+|    C                     Z-ADD0         DSL12
+|    C                     Z-ADD0         DSL13
+|    C                     Z-ADD0         DSL14
+|    C                     Z-ADD0         DSL15
+|    C                     Z-ADD0         DSL16
+|    C*REF FIELDS
+|    C                     MOVE *BLANKS   D#A03
+|    C                     MOVE *BLANKS   ME04
+|    C*
+16===CSR                   ENDSR
+      *==============================================================*
+      *          RTN262....MOVE DATA TO SCREEN
+      *==============================================================*
+17===CSR         RTN262    BEGSR
+|    C*
+|    C                     MOVE SL01      DSL01
+B2TRCC                     Z-ADDSL02      DSL02
+B2CHKC           DSL02     ADD  1         DSL021
+|    C                     MOVE SL03      DSL03
+|    C                     Z-ADDSL04      DSL04
+|    C                     Z-ADDSL05      DSL05
+|    C                     Z-ADDSL06      DSL06
+|    C                     Z-ADDSL07      DSL07
+|    C                     Z-ADDSL08      DSL08
+|    C                     Z-ADDSL09      DSL09
+|    C                     Z-ADDSL10      DSL10
+|    C                     Z-ADDSL11      DSL11
+|    C                     Z-ADDSL12      DSL12
+|    C                     Z-ADDSL13      DSL13
+|    C                     Z-ADDSL14      DSL14
+|    C                     Z-ADDSL15      DSL15
+|    C                     Z-ADDSL16      DSL16
+|    C* GET 客戶專櫃
+|    C                     MOVE *BLANKS   ME04
+|    C                     MOVELDSL01     ME01
+|    C                     MOVEL*BLANKS   ME02
+|    C           KEYME     CHAINME0                  40
+|    C* GET 產品
+|    C                     MOVE *BLANKS   D#A03
+|    C                     MOVEL'ID'      #A01
+|    C                     MOVELDSL03     #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      D#A03
+| 01-C                     END
+|    C*
+17===CSR                   ENDSR
+      *==============================================================*
+      *          RTN270....F5 -- 參考資料
+      *==============================================================*
+18===CSR         RTN270    BEGSR
+|    C*
+|    C                     EXSR RTN280
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+| 01-C           *IN99     IFEQ '0'
+|   C           #CSR      DIV  256       D#ROW            *ROW
+|   C                     MVR            D#COL            *COL
+| 01-C                     END
+|    C                     SETON                     99
+|    C*
+18===C                     ENDSR
+      *==============================================================*
+      *          RTN280....CHECK 'SC02' SCREEN
+      *==============================================================*
+19===CSR         RTN280    BEGSR
+|    C* GET 專櫃
+|    C                     MOVE *BLANKS   ME04
+| 01-C           DSL01     IFEQ *BLANKS
+|   C                     SETON                     609499
+| 01*C                     ELSE
+      *
+|   C                     MOVELDSL01     ME01
+|   C                     MOVEL*BLANKS   ME02
+|   C           KEYME     CHAINME0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     SETON                     608999
+| 02*C                     ELSE
+| 03-C           DSL01L    IFNE 'B'
+|   C                     SETON                     608899
+| 03-C                     END
+| 02-C                     END
+| 01-C                     END
+|    C   99                GOTO END280
+      *年度
+B2CHKC*M001D     DSL02     IFEQ 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|   C*M001D               SETON                     619499
+| 04-C*M001D               END
+|    C*  99                GOTO END280
+B2CHKC           DSL02     ADD  1         DSL021
+|    C* GET 產品識別
+|    C                     MOVE *BLANKS   D#A03
+| 05-C           DSL03     IFEQ *BLANKS
+|   C                     SETON                     629499
+| 05*C                     ELSE
+|   C                     MOVEL'ID'      #A01
+|   C                     MOVELDSL03     #A02
+|   C           KEY#A     CHAIN#A0                  40
+| 06-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      D#A03
+| 06*C                     ELSE
+|   C                     SETON                     628999
+| 06-C                     END
+| 05-C                     END
+|    C   99                GOTO END280
+      *
+M001AC                     MOVE DSL02     HB2@YY  2
+M001AC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+M001AC                     MOVE HB2@Y4    KSL02
+B2???C           KEYSL1    SETLLSL0                      40
+B2INF *CVR0001 sev.00 Field DSL01 is not a date or year
+B2INF *CVR0001 sev.00 Field SL01 is not a date or year
+B2INF *CVR5006 sev.50 The converter tool cannot handle add/remove century
+B2INF *   between fields DSL02 and SL02 for key-field usage. Please
+B2INF *   manually define a new KLIST with proper field length and use it
+B2INF *   instead
+B2INF *CVR0001 sev.00 Field DSL03 is not a date or year
+B2INF *CVR0001 sev.00 Field SL03 is not a date or year
+| 07-C           DOPT1     IFEQ '1'
+| 08-C           *IN40     IFEQ '1'
+|   C                     SETON                     606165
+|   C                     SETON                     669299
+| 08-C                     END
+| 07*C                     ELSE
+| 09-C           *IN40     IFEQ '0'
+|   C                     SETON                     606165
+|   C                     SETON                     669399
+| 09-C                     END
+| 07-C                     END
+|    C   99                GOTO END280
+      *DSL04
+|    C           DSL05     ADD  DSL06     DSL04
+|    C                     ADD  DSL07     DSL04
+|    C                     ADD  DSL08     DSL04
+|    C                     ADD  DSL09     DSL04
+|    C                     ADD  DSL10     DSL04
+|    C                     ADD  DSL11     DSL04
+|    C                     ADD  DSL12     DSL04
+|    C                     ADD  DSL13     DSL04
+|    C                     ADD  DSL14     DSL04
+|    C                     ADD  DSL15     DSL04
+|    C                     ADD  DSL16     DSL04
+      *
+19===CSR         END280    ENDSR
+     C*==============================================================*
+     C*          RTN29S....SCREEN TO FILE --- H
+     C*==============================================================*
+20===C           RTN29S    BEGSR
+      *
+|    C                     MOVE DSL01     SL01
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADDDSL02     SL02
+B2NEWC                     MOVE DSL02     HB2@YY  2
+B2NEWC                     EXSR HB@24Y                     + CENTURY 2->4 YEAR
+B2NEWC                     MOVE HB2@Y4    SL02
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|    C                     MOVE DSL03     SL03
+|    C                     Z-ADDDSL04     SL04
+|    C                     Z-ADDDSL05     SL05
+|    C                     Z-ADDDSL06     SL06
+|    C                     Z-ADDDSL07     SL07
+|    C                     Z-ADDDSL08     SL08
+|    C                     Z-ADDDSL09     SL09
+|    C                     Z-ADDDSL10     SL10
+|    C                     Z-ADDDSL11     SL11
+|    C                     Z-ADDDSL12     SL12
+|    C                     Z-ADDDSL13     SL13
+|    C                     Z-ADDDSL14     SL14
+|    C                     Z-ADDDSL15     SL15
+|    C                     Z-ADDDSL16     SL16
+|    C*
+B2000C                     Z-ADDDATE      SLXX
+B2000C                     TIME           SLYY
+|    C                     MOVE $USER     SLZZ
+|    C*
+|    C*
+20===C                     ENDSR
+     C*==============================================================*
+     C*          RTN990....AUT CHK (CALL SUBPGM)
+     C*==============================================================*
+21===C           RTN990    BEGSR
+|    C*
+|    C                     CALL 'S#S01'
+|    C                     PARM $USER     S0101I 10
+|    C                     PARM           S0102I 10
+|    C                     PARM           S0101O  1
+| 01-C           S0101O    IFEQ 'N'
+|   C                     SETON                     9099
+| 01-C                     END
+|    C*
+21===C                     ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+22===C           RTNF4     BEGSR
+|    C*
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+|    C********************
+|    C*  FOR  SCR002     *
+|    C********************
+| 01-C           APPSCR    IFEQ 'SCR002'
+|   C** 客戶專櫃
+| 02-C           D#ROW     IFEQ 6
+|   C           D#COL     ANDGE13
+|   C           D#COL     ANDLE17
+|   C                     CALL 'WDS003'
+|   C                     PARM           S003O1  9
+|   C                     MOVELS003O1    DSL01
+| 02-C                     END
+|   C*
+|   C** 產品識別
+| 03-C           D#ROW     IFEQ 8
+|   C           D#COL     ANDGE13
+|   C           D#COL     ANDLE14
+|   C                     CALL 'WDS012'
+|   C                     PARM 'ID'      S012I1  8
+|   C                     PARM           S012O1 10
+|   C                     MOVELS012O1    DSL03
+| 03-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     SETON                     99
+|    C*
+22===C           ENDF4     ENDSR
+     C*==============================================================*
+     C*          ERRSR ....DATA LOCK ROUTINE
+     C*==============================================================*
+23===C           ERRSR     BEGSR
+|    C*
+|    C                     CALL 'P50'
+|    C           DMSG      PARM           P5001O 78
+|    C                     SETON                     9799
+|    C*
+23===C                     ENDSR'*DETC'
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2NEWC/COPY HBP2CVTR
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+**
+新增修改      刪除查詢採購
+

@@ -1,0 +1,211 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM-ID   : SER0102                                    *
+     H*    PROGRAM NAME :通路無銷售資料異常表                      *
+     H*    AUTHOR       : A1491 EASON                                *
+     H*    CREATE DATE  : 97/10/28                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :採購管理                                  *
+     H****************************************************************
+     FSEHAPF  IP  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FMANDPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FSCWK17  O   E           K        DISK
+     FSER020P O   E             39     PRINTER
+     E*---------------------------------------------------------------
+     IHA0
+     I                                              HA03  L3
+     I                                              HA04  L2
+     I                                              HA05  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      550 550 @K01
+     I                                      601 602 DHA01
+     I                                      603 604 DHA02
+     I                                      605 6100DHA03S
+     I                                      611 6160DHA03E
+     I                                      617 617 DATA
+     I                                      641 6480DATES
+     I                                      651 6580DATEE
+     I                                      661 6680WHA03S
+     I                                      671 6780WHA03E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYND     KLIST
+     C                     KFLD           DHA01
+     C                     KFLD           DHA02
+     C           KEYNE     KLIST
+     C                     KFLD           DHA01
+     C                     KFLD           DHA02
+     C                     KFLD           HA04
+     C           KEY#B     KLIST
+     C                     KFLD           DHA01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39                EXSR RTN900
+     C*
+     C           KEYNE     CHAINMANEPF               40
+     C   40                MOVEL*BLANK    NE05
+     C* GET轉換日期
+     C                     CALL 'P31'
+     C                     PARM HA03      P3101I  80
+     C                     PARM '2'       P3102I  1
+     C                     PARM '1'       P3103I  1
+     C                     PARM '3'       P3104I  1
+     C                     PARM '1'       P3105I  1
+     C           SHA03     PARM           P3101O  80
+     C*
+     C                     ADD  HA08      PHA08
+     C                     ADD  HA08      Q2
+     C                     ADD  HA08      Q4
+     C                     ADD  HA08      THA08
+     C*
+     C*
+     CL1 10                EXSR RTNL0
+     CL2 10                EXSR RTNL1
+     CL3 10                EXSR RTNL2
+     CLR 10                EXSR RTNL3
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN010....GET HEADING
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C* GET公司別
+|    C                     MOVELDHA01     W1701
+|    C                     MOVEL*BLANK    D#B03
+|    C           KEY#B     CHAINPA#BPF               40
+|    C  N40                MOVEL#B03      D#B03
+|    C*
+|    C           KEYND     CHAINMANDPF               40
+|    C  N40                MOVELND04      DND04     P
+|    C   40                MOVEL*BLANK    DND04
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C                     SETON                     303132
+|    C*
+|    C                     Z-ADD*ZERO     PHA07
+|    C                     Z-ADD*ZERO     PHA08
+|    C                     Z-ADD*ZERO     Q1
+|    C                     Z-ADD*ZERO     Q2
+|    C                     Z-ADD*ZERO     Q3
+|    C                     Z-ADD*ZERO     Q4
+|    C                     Z-ADD*ZERO     THA07   90
+|    C                     Z-ADD*ZERO     THA08   90
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTNWK  ... WRIET WORKFILE
+      *==============================================================*
+02===C           RTNWK     BEGSR
+|    C*
+|    C                     Z-ADDHA03      W1702
+|    C                     MOVELHA04      W1703
+|    C                     MOVELNE05      W1704
+|    C                     Z-ADDPHA07     W1705
+|    C                     Z-ADDPHA08     W1706
+|    C                     WRITEW17
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTNL0  ...依產品計算未稅金額
+      *==============================================================*
+03===C           RTNL0     BEGSR
+|    C*
+     C           THA08     DIV  1.05      THA07     H
+     C                     ADD  THA07     PHA07
+     C                     ADD  THA07     Q1
+     C                     ADD  THA07     Q3
+     C                     Z-ADD0         THA08
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL1  ...到分店日期小計
+      *==============================================================*
+03===C           RTNL1     BEGSR
+|    C*
+|    C                     EXSR RTNWK
+|    C                     WRITEPD1
+|    C                     SETOF                     30
+|    C*
+|    C                     Z-ADD*ZERO     PHA07
+|    C                     Z-ADD*ZERO     PHA08
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL2  ...到分店日期小計
+      *==============================================================*
+04===C           RTNL2     BEGSR
+|    C*
+|    C                     SETON                     30
+|    C                     WRITEPD2
+|    C*
+|    C                     Z-ADD*ZERO     PHA07
+|    C                     Z-ADD*ZERO     PHA08
+|    C                     Z-ADD*ZERO     Q1
+|    C                     Z-ADD*ZERO     Q2
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNL3 ....總計
+      *==============================================================*
+05===C           RTNL3     BEGSR
+|    C*
+|    C                     SETON                     30
+|    C                     WRITEPD3
+|    C*
+|    C                     Z-ADD*ZERO     PHA07
+|    C                     Z-ADD*ZERO     PHA08
+|    C                     Z-ADD*ZERO     Q1
+|    C                     Z-ADD*ZERO     Q2
+|    C                     Z-ADD*ZERO     Q3
+|    C                     Z-ADD*ZERO     Q4
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C           KEY#B     CHAINPA#BPF               40
+|    C   40                MOVEL*BLANK    D#B03     P
+|    C  N40                MOVEL#B03      D#B03     P
+|    C           KEYND     CHAINMANDPF               40
+|    C   40                MOVEL*BLANK    DND04     P
+|    C  N40                MOVELND04      DND04     P
+|    C                     WRITEPH1
+|    C*
+|    C                     SETON                     303132
+|    C                     SETOF                     39
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+07===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C           KEY#B     CHAINPA#BPF               40
+|   C   40                MOVEL*BLANK    D#B03     P
+|   C  N40                MOVEL#B03      D#B03     P
+|   C           KEYND     CHAINMANDPF               40
+|   C   40                MOVEL*BLANK    DND04     P
+|   C  N40                MOVELND04      DND04     P
+|   C                     WRITEPH1
+|   C                     WRITEPE3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+07===C                     ENDSR
+

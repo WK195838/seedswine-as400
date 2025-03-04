@@ -1,0 +1,300 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM-ID   : PUC0411                                    *
+     H*    PROGRAM NAME :運費月結處理                              *
+     H*    AUTHOR       : A1491 EASON                                *
+     H*    CREATE DATE  : 97/10/21                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :採購管理                                  *
+     H****************************************************************
+     FPA#BPF  IF  E           K        DISK
+     FC#EJPF  UF  E           K        DISK
+     FPOCKPF  UF  E           K        DISK
+     FPUC0411PO   E             38     PRINTER
+     FPUC0412PO   E             39     PRINTER
+     E*---------------------------------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      203 2080DDATE
+     I                                      125 1270$CPY
+     I                                      201 2080$EG8
+     I                                      217 218 $PRTCD
+     I                                      219 219 $PENV
+     I                                      500 500 $DATA
+      *
+     I                                      501 502 DCK01
+     I                                      505 5080DCK02
+     I                                      510 5150WCK02
+     I                                      520 520 @A01
+     I                                      530 5300@WWW
+     I                                      521 5280SEJ07
+     I                                      531 5380SEJ08
+     I            DS
+     I                                        1   60WYM
+     I                                        1   40WYY
+     I                                        5   60WMM
+     I            DS
+     I                                        1   80W1YMD
+     I                                        1   40W1YY
+     I                                        5   60W1MM
+     I                                        1   60W1YM
+     C*                    DEFN
+     C*==============================================================*
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+      *
+      *
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010
+      *判斷是否有資料
+     C                     EXSR RTN100
+      *有資料
+  01-C           $DATA     IFEQ 'Y'
+    C                     EXSR RTN200
+     *沒有錯誤
+  02-C           @A01      IFEQ *BLANK
+    C                     EXSR RTN300
+  02-C                     ENDIF
+     *
+  01-C                     ENDIF
+      *
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010... INITIAL
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVEL*BLANK    @A01
+|    C                     Z-ADD0         WDATE   80
+|    C                     Z-ADD0         TDATE   80
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100... DETAIL
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|     *
+|    C           *LOVAL    SETLLCK0
+|    C                     READ CK0                      46
+| 01-C           *IN46     IFEQ '0'
+|   C                     MOVEL'Y'       $DATA
+| 01*C                     ELSE
+|   C                     MOVEL'N'       $DATA
+| 01-C                     ENDIF
+|     *
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200.. 異常報表
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|     *
+|     *尚未確認的箱數資料
+|    C           *LOVAL    SETLLCK0
+|    C                     READ CK0                      46
+| 01-C           *IN46     DOWEQ'0'
+| 02-C           CK17      IFNE 'V'
+|   C                     MOVEL'2'       @A01
+|   C                     GOTO EASON
+| 02-C                     ENDIF
+|   C                     READ CK0                      46
+| 01-C                     ENDDO
+|     *
+|    C                     MOVEL*BLANK    Q1      1
+|     *
+|     *單件運費異常
+|    C           *LOVAL    SETLLCK0
+|    C                     READ CK0                      46
+| 03-C           *IN46     DOWEQ'0'
+| 04-C*          CK06      IFEQ '1'                        980308取消
+|    *
+|   C                     CALL 'GET005'
+|   C                     PARM CK07      T0051I  1
+|   C                     PARM CK09      T0052I  1
+|   C                     PARM CK03      T0053I  80
+|   C                     PARM           T0051O  40
+| 05-C           T0051O    IFEQ 0
+|    *
+|   C                     MOVEL'3'       @A01
+|    *
+| 06-C           Q1        IFEQ *BLANK
+|   C                     EXSR RTN210
+|   C                     MOVEL'Y'       Q1
+| 06-C                     ENDIF
+|    *
+| 07-C           *IN38     IFEQ '1'
+|   C                     EXSR RTN210
+|   C                     SETOF                     38
+| 07-C                     ENDIF
+|    *
+|   C                     Z-ADDCK04      WDATE
+|   C                     EXSR RTN31A
+|   C                     Z-ADDTDATE     SCK04
+|   C                     WRITEPD1
+|    *
+| 05-C                     ENDIF
+|    *
+| 04-C*                    ENDIF                           980308取消
+|   C                     READ CK0                      46
+| 03-C                     ENDDO
+|     *
+|    C                     MOVEL*BLANK    Q1
+|     *最低運費異常
+|    C           *LOVAL    SETLLCK0
+|    C                     READ CK0                      46
+| 08-C           *IN46     DOWEQ'0'
+| 09-C*          CK06      IFEQ '1'                        980308取消
+|    *
+|   C                     CALL 'GET006'
+|   C                     PARM CK07      T0061I  1
+|   C                     PARM CK09      T0062I  1
+|   C                     PARM CK03      T0063I  80
+|   C                     PARM           T0061O  40
+| 10-C           T0061O    IFEQ 0
+|    *
+|   C                     MOVEL'4'       @A01
+|    *
+| 11-C           Q1        IFEQ *BLANK
+|   C                     EXSR RTN210
+|   C                     MOVEL'Y'       Q1
+| 11-C                     ENDIF
+|    *
+| 12-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN210
+|   C                     SETOF                     38
+| 12-C                     ENDIF
+|    *
+|   C                     Z-ADDCK04      WDATE
+|   C                     EXSR RTN31A
+|   C                     Z-ADDTDATE     SCK04
+|   C                     WRITEPD1A
+|    *
+| 10-C                     ENDIF
+|    *
+| 09-C*                    ENDIF                           980308取消
+|   C                     READ CK0                      46
+| 08-C                     ENDDO
+|     *
+03===C           EASON     ENDSR
+     C*==============================================================*
+     C*          RTN210.. 寫異常表
+     C*==============================================================*
+04===C           RTN210    BEGSR
+|     *
+|    C                     MOVELCK01      DCK01
+|    C           DCK01     CHAIN#B0                  40
+|    C  N40                MOVEL#B03      D#B03
+|    C   40                MOVEL*BLANK    D#B03
+| 01-C           @A01      IFEQ '3'
+|   C                     WRITEPH1
+| 01-C                     ENDIF
+| 02-C           @A01      IFEQ '4'
+|   C                     WRITEPH1A
+| 02-C                     ENDIF
+|     *
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN300.. 更新資料以及計算
+     C*==============================================================*
+05===C           RTN300    BEGSR
+|     *
+|    C           *LOVAL    SETLLCK0
+|    C                     READ CK0                      46
+| 01-C           *IN46     DOWEQ'0'
+|    *
+|   C                     Z-ADD0         CK13
+|   C                     Z-ADD0         CK14
+|    *一般運送
+| 02-C*          CK06      IFEQ '1'                        980308取消
+|    *  運費計算
+|   C                     CALL 'GET005'                   單件運費
+|   C                     PARM CK07      T0051I  1
+|   C                     PARM CK09      T0052I  1
+|   C                     PARM CK03      T0053I  80
+|   C                     PARM           T0051O  40
+|   C                     Z-ADDT0051O    CK13
+|   C           CK12      MULT CK13      CK14
+| 02-C*                    ENDIF                           980308取消
+|    *
+|   C                     MOVEL'P'       CK17
+|   C                     MOVEL*BLANK    CKWW
+|   C                     MOVEL'PUC0412' CKWW
+|   C                     Z-ADD$EG8      CKXX
+|   C                     TIME           CKYY
+|   C                     MOVEL$USER     CKZZ
+|   C                     UPDATCK0
+|    *
+|   C                     READ CK0                      46
+| 01-C                     ENDDO
+|     *
+|    C                     MOVEL'1'       @A01
+|    C*
+|    C*運費月結參數檔更新年月份
+|    C           DCK01     CHAINEJ0                  40
+|    C           EJ02      ADD  1         WYM
+| 03-C           WMM       IFGT 12
+|   C                     Z-ADD1         WMM
+|   C                     ADD  1         WYY
+| 03-C                     ENDIF
+|   C                     Z-ADDEJ07      W1YMD
+|   C                     EXSR RTN70A
+|   C                     Z-ADDW1YMD     EJ07             下月區間起日
+|   C                     Z-ADDEJ08      W1YMD
+|   C                     EXSR RTN70A
+|   C                     Z-ADDW1YMD     EJ08             下月區間訖日
+|    C                     Z-ADDWYM       EJ02
+|    C                     MOVEL*BLANK    EJ03
+|    C                     MOVEL*BLANK    EJ04
+|    C                     MOVEL*BLANK    EJ05
+|    C                     MOVEL*BLANK    EJWW
+|    C                     MOVEL'PUC0412' EJWW
+|    C                     Z-ADD$EG8      EJXX
+|    C                     TIME           EJYY
+|    C                     MOVEL$USER     EJZZ
+|    C                     UPDATEJ0
+|     *
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN31A....CALL P31
+     C*==============================================================*
+06===C           RTN31A    BEGSR
+|     *
+|    C                     CALL 'P31'
+|    C                     PARM WDATE     P31I1   80
+|    C                     PARM '2'       P3112   1
+|    C                     PARM '1'       P31I3   1
+|    C                     PARM '3'       P31I4   1
+|    C                     PARM '1'       P31I5   1
+|    C           TDATE     PARM           P31IO   80
+|     *
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN31B....CALL P31
+     C*==============================================================*
+07===C           RTN31B    BEGSR
+|     *
+|    C                     CALL 'P31'
+|    C                     PARM WDATE     P31I1   80
+|    C                     PARM '3'       P3112   1
+|    C                     PARM '1'       P31I3   1
+|    C                     PARM '2'       P31I4   1
+|    C                     PARM '1'       P31I5   1
+|    C           TDATE     PARM           P31IO   80
+|     *
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN70A....推算下一月份
+      *==============================================================*
+30===CSR         RTN70A    BEGSR
+|    C*
+|    C                     ADD  1         W1MM
+| 01-C           W1MM      IFGT 12
+|   C                     ADD  1         W1YY
+|   C                     Z-ADD1         W1MM
+| 01-C                     ENDIF
+|    C*
+30===CSR         END70A    ENDSR
+

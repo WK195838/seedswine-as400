@@ -1,0 +1,99 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : ANDY                                      */
+     /*    CREATE DATE  : 81/05/15                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : SAR043C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款作業                             */
+     /*    REMARK       :業務員業績報表                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&IN20) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSC28S) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DSC28E) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DSC27S) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DSC27E) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATES)  TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YYMM)  TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DATA)   TYPE(*CHAR) LEN(1)
+
+             CPYF       FROMFILE(REWF12) TOFILE(QTEMP/REWF12) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF12))
+             OVRDBF     FILE(REWF12) TOFILE(QTEMP/REWF12) SHARE(*YES)
+
+
+     /*  禮盒拆單瓶 */
+             CPYF       FROMFILE(RES18WF) TOFILE(QTEMP/RES18WF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/RES18WF))
+             OVRDBF     FILE(RES18WF) TOFILE(QTEMP/RES18WF) SHARE(*YES)
+
+
+             CHGVAR     VAR(&DSC28S) VALUE(%SST(*LDA 601 4))
+             CHGVAR     VAR(&DSC28E) VALUE(%SST(*LDA 605 4))
+             CHGVAR     VAR(&DSC27S) VALUE(%SST(*LDA 611 6))
+             CHGVAR     VAR(&DSC27E) VALUE(%SST(*LDA 617 6))
+             CHGVAR     VAR(&DATES)  VALUE(%SST(*LDA 642 6))
+             CHGVAR     VAR(&YYMM)  VALUE(%SST(*LDA 642 4))
+             CHGVAR     VAR(&DATA)   VALUE(%SST(*LDA 641 1))
+             CHGVAR     VAR(&IN20)   VALUE(%SST(*LDA 750 1))
+
+             OVRPRTF    FILE(SAR043P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('業務業績')
+             OVRDBF     FILE(SOSCPF) SHARE(*YES)
+
+             IF         COND(&IN20 = '0') THEN(DO)
+             OPNQRYF    FILE((SOSCPF)) QRYSLT(' (SC28 *EQ %RANGE("' +
+                          *CAT &DSC28S *CAT '" "' *CAT &DSC28E *CAT +
+                          '")) & (SC27 *EQ %RANGE("' *CAT &DSC27S +
+                          *CAT '" "' *CAT &DSC27E *CAT '")) *AND  +
+                          (CSC081 *EQ "' *CAT &YYMM *CAT '") & +
+                          (SC08 *LE ' *CAT &DATES *CAT ') *AND  +
+                          SC35 *NE "T" *AND SC13 *NE "*" ') +
+                          KEYFLD((SC28) (SC27) (SC02)) +
+                          MAPFLD((SC081 SC08 *CHAR 6) (CSC081 +
+                          '%SST(SC081 1 4)' *CHAR 4))
+
+             ENDDO
+             ELSE       CMD(DO)
+
+             OPNQRYF    FILE((SOSCPF)) QRYSLT(' (SC28 *EQ %RANGE("' +
+                          *CAT &DSC28S *CAT '" "' *CAT &DSC28E *CAT +
+                          '")) & (SC27 *EQ %RANGE("' *CAT &DSC27S +
+                          *CAT '" "' *CAT &DSC27E *CAT '")) *AND  +
+                          (SC391 *EQ "' *CAT &YYMM *CAT '") & (SC39 +
+                          *LE ' *CAT &DATES *CAT ') *AND  SC35 *NE +
+                          "T" *AND SC13 *EQ "V" ') KEYFLD((SC28) +
+                          (SC27) (SC02)) MAPFLD((SC391 SC39 *CHAR +
+                          6) (CSC391 '%SST(SC391 1 4)' *CHAR 4))
+
+             ENDDO
+             CALL       SAR0431
+             CALL       SAR0432
+
+             CLOF       OPNID(SOSCPF)
+             DLTOVR     FILE(*ALL)
+
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             CHGVAR     VAR(&P6601I) VALUE('SAR043P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

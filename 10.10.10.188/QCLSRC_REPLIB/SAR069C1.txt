@@ -1,0 +1,233 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : TINA                                      */
+     /*    CREATE DATE  : 82/09/21                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : SAR069C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :銷售分析系統                             */
+     /*    REMARK       :產品銷售分析週報表                       */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DMA07) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DMA11) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSEL1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSEL2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&YMDS) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&YMDE) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&F01S) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&F01E) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&F02S) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&F02E) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&F02SYM) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&F02EYM) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&F02EW) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&F0201) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&F03S) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&F03E) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DMA01S) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DMA01E) TYPE(*CHAR) LEN(9)
+     /***************************************************************/
+
+             CPYF       FROMFILE(REWF87) TOFILE(QTEMP/REWF87) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF87))
+     /*  禮盒拆單瓶 */
+             CPYF       FROMFILE(RES18WF) TOFILE(QTEMP/RES18WF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/RES18WF))
+             OVRDBF     FILE(RES18WF) TOFILE(QTEMP/RES18WF) SHARE(*YES)
+
+
+             OVRDBF     FILE(REWF87) TOFILE(QTEMP/REWF87) SHARE(*YES)
+             OVRDBF     FILE(REWF88) TOFILE(SOSCPF) SHARE(*YES)
+             OVRDBF     FILE(REWF89) TOFILE(SOSGPF) SHARE(*YES)
+             OVRDBF     FILE(SOCDLF1) SHARE(*YES)
+
+             CHGVAR     VAR(&DMA07) VALUE(%SST(*LDA 601 1))
+             CHGVAR     VAR(&DMA11) VALUE(%SST(*LDA 602 1))
+             CHGVAR     VAR(&DSEL1) VALUE(%SST(*LDA 603 1))
+             CHGVAR     VAR(&DSEL2) VALUE(%SST(*LDA 604 1))
+             CHGVAR     VAR(&YMDS) VALUE(%SST(*LDA 631 6))
+             CHGVAR     VAR(&YMDE) VALUE(%SST(*LDA 641 6))
+             CHGVAR     VAR(&F01S) VALUE(%SST(*LDA 651 6))
+             CHGVAR     VAR(&F01E) VALUE(%SST(*LDA 661 6))
+             CHGVAR     VAR(&F02S) VALUE(%SST(*LDA 671 6))
+             CHGVAR     VAR(&F02E) VALUE(%SST(*LDA 681 6))
+             CHGVAR     VAR(&F03S) VALUE(%SST(*LDA 691 4))
+             CHGVAR     VAR(&F03E) VALUE(%SST(*LDA 701 4))
+             CHGVAR     VAR(&F02SYM) VALUE(%SST(*LDA 671 4))
+             CHGVAR     VAR(&F02EYM) VALUE(%SST(*LDA 681 4))
+             CHGVAR     VAR(&F02EW) VALUE(%SST(*LDA 687 4))
+             CHGVAR     VAR(&F0201) VALUE(%SST(*LDA 711 6))
+             CHGVAR     VAR(&DMA01S) VALUE(%SST(*LDA 721 9))
+             CHGVAR     VAR(&DMA01E) VALUE(%SST(*LDA 731 9))
+             OVRPRTF    FILE(SAR069P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('產銷週報')
+       /*當年之起訖為同一月份時*/
+             IF         COND(&F02SYM *EQ &F02EYM) THEN(DO)
+             /*含試飲時*/
+             IF         COND(&DSEL1 *EQ 'Y') THEN(DO)
+             OPNQRYF    FILE((SOSCPF) (SOSDPF)) FORMAT(REWF88) +
+                          QRYSLT('((MSC39 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '")) *OR ( +
+                          MSC39 *EQ %RANGE("' *CAT &F01S *CAT '" "' +
+                          *CAT &F01E *CAT '")) *OR (MSC39 *EQ +
+                          %RANGE("' *CAT &F02S *CAT '" "' *CAT +
+                          &F02E *CAT '"))) &  SC35 *NE "T" &  SD03 +
+                          *EQ %RANGE("' *CAT &DMA01S *CAT '" "' +
+                          *CAT &DMA01E *CAT '") ') KEYFLD((SD03)) +
+                          JFLD((1/SC02 2/SD02 *EQ)) MAPFLD((MSC39 +
+                          SC39 *CHAR 6))
+             OVRDBF     FILE(REWF90) TOFILE(SOSNPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSNPF) (SOSOPF)) FORMAT(REWF90) +
+                          QRYSLT(' ((MSN06 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '")) *OR  +
+                          (MSN06 *EQ %RANGE("' *CAT &F01S *CAT '" +
+                          "' *CAT &F01E *CAT '")) *OR (MSN06 *EQ +
+                          %RANGE("' *CAT &F02S *CAT '" "' *CAT +
+                          &F02E *CAT '"))) & SN10 *NE "T" & SN02L +
+                          *EQ "R3" & SO03 *EQ %RANGE("' *CAT +
+                          &DMA01S *CAT '" "' *CAT &DMA01E *CAT '") +
+                          ') KEYFLD((SO03)) JFLD((1/SN02 2/SO02 +
+                          *EQ)) MAPFLD((MSN06 SN06 *CHAR 6) (SN02L +
+                          '%SST(SN02 3 2)' *CHAR 2))
+                          ENDDO
+             ELSE       CMD(DO)
+             /*不含試飲時*/
+             OPNQRYF    FILE((SOSCPF) (SOSDPF)) FORMAT(REWF88) +
+                          QRYSLT('((MSC39 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '")) *OR +
+                          (MSC39 *EQ %RANGE("' *CAT &F01S *CAT '" +
+                          "' *CAT &F01E *CAT '")) *OR (MSC39 *EQ +
+                          %RANGE("' *CAT &F02S *CAT '" "' *CAT +
+                          &F02E *CAT '"))) & SC03 *NE "S4" &  SC35 +
+                          *NE "T" &  SD03 *EQ %RANGE("' *CAT +
+                          &DMA01S *CAT '" "' *CAT &DMA01E *CAT '") +
+                          ') KEYFLD((SD03)) JFLD((1/SC02 2/SD02 +
+                          *EQ)) MAPFLD((MSC39 SC39 *CHAR 6))
+                          ENDDO
+
+             OPNQRYF    FILE((SOSGPF) (SOSHPF)) FORMAT(REWF89) +
+                          QRYSLT('(MSG26 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '") *OR MSG26 +
+                          *EQ %RANGE("' *CAT &F01S *CAT '" "' *CAT +
+                          &F01E *CAT '") *OR MSG26 *EQ %RANGE("' +
+                          *CAT &F02S *CAT '" "' *CAT &F02E *CAT +
+                          '")) & SH03 *EQ %RANGE("' *CAT &DMA01S +
+                          *CAT '" "' *CAT &DMA01E *CAT '") & SG17 +
+                          *EQ "            "') KEYFLD((SH03)) +
+                          JFLD((1/SG02 2/SH02 *EQ)) MAPFLD((MSG26 +
+                          SG26 *CHAR 6))
+             OPNQRYF    FILE((SOCDLF1)) QRYSLT(' CD29 *EQ ("' *CAT +
+                          &DMA07 *CAT '") & MCD01 *EQ %RANGE("' +
+                          *CAT &F03S *CAT '" "' *CAT &F03E *CAT '") +
+                          & CD04 *EQ %RANGE("' *CAT &DMA01S *CAT '" +
+                          "' *CAT &DMA01E *CAT '") & (CD05 *NE "Y") +
+                          & (CD15 *NE "T") ') KEYFLD((CD04)) +
+                          MAPFLD((ZCD01 CD01 *ZONED 4) (MCD01 ZCD01 +
+                          *CHAR 4))
+
+                          ENDDO
+             ELSE       CMD(DO)
+      /*當年之起訖不為同一月份時*/
+             /*含試飲時*/
+             IF         COND(&DSEL1 *EQ 'Y') THEN(DO)
+             OPNQRYF    FILE((SOSCPF) (SOSDPF)) FORMAT(REWF88) +
+                          QRYSLT('( MSC39 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '") *OR MSC39 +
+                          *EQ %RANGE("' *CAT &F01S *CAT '" "' *CAT +
+                          &F01E *CAT '") *OR MSC39 *EQ %RANGE("' +
+                          *CAT &F0201 *CAT '" "' *CAT &F02E *CAT +
+                          '")) & SC35 *NE "T" & SD03 *EQ %RANGE("' +
+                          *CAT &DMA01S *CAT '" "' *CAT &DMA01E *CAT +
+                          '") ') KEYFLD((SD03)) JFLD((1/SC02 2/SD02 +
+                          *EQ)) MAPFLD((MSC39 SC39 *CHAR 6))
+             OVRDBF     FILE(REWF90) TOFILE(SOSNPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSNPF) (SOSOPF)) FORMAT(REWF90) +
+                          QRYSLT(' ((MSN06 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '")) *OR  +
+                          (MSN06 *EQ %RANGE("' *CAT &F01S *CAT '" +
+                          "' *CAT &F01E *CAT '")) *OR (MSN06 *EQ +
+                          %RANGE("' *CAT &F0201 *CAT '" "' *CAT +
+                          &F02E *CAT '"))) & SN10 *NE "T" & SN02L +
+                          *EQ "R3" & SO03 *EQ %RANGE("' *CAT +
+                          &DMA01S *CAT '" "' *CAT &DMA01E *CAT '") +
+                          ') KEYFLD((SO03)) JFLD((1/SN02 2/SO02 +
+                          *EQ)) MAPFLD((MSN06 SN06 *CHAR 6) (SN02L +
+                          '%SST(SN02 3 2)' *CHAR 2))
+                          ENDDO
+
+             ELSE       CMD(DO)
+
+             /*不含試飲時*/
+             OPNQRYF    FILE((SOSCPF) (SOSDPF)) FORMAT(REWF88) +
+                          QRYSLT('(( MSC39 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '")) *OR +
+                          (MSC39 *EQ %RANGE("' *CAT &F01S *CAT '" +
+                          "' *CAT &F01E *CAT '")) *OR (MSC39 *EQ +
+                          %RANGE("' *CAT &F0201 *CAT '" "' *CAT +
+                          &F02E *CAT '"))) & SC03 *NE "S4" &  SC35 +
+                          *NE "T" & SD03 *EQ %RANGE("' *CAT &DMA01S +
+                          *CAT '" "' *CAT &DMA01E *CAT '") ') +
+                          KEYFLD((SD03)) JFLD((1/SC02 2/SD02 *EQ)) +
+                          MAPFLD((MSC39 SC39 *CHAR 6))
+                          ENDDO
+
+
+             OPNQRYF    FILE((SOSGPF) (SOSHPF)) FORMAT(REWF89) +
+                          QRYSLT('(( MSG26 *EQ %RANGE("' *CAT &YMDS +
+                          *CAT '" "' *CAT &YMDE *CAT '")) *OR +
+                          (MSG26 *EQ %RANGE("' *CAT &F01S *CAT '" +
+                          "' *CAT &F01E *CAT '")) *OR (MSG26 *EQ +
+                          %RANGE("' *CAT &F0201 *CAT '" "' *CAT +
+                          &F02E *CAT '"))) & SH03 *EQ %RANGE("' +
+                          *CAT &DMA01S *CAT '" "' *CAT &DMA01E *CAT +
+                          '") & SG17 *EQ "            "') +
+                          KEYFLD((SH03)) JFLD((1/SG02 2/SH02 *EQ)) +
+                          MAPFLD((MSG26 SG26 *CHAR 6))
+             OPNQRYF    FILE((SOCDLF1)) QRYSLT(' CD29 *EQ ("' *CAT +
+                          &DMA07 *CAT '") & ((MCD01 *EQ %RANGE("' +
+                          *CAT &F03S *CAT '" "' *CAT &F03E *CAT +
+                          '")) *OR (MCD01 *EQ %RANGE("' *CAT +
+                          &F02SYM *CAT '" "' *CAT &F02EW *CAT '"))) +
+                          & CD04 *EQ %RANGE("' *CAT &DMA01S *CAT '" +
+                          "' *CAT &DMA01E *CAT '") & (CD05 *NE "Y") +
+                          & (CD15 *NE "T") ') KEYFLD((CD04)) +
+                          MAPFLD((ZCD01 CD01 *ZONED 4) (MCD01 ZCD01 +
+                          *CHAR 4))
+                          ENDDO
+
+
+             CALL       SAR0691
+             CALL       SAR0692
+
+             CLOF       OPNID(SOSCPF)
+             CLOF       OPNID(SOSGPF)
+             IF         COND(&DSEL1 *EQ 'Y') THEN(DO)
+             CLOF       OPNID(SOSNPF)
+             ENDDO
+             CLOF       OPNID(SOCDLF1)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6601I) VALUE('SAR069P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+             ENDPGM
+

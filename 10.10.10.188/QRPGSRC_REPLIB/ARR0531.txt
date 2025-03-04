@@ -1,0 +1,172 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0531                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/04/06                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款作業                                 *
+      * REMARK       :票據兌現明細表                               *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.22  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FARACPF  IP  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     F*PA#BPF  IF  E           K        DISK
+B2CHKFARR053P O   E             39     PRINTER
+B2INF *CVR3010 sev.30 PRINTER file ARR053P must be converted, because file
+B2INF *   AC11 (and more) are shared by name with other database fields
+B2INF *   which require to be expanded. Please convert ARR053P, enlarging
+B2INF *   all involved fields prior to compilation, or manually insert in
+B2INF *   this source the proper RENAME and MOVE statements to avoid name
+B2INF *   sharing
+     IAC0
+     I                                              AC12  L2
+     I                                              AC11  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*
+     I                                      601 602 DAC01S
+     I                                      670 671 DAC01E
+     I                                      603 616 DAC12S
+     I                                      611 616 DAC121
+     I                                      617 630 DAC12E
+     I                                      625 630 DAC122
+     I                                      631 6360DAC11S
+     I                                      637 6420DAC11E
+     I                                      643 651 DAC23S
+     I                                      652 660 DAC23E
+M001AI                                      681 6880DATES
+M001AI                                      691 6980DATEE
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           AC02
+     C                     KFLD           AC03
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C*          *LIKE     DEFN AG04      OAG04                        OM
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *INIT ENVIRM
+     C  N10                EXSR RTN100
+     C*
+     C   39N38             EXSR RTN900
+     C   39 38             EXSR RTN910
+     C                     EXSR RTN200                     *FILE TO SCR
+     C*
+     CL1 10                EXSR RTN8L1
+     CL2 10                SETON                     3839
+     CLR                   EXSR RTN999
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C* 小計
+|    C                     Z-ADD0         STAC08
+|    C* 合計
+|    C                     Z-ADD0         TOTAL
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     1030
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....MOVE DATA TO SCREEN
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C* GET轉換日期
+M001AC                     Z-ADDAC11      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM AC11      S001I2  80
+B2MODC*M001M     AC11      PARM           S001O1  80
+M001MC                     PARM W6        S001I2  60
+M001MC           PAC11     PARM           S001O1  60
+M001AC                     Z-ADDAC07      W6
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM AC07      S001I2  80
+B2MODC*M001M     AC07      PARM           S001O1  80
+M001MC                     PARM W6        S001I2  60
+M001MC           PAC07     PARM           S001O1  60
+|    C* GET 客戶名稱
+|    C           KEYME     CHAINME0                  40
+|    C   40                MOVE *BLANK    ME04
+|    C***
+|    C* 小計
+|    C                     ADD  AC08      STAC08
+|    C* 合計
+|    C                     ADD  AC08      TOTAL
+|    C*
+|    C                     WRITEPD1
+|    C                     SETOF                     30
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     30
+|    C                     SETOF                     39
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN910....換下頁
+      *==============================================================*
+05===C           RTN910    BEGSR
+|    C*
+|    C                     WRITEPD3
+|    C                     WRITEPE3
+|    C                     EXSR RTN010
+|    C                     EXSR RTN100
+|    C                     SETOF                     3839
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN8L1....L1 ON  ( PRINT 入帳日期小計)
+     C*==============================================================*
+06===C           RTN8L1    BEGSR
+|    C*
+|    C                     SETON                     30
+|    C                     WRITEPD2
+|    C* 入帳日期小計
+|    C                     Z-ADD0         STAC08
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+07===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN100
+| 01*C                     ELSE
+|   C                     WRITEPD3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+07===C                     ENDSR
+

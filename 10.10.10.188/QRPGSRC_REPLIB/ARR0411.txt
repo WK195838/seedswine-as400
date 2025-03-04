@@ -1,0 +1,343 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0411                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/04/24                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :客戶對帳單                                   *
+     A*===============================================================
+     A* CODE |  AUTHOR  |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M004 | MICHELLE | 00.06.15 |未沖餘額＝發票金額－收款－價差－
+     A*                             價差稅額
+     A*================================================================
+      ****************************************************************
+     FSOSIPF  IF  E           K        DISK
+     FREWF11  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARADLF01IF  E           K        DISK
+     FARAFLF8 IF  E           K        DISK
+     FARR041P O   E             39     PRINTER
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+M001AI                                      201 2080DATE
+     I                                      598 5990$PRTID
+     I                                      601 601 DSI03S
+     I                                      602 602 DSI03E
+     I                                      603 603 DSI01
+     I                                      604 604 DSI01S
+     I                                      605 605 DSI01E
+     I                                      611 612 DSI04S
+     I                                      613 614 DSI04E
+     I                                      621 625 DSI12S
+     I                                      631 635 DSI12E
+     I                                      641 646 DSI31S
+     I                                      651 656 DSI31E
+     I*(MM/DD/YY)
+     I                                      661 6660DSI29S
+     I                                      671 6760DSI29E
+     I*(YY/MM/DD)
+     I*(MM/DD/YY)
+     I                                      681 6860WSI29S
+     I                                      691 6960WSI29E
+     I*(YY/MM/DD)
+     I                                      701 7060DSI35S
+     I                                      711 7160DSI35E
+     I*(YY/MM/DD)
+     I                                      721 7260WSI35S
+     I                                      731 7360WSI35E
+     I*(YYYY/MM/DD)
+     I                                      850 8570YMDS8
+     I                                      858 8650YMDE8
+M001AI                                      866 8730YMDS81
+M001AI                                      874 8810YMDE81
+     I*
+     I            DS
+     I                                        1   60PDATE
+     I                                        1   20PYY
+     I                                        3   40PMM
+     I                                        5   60PDD
+      *==============================================================*
+      *                    DEFN RTN
+      *==============================================================*
+     C           *LIKE     DEFN SI12      HSI12
+     C           *LIKE     DEFN SI13      HSI13
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYHSI    KLIST
+     C                     KFLD           HSI12
+     C           KEYAD     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C           KEYAF     KLIST
+     C                     KFLD           SI02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN001
+     C                     READ SI0                      42
+  01-C           *IN42     DOWEQ'0'
+    C  N10                EXSR RTN010
+  02-C           SI12      IFNE HSI12
+    C           SI13      ORNE HSI13
+    C                     EXSR RTN300                     *合計SOSI
+    C                     EXSR RTN200                     *READE REWF11
+    C                     SETON                       3839
+    C                     MOVE SI12      HSI12
+    C                     MOVE SI13      HSI13
+  02-C                     END
+    C*
+    C   39N38             EXSR RTN900                     *OVRFLW-THE SAME CUST
+    C   39 38             EXSR RTN910                     *OVRFLW-NOT THE SAME
+    C*
+    C                     EXSR RTN100                     *READE SOSIPF
+    C*
+    C                     READ SI0                      42
+  01-C                     END
+     C   42                EXSR RTN300                     *合計SOSI
+     C   42                EXSR RTN200                     *READE REWF11
+     C*
+     C                     SETON                         LR
+     C*==============================================================*
+     C*          RTN001....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN001    BEGSR
+|    C*
+M001DC*                    Z-ADD0         DATE    80
+|    C*M001D               CALL 'RES001'
+|    C*M001D               PARM 'MDY'     S001I1  3
+M001DC*                    PARM $EGMDY    S001I2  80
+M001DC*          DATE      PARM           S001O1  80
+|    C*系統日期或確認日期
+M001DC*          WSI35E    IFLE DATE
+M001AC           YMDE81    IFLE DATE
+B2???C           YMDE81    SUB  110000    PDATE
+B2INF *CVR0001 sev.00 Field PDATE is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+     C                     ELSE
+B2???C           DATE      SUB  110000    PDATE
+B2INF *CVR0001 sev.00 Field PDATE is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+  01-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+02===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE SI12      HSI12
+|    C                     MOVE SI13      HSI13
+|    C****
+|    C*分店全稱＆分店地址１＆分店地址２
+|    C****
+|    C           KEYHSI    CHAINME0                  40
+|    C   40                MOVE *BLANK    DME03
+|    C  N40                MOVELME03      DME03
+|    C   40                MOVE *BLANK    ME05
+|    C   40                MOVE *BLANK    ME06
+|    C****
+|    C*業務員名稱
+|    C****
+|    C           SI12      CHAINME0                  41
+|    C*
+| 01-C           *IN41     IFEQ '0'
+|   C           ME15      CHAINMC0                  42
+|   C*
+| 02-C           *IN42     IFEQ '1'
+|   C                     MOVE *BLANK    MC02
+| 02-C                     END
+|   C*
+| 01*C                     ELSE
+|   C                     MOVE *BLANK    MC02
+| 01-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     Z-ADD0         PD1TOT
+|    C                     SETON                         10
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READ SOSIPF
+      *==============================================================*
+03===C           RTN100    BEGSR
+|    C*
+M001AC                     Z-ADDSI06      WSI06   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI06      S001I2  80
+M001AC                     PARM WSI06     S001I2  60
+M001DC*          DSI06     PARM           S001O1  80
+M001AC           DSI06     PARM           S001O1  60
+|    C*
+|    C*應收日期
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'YMD'     S001I1  3
+|    C*                    PARM SI29      S001I2  60
+|    C*          DSI29     PARM           S001O1  60
+     C                     Z-ADDSI25      PSI30
+     C           KEYAD     SETLLAD0
+     C           KEYAD     READEAD0                      46
+     C           *IN46     DOWEQ'0'
+B2000C           AD12      IFLE YMDE81
+     C                     SUB  AD08      PSI30
+     C                     END
+     C           KEYAD     READEAD0                      46
+     C                     END
+      *
+     C           KEYAF     SETLLAF0
+     C           KEYAF     READEAF0                      46
+     C           *IN46     DOWEQ'0'
+B2000C           AF05      IFLE YMDE81
+     C                     SUB  AF07      PSI30
+M004AC                     SUB  AF09      PSI30
+     C                     END
+     C           KEYAF     READEAF0                      46
+     C                     END
+|    C*未收金額為零不列印
+     C           PSI30     IFNE 0
+|    C                     ADD  PSI30     PD1TOT
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1                        *WRITE
+     C                     END
+|    C*
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READ REWFPF
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*
+     C                     MOVE *BLANK    A1106  14
+|    C                     Z-ADD0         PD3TOT
+|    C           KEYHSI    SETLLWF110
+|    C           KEYHSI    READEWF110                    44
+| 01-C           *IN44     DOWEQ'0'
+M001AC                     Z-ADDWF1101    XF1101  60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WF1101    S001I2  80
+M001AC                     PARM XF1101    S001I2  60
+B2INF *CVR3005 sev.30 Converted code may not work properly. Please verify
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|   C*
+M001DC*          DF1101    PARM           S001O1  80
+M001AC           DF1101    PARM           S001O1  60
+M001AC                     Z-ADDWF1107    XF1107  60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WF1107    S001I2  80
+M001AC                     PARM XF1107    S001I2  60
+B2INF *CVR3005 sev.30 Converted code may not work properly. Please verify
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+M001DC*          DF1107    PARM           S001O1  80
+M001AC           DF1107    PARM           S001O1  60
+|   C*
+|   C                     EXSR RTN360                     *ADD TOT
+|   C   39                EXSR RTN900
+|   C                     WRITEPD3
+     C                     SETON                     30
+|   C           KEYHSI    READEWF110                    44
+| 01-C                     END
+|    C   44                EXSR RTN400
+|    C   10                WRITEPD5
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN360....ADD SUBTOT  TO  ENDTOT ---REWF11
+      *==============================================================*
+06===C           RTN360    BEGSR
+|    C*
+     C           WF1106    IFNE A1106
+|    C                     ADD  WF1105    PD3TOT
+     C                     MOVE WF1106    A1106
+     C                     SETOF                     30
+     C                     END
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE SOSIPF---PD1
+      *==============================================================*
+07===C           RTN300    BEGSR
+|    C   39                EXSR RTN900
+     C           PD1TOT    IFNE 0
+|    C                     WRITEPD2
+     C                     SETON                     10
+     C                     END
+|    C                     Z-ADD0         PD1TOT
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE REWF11---PD3
+      *==============================================================*
+08===C           RTN400    BEGSR
+     C*
+     C           PD3TOT    IFNE 0
+|    C   39                EXSR RTN900
+|    C                     WRITEPD4
+     C                     SETON                     10
+     C                     SETOF                     30
+|    C                     Z-ADD0         PD3TOT
+     C                     END
+     C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW--同一客戶
+      *==============================================================*
+09===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPH1                        *HEADING
+|    C                     SETOF                     39
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN910....OVERFLOW --不同客戶
+      *==============================================================*
+10===C           RTN910    BEGSR
+|    C****
+|    C*分店全稱＆分店地址１＆分店地址２
+|    C****
+|    C           KEYHSI    CHAINME0                  40
+|    C   40                MOVE *BLANK    DME03
+|    C  N40                MOVELME03      DME03
+|    C   40                MOVE *BLANK    ME05
+|    C   40                MOVE *BLANK    ME06
+|    C****
+|    C*業務員名稱
+|    C****
+|    C           SI12      CHAINME0                  41
+|    C*
+| 01-C           *IN41     IFEQ '0'
+|   C           ME15      CHAINMC0                  42
+|   C*
+| 02-C           *IN42     IFEQ '1'
+|   C                     MOVE *BLANK    MC02
+| 02-C                     END
+|   C*
+| 01*C                     ELSE
+|   C                     MOVE *BLANK    MC02
+| 01-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     3938
+|    C*
+10===C                     ENDSR
+     C/COPY HBP2CVTR
+

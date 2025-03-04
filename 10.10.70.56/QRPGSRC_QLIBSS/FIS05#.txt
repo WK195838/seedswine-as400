@@ -1,0 +1,138 @@
+     H****************************************************************
+     H*    PROGRAM NAME : FIS05#                                     *
+     H*    AUTHOR       : A1043 JACKIE                               *
+     H*    CREATE DATE  : 78/11/01                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :財務系統                                  *
+     H*    SUBSYSTEM    :人事薪資系統                              *
+     H*    PROCEDURE    :                                            *
+     H*    PURPOSE      :部門代號建檔                              *
+     H*    INDICATORS   :                                            *
+     H*         50-53   : SUBFILE                                    *
+     H*                   50 --- SFLDSP                              *
+     H*                   51 --- SFLDSPCTL                           *
+     H*                   52 --- SFLCLR                              *
+     H*                   53 --- SFLEND                              *
+     H*         96-98   : MESSAGE                                    *
+     H*                   96 --- NO DATA                             *
+     H*                   97 --- LAST PAGE                           *
+     H*                   98 --- FIRST PAGE                          *
+     H*    REMARKS      : 1. ROLL UP / ROLL DOWN CTL BY AS/400       *
+     H*                   2. CONTROL SFL CAN'T EXTEND                *
+     H*                   3. USE SFLRCDNBR(DRRN ) CONTROL SFLDSP     *
+     H*                   4.代碼類別(NM01) = '01'為部門代碼檔    *
+     H****************************************************************
+     FNMPF    IF  E           K        DISK
+     FCMPF    IF  E           K        DISK
+     FFIS05D# CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I            DS
+     I                                        1  15 WNM02
+     I                                        1   1 WNM021
+     I                                        2   6 WNM022
+     I            DS
+     I                                        1  15 NM02
+     I                                        1   1 DNM021
+     I                                        2   6 DNM022
+     I            DS
+     I                                        1  42 NM03
+     I                                        1  14 DNM03
+     I           UDS
+     I                                      111 1160DDATE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           WNM021    PARM           S05I1   1
+     C           WNM022    PARM           S05I2   5
+     C           *IN03     PARM *IN03     S05O1   1
+     C*==============================================================*
+     C*                    KEY LIST FOR NMPF
+     C*==============================================================*
+     C           KEYNM     KLIST                           *NMPF
+     C                     KFLD           WNM01   2
+     C                     KFLD           WNM02  15
+     C*==============================================================*
+     C*          MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C                     EXSR RTN100                     *WRT FULL SFL
+     C                     Z-ADD1         DRRN
+     C*
+     C           *IN12     DOWEQ'0'
+     C           *IN03     IFEQ '0'
+     C*
+     C           *IN25     IFEQ '1'                        *ROLLUP
+     C                     SETON                     97    *LAST PAGE
+     C                     Z-ADDRRN       DRRN
+     C                     END
+     C*
+     C           *IN26     IFEQ '1'                        *ROLLDOWN
+     C                     SETON                     98    *FIRST PAGE
+     C                     Z-ADD1         DRRN
+     C                     END
+     C*
+     C                     EXSR RTN200                     *EXFMT
+     C*
+     C                     ELSE
+     C                     SETON                     12
+     C                     END
+     C*
+     C                     END
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL
+     C*==============================================================*
+     CSR         RTN010    BEGSR
+     C*INITIAL VALUES
+     C                     Z-ADD*ZEROS    RRN
+     C                     Z-ADD*ZEROS    DRRN
+     C*SFL CLEAR
+     C                     SETON                     52
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C*SET KEYNM VALUES
+     C                     MOVE '01'      WNM01
+     C           KEYNM     SETLLNMPF
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....READ DATA TO SUBFILE
+     C*==============================================================*
+     CSR         RTN100    BEGSR
+     C           *IN53     DOWEQ'0'                        *SFL FULL
+     C*
+     C           WNM01     READENMPF                     44*READ EQ DIV
+     C*
+     C           *IN44     IFEQ '0'                        *EOF
+     C           DNM021    IFEQ WNM021                     *COMP CO.
+     C                     ADD  1         RRN
+     C                     WRITESFLSR                    53
+     C                     END
+     C                     ELSE
+     C                     SETON                     53
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     Z-ADDRRN       DRRN             *GET SFL POS
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....EXFMT SFL
+     C*==============================================================*
+     CSR         RTN200    BEGSR
+     C           RRN       IFGT *ZEROS
+     C                     SETON                     50    *SFLDSP
+     C                     ELSE
+     C                     SETON                     96    *NO DATA
+     C                     END
+     C*
+     C                     SETON                     51    *SFLDSPCTL
+     C           WNM021    CHAINCMPF                 40
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR
+     C*
+     C                     SETOF                     5051
+     C                     SETOF                     969798
+     C                     ENDSR
+

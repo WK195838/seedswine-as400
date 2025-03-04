@@ -1,0 +1,182 @@
+      ****************************************************************
+      * PROGRAM ID : P34                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :計算該月日數                                   *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3401I    I   *DEC    6 0  輸入年月YYYYMM *
+      *             01   P3403I    I   *CHAR   1    日期格式       *
+      *                                              '1'=00YYMM      *
+      *                                              '2'=YYYYMM      *
+      *             01   P3404I    I   *CHAR   1    曆別           *
+      *                                             １：西曆       *
+      *                                             ２：國曆       *
+      *             02   P3411O    O   *CHAR   1   驗証結果...     *
+      *                                             Y=OK , N =ERROR  *
+      *             03   P3412O    O   *DEC    2 0 該月日數        *
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3401     N   *DEC    4 0 西元年          *
+      *             02   P3402(P34)N   *DEC    2 0 月份            *
+      *             04   P3404     N   *DEC    5 0 商數            *
+      *             05   P3405     N   *DEC    4 0 餘數            *
+      *             06   P3406     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P3407     N   *CHAR   1   驗証(Y/N)       *
+      *             08   P34DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P34DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P3406=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P3406=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P3406=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P3406=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E* P34DAY:每月日數
+     E                    P34DAY 12  12  2 0
+      *
+     I            DS
+     I                                        1   60WDATE
+     I                                        1   40WYY
+     I                                        5   60WMM
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3401I  60
+     C                     PARM           P3403I  1
+     C                     PARM           P3404I  1
+     C                     PARM           P3411O  1
+     C                     PARM           P3412O  20
+     C*
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+     C*
+     C                     EXSR P34CHK                     *CHK中西曆
+     C   99                GOTO QUIT
+     C                     EXSR P34GYM                     *GET西年月
+     C*
+     C                     Z-ADDWYYYY     P3401   40
+     C                     Z-ADDWMM       P3402   20
+     C*
+     C                     EXSR P34LEP                     *CHK潤年
+     C                     EXSR P34CKD                     *GET日數
+     C*
+     C           QUIT      TAG
+     C                     MOVE P3407     P3411O
+     C                     Z-ADDP34NUM    P3412O
+     C                     SETON                     LR
+      *--------------------------------------------------------------*
+      *                 P34CHK....CHECK中西曆
+      *--------------------------------------------------------------*
+01===C           P34CHK    BEGSR
+|    C*
+|    C*CHECK曆別:"1"為西曆,"2"國曆,不可為其它,
+|    C*
+| 01-C           P3404I    IFNE '1'
+|   C           P3404I    ANDNE'2'
+|   C                     SETON                     99
+| 01-C                     END                             *END IF
+|    C   99                GOTO ERROR
+|    C*
+|    C*CHECK日期格式:"1":00YYMM,"2":YYYYMM不可為其它,
+|    C*
+| 02-C           P3403I    IFNE '1'
+|   C           P3403I    ANDNE'2'
+|   C                     SETON                     99
+| 02-C                     END                             *END IF
+|    C   99                GOTO ERROR
+|    C*
+|    C           ERROR     TAG
+| 03-C           *IN99     IFEQ '1'
+|   C                     MOVE 'N'       P3407
+|   C                     Z-ADD0         P34NUM
+| 03-C                     END
+01===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P34GYM....產生西元年月
+      *--------------------------------------------------------------*
+02===C           P34GYM    BEGSR
+|    C*
+|    C                     Z-ADDP3401I    WDATE
+|    C*
+| 01-C           P3404I    IFEQ '1'                        *西曆
+| 02-C           P3403I    IFEQ '1'                        *00YYMM
+| 03-C           WYY       IFLT 80
+|   C           WYY       ADD  2000      WYYYY   40
+| 03*C                     ELSE
+|   C           WYY       ADD  1900      WYYYY
+| 03-C                     END
+| 02*C                     ELSE                            *YYYYMM
+|   C                     Z-ADDWYY       WYYYY
+| 02-C                     END
+|   C*
+|   C*
+| 01*C                     ELSE                            *國曆
+|   C           WYY       ADD  1911      WYYYY
+| 01-C                     END
+02===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P34LEP....VERIFY LEAP YEAR                          *
+      *--------------------------------------------------------------*
+03===C           P34LEP    BEGSR
+|    C           P3401     DIV  400       P3404   50
+|    C                     MVR            P3405   40
+| 01-C           P3405     IFEQ 0
+|   C                     MOVE 'Y'       P3406   1
+| 01*C                     ELSE
+|   C*
+|   C           P3401     DIV  100       P3404
+|   C                     MVR            P3405
+| 02-C           P3405     IFEQ 0
+|   C                     MOVE 'N'       P3406
+| 02*C                     ELSE
+|   C*
+|   C           P3401     DIV  4         P3404
+|   C                     MVR            P3405
+| 03-C           P3405     IFEQ 0
+|   C                     MOVE 'Y'       P3406
+| 03*C                     ELSE
+|   C                     MOVE 'N'       P3406
+| 03-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 01-C                     END
+03===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P34CKD....CHECK MONTH & DATE                        *
+      *--------------------------------------------------------------*
+04===C           P34CKD    BEGSR
+| 01-C           P3402     IFGT 12
+|   C           P3402     OREQ 0
+|   C                     MOVE 'N'       P3407   1
+|   C                     Z-ADD0         P34NUM  20
+| 01*C                     ELSE
+|   C*
+|   C                     MOVE 'Y'       P3407
+|   C                     Z-ADDP3402     P34     20
+|   C                     Z-ADDP34DAY,P34P34NUM
+|   C*
+| 02-C           P3402     IFEQ 2
+|   C           P3406     ANDEQ'Y'
+|   C                     Z-ADD29        P34NUM
+| 02-C                     END
+|   C*
+| 01-C                     END
+04===C                     ENDSR
+      *--------------------------------------------------------------*
+**
+312831303130313130313031
+

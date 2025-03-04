@@ -1,0 +1,89 @@
+     /**************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266  */
+     /*                                                            */
+     /*    PROGRAM ID   : JLB041                                   */
+     /*    PROGRAM NAME : 國外到貨傳票批次                       */
+     /*    AUTHOR       : AN MING HSIA                             */
+     /*    CREATE DATE  : 05/27/93                                 */
+     /*    UPDATE DATE  :                                          */
+     /*    SYSTEM       : 進銷存收TO總帳                       */
+     /**************************************************************/
+             PGM
+
+             DCL        VAR(&D01)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&D02)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&F01)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&F02)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             CHGVAR     VAR(&D01)   VALUE(%SST(*LDA 629 1))
+             CHGVAR     VAR(&D02)   VALUE(%SST(*LDA 630 1))
+             CHGVAR     VAR(&F01)   VALUE(%SST(*LDA 601 8))
+             CHGVAR     VAR(&F02)   VALUE(%SST(*LDA 609 8))
+     /**** WF#GPF   ****/
+             CPYF       FROMFILE(WF#GPF) TOFILE(QTEMP/WF#GPF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WF#GPF))
+             OVRDBF     FILE(WF#GPF) TOFILE(QTEMP/WF#GPF) SHARE(*YES)
+
+     /**** WFJL10PF ****/
+             CPYF       FROMFILE(WFJL10PF) TOFILE(QTEMP/WFJL10PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL10PF))
+             OVRDBF   FILE(WFJL10PF) TOFILE(QTEMP/WFJL10PF) SHARE(*YES)
+
+     /**** WFJL10LF ****/
+             CRTDUPOBJ  OBJ(WFJL10LF) FROMLIB(REFLIB) OBJTYPE(*ALL) +
+                          TOLIB(QTEMP)
+             MONMSG     MSGID(CPD2104 CPF2130)
+             OVRDBF   FILE(WFJL10LF) TOFILE(QTEMP/WFJL10LF) SHARE(*YES)
+     /**** WFJL17PF ****/
+             CPYF       FROMFILE(WFJL17PF) TOFILE(QTEMP/WFJL17PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL17PF))
+             OVRDBF   FILE(WFJL17PF) TOFILE(QTEMP/WFJL17PF) SHARE(*YES)
+
+             OVRDBF     FILE(POPDPF) SHARE(*YES)
+             OPNQRYF    FILE((POPDPF)) QRYSLT('PD01A *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") & +
+                          PD04 *EQ %RANGE(' *CAT &F01 *CAT ' ' *CAT +
+                          &F02 *CAT ') ') KEYFLD(*FILE) +
+                          MAPFLD((PD01A '%SST(PD01 1 1)' *CHAR 1) +
+                          (PD01B '%SST(PD01 2 1)' *CHAR 1))
+
+   /*產生暫存檔及傳票*/
+             CALL       JLB0412
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CALL       LOG
+
+             CHGVAR     VAR(&P6601I) VALUE('LOGP')
+             CHGVAR     VAR(&P6602I) VALUE('2')
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE('00')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             CLOF       OPNID(POPDPF)
+
+             OVRPRTF    FILE(JLB0413P) PAGESIZE(*N 158) CPI(12) +
+                        USRDTA('到貨傳票')
+             CALL       JLB0413
+
+             CHGVAR     VAR(&P6601I) VALUE('JLB0413P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,4128 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250
+     H*
+     H*    PROGRAM ID   : JLB051
+     H*    PROGRAM NAME : 庫存異動傳票批次
+     H*    AUTHOR       : D910121 CHARLES
+     H*    CREATE DATE  : 1993.05.27
+     H*    UPDATE DATE  :
+     H*    SYSTEM       : 進銷存收TO總帳
+     F****************************************************************
+     FWFJL10PFUF  E           K        DISK                      A
+     FWFJL10LFIF  E           K        DISK
+     F            WFJL10R                           KRENAMEWFJL10L
+     FWFJL20PFUF  E           K        DISK                      A
+     FPA#GPF  UF  E           K        DISK                      A
+     FIMIBPF  IF  E           K        DISK
+     FIMICPF  IF  E           K        DISK
+     FIMIDPF  IF  E           K        DISK
+     FIMIEPF  IF  E           K        DISK
+     FIMIFPF  IF  E           K        DISK
+     FIMIGPF  IF  E           K        DISK
+     FIMIHPF  IF  E           K        DISK
+     FIMIUPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FGLAAPF  IF  E           K        DISK
+     FGLAFPF  IF  E           K        DISK
+     FGLAHPF  O   E           K        DISK
+     FWF#GPF  O   E           K        DISK
+     FWF#GPF01O   E           K        DISK
+     E*---------------------------------------------------------------*
+     E*輸入欄位代碼 ... EX.( 10 )=>AH05A
+     E                    CHK1        7  2
+     E*輸入欄位內容 ... EX.( R&D )=>AH05
+     E                    CHK2        4 20
+     E*輸入欄位說明 EX.(研發部)=>CALL 檢核程式&AA04得之.
+     E                    CHK3        7 20
+     E*驗收單號'D00000000001'
+     E                    ARR     1   1 12
+     I*CURSOR POSTITON
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I*LOCAL DATA AREA
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$ADMDY
+B2MODI                                      187 1940$ADYMD
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      152 161 $USERN
+B2MODI                                      203 2100ADYYMD
+      *確認年月
+B2MODI                                      603 6080F01
+      *公司第一碼
+     I            DS
+     I                                        1   2 IB02
+     I                                        1   1 WIB02
+     I            DS
+     I                                        1   2 IC01
+     I                                        1   1 WIC01
+     I            DS
+     I                                        1   2 IE01
+     I                                        1   1 WIE01
+     I            DS
+     I                                        1   2 IG01
+     I                                        1   1 WIG01
+      *物流點一碼
+     I            DS
+     I                                        1   5 IB03
+     I                                        1   1 IB03L
+     I            DS
+     I                                        1   5 IG03
+     I                                        1   1 IG03L
+     I            DS
+     I                                        1   5 IE03
+     I                                        1   1 IE03L
+     I            DS
+     I                                        1   5 IU03
+     I                                        1   1 IU03L
+      *產品品牌
+     I            DS
+     I                                        1   9 IB01
+     I                                        3   4 IB01A
+     I            DS
+     I                                        1   9 IH034
+     I                                        3   4 IH034A
+     I*檢核程式之參數.....................................
+     ICHKPGM      DS
+     I                                        1   2 AH01
+     I                                        3  22 WPARM1
+     I                                       23  32 WPARM2
+     I                                       33  33 WCHK
+      *計算確認年月最後一天
+     I            DS
+B2MODI                                        1   80ADYMD
+B2MODI                                        1   60YM
+B2MODI                                        7   80DD
+      *成本調整DATE + TIME
+     I            DS
+B2MODI                                        1  14 IB04YY
+B2MODI                                        1   80IB04
+B2MODI                                        9  140IBYY
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *LIKE     DEFN #G01      W#G01
+B2000C           *LIKE     DEFN #G02      W#G02
+     C           *LIKE     DEFN #G03      W#G03
+     C           *LIKE     DEFN AH03      WAH03
+      *FOR傳票號碼產生
+B2000C           *LIKE     DEFN JL1001    WL1001
+     C           *LIKE     DEFN JL1002    WL1002
+     C           *LIKE     DEFN J1002$    W1002$
+     C           *LIKE     DEFN JL1003    WL1003
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYAA     KLIST
+     C                     KFLD           AH01
+     C                     KFLD           CHK1,I
+     C           KEYW10    KLIST
+     C                     KFLD           JL1001           *確認日期
+     C                     KFLD           JL1002           *公司別2
+     C                     KFLD           J1002$           *辦事處1
+     C                     KFLD           JL1003           *傳票別
+     C                     KFLD           JL1004           *會計科目
+     C                     KFLD           JL1005           *成本中心
+     C                     KFLD           JL1006           *對項別
+     C                     KFLD           JL1007           *相關號碼１
+     C                     KFLD           JL1008           *相關號碼２
+     C                     KFLD           JL1009           *日期
+     C                     KFLD           JL1010           *數量
+     C                     KFLD           JL1011           *其它
+     C           KEYW20    KLIST
+     C                     KFLD           JL2002           *公司別1
+     C                     KFLD           JL2001           *確認日期
+     C                     KFLD           JL2013           *傳票別
+     C                     KFLD           JL2014           *原因
+     C                     KFLD           JL2003           *物流點
+     C                     KFLD           JL2004           *產品代號
+     C           KEY#G     KLIST
+     C                     KFLD           W#G01
+     C           KEYAF     KLIST
+     C                     KFLD           AH01             *公司別
+     C                     KFLD           AH04             *會計科目
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR R0100                      *INITIAL
+     C*
+     C                     EXSR R2000
+      *
+     C                     EXSR R4000
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R0100 ....INITIAL VALUE
+     C*==============================================================*
+01===C           R0100     BEGSR
+|    C*--------------------------------------------------------------*
+|    C                     Z-ADD*ZERO     W01    132
+|    C                     Z-ADD*ZERO     W02    132
+|    C                     Z-ADD*ZERO     W03    132
+|    C                     Z-ADD*ZERO     W04    132
+|    C                     Z-ADD*ZERO     W05    132
+|    C                     Z-ADD*ZERO     W06    132
+|    C                     Z-ADD*ZERO     W07    132
+|    C                     Z-ADD*ZERO     W08    132
+|    C                     Z-ADD0         WQTY    70
+|    C                     Z-ADD0         WCOST  132
+|    C                     Z-ADD0         WAMT   154
+|    C*
+      *計算確認年月最後一天ADYMD =YM+DD
+|    C                     Z-ADD0         ADYMD
+B2000C                     Z-ADDF01       YM
+B2MODC                     Z-ADDF01       WYM     60
+B2CHKC                     SUB  1100      WYM
+|    C                     CALL 'P22'
+B2MODC                     PARM WYM       P2201I  60
+|    C                     PARM           P2201O  1
+|    C           DD        PARM           P2202O  20
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R2000 .計算各單別檔
+     C*==============================================================*
+02===C           R2000     BEGSR
+|    C*
+|    C                     EXSR RTNIB
+|    C                     EXSR RTNIC
+|    C                     EXSR RTNIE
+|    C                     EXSR RTNIG
+|    C                     EXSR RTNIU
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB .計算成本檔
+     C*==============================================================*
+03===C           RTNIB     BEGSR
+|    C*
+|    C           *LOVAL    SETLLIB0
+|    C                     READ IB0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+B2???C                     MOVELIB04YY    W#G01
+B2INF *CVR5011 sev.50 Field W#G01 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2000C                     Z-ADDIB04      W#G02
+|   C*
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#21
+| 02-C           IB17      IFEQ '01'
+|   C           IB17      OREQ '02'
+|   C           IB17      OREQ '03'
+|   C           IB17      OREQ '04'
+|   C           IB17      OREQ '06'
+|   C           IB17      OREQ '07'
+|   C           IB17      OREQ '08'
+|   C           IB17      OREQ '10'
+|   C           IB17      OREQ '11'
+|   C           IB17      OREQ '12'
+|   C           IB17      OREQ '13'
+|   C           IB17      OREQ '14'
+|   C           IB17      OREQ '16'
+|   C           IB17      OREQ '17'
+|   C           IB17      OREQ '19'
+|   C           IB17      OREQ '20'
+|   C           IB17      OREQ '21'
+|   C           IB17      OREQ '22'
+|   C           IB17      OREQ '23'
+|   C*
+      *INITIAL檔案共同欄位WFJL10PF/WFJL20PF KEY VALUES
+|   C                     EXSR RINTIB
+      *
+      *WCOST成本
+|   C           IB10      ADD  IB11      WCOST
+|   C                     ADD  IB12      WCOST
+      *傳票WFJL10PF
+| 03-C           IB17      IFEQ '01'
+|   C           IB17      OREQ '07'
+|   C           IB17      OREQ '08'
+|   C           IB17      OREQ '10'
+|   C           IB17      OREQ '11'
+|   C           IB17      OREQ '14'
+|   C           IB17      OREQ '16'
+|   C           IB17      OREQ '17'
+|   C           IB17      OREQ '19'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'1'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'1'       JL2013
+      *
+|   C                     EXSR RTNIB1
+| 03*C                     ELSE
+      *------------
+| 04-C           IB17      IFEQ '02'
+|   C           IB17      OREQ '03'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'2'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'2'       JL2013
+|   C                     EXSR RTNIB2
+| 04*C                     ELSE
+      *------------
+| 05-C           IB17      IFEQ '04'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'3'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'3'       JL2013
+|   C                     EXSR RTNIB3
+| 05*C                     ELSE
+      *------------
+| 06-C           IB17      IFEQ '06'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'4'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'4'       JL2013
+|   C                     EXSR RTNIB4
+| 06*C                     ELSE
+      *------------
+| 07-C           IB17      IFEQ '12'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'5'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'5'       JL2013
+|   C                     EXSR RTNIB5
+| 07*C                     ELSE
+      *------------
+| 08-C           IB17      IFEQ '13'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIB04      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIB04      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIB6
+      *------------
+| 08*C                     ELSE
+| 09-C           IB17      IFEQ '20'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIB04      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIB04      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIB7
+| 09*C                     ELSE
+      *------------
+| 10-C           IB17      IFEQ '21'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'9'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'9'       JL2013
+|   C                     EXSR RTNIB8
+| 10*C                     ELSE
+| 11-C           IB17      IFEQ '22'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIB04      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIB04      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIB9
+| 11*C                     ELSE
+| 12-C           IB17      IFEQ '23'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIB04      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIB04      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIBA
+| 12-C                     END
+| 11-C                     END
+| 10-C                     END
+| 09-C                     END
+| 08-C                     END
+| 07-C                     END
+| 06-C                     END
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+      *銷貨成本彙總WFJL20PF
+      *產品代號
+|   C                     MOVELIB01      JL2004
+      *----------------------------------------------------------------
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C                     Z-ADD0         W03
+|   C                     Z-ADD0         W04
+|   C                     Z-ADD0         W05
+|   C                     Z-ADD0         W06
+|   C                     Z-ADD0         W07
+|   C                     Z-ADD0         W08
+| 13-C           WCOST     IFGT 0
+      *調入
+|   C*W01數量
+|   C                     Z-ADDIB13      W01
+|   C*W02成本ＦＯＢ
+|   C                     Z-ADDIB10      W02
+|   C*W03成本ＦＨＩ
+|   C                     Z-ADDIB11      W03
+|   C*W04成本ＤＵＴＹ
+|   C                     Z-ADDIB12      W04
+| 13*C                     ELSE
+      *調出
+|   C*W05數量
+|   C           IB13      MULT -1        W05
+|   C*W06成本ＦＯＢ
+|   C           IB10      MULT -1        W06
+|   C*W07成本ＦＨＩ
+|   C           IB11      MULT -1        W07
+|   C*W08成本ＤＵＴＹ
+|   C           IB12      MULT -1        W08
+      *
+| 13-C                     END
+|   C*
+|   C                     EXSR R2C00
+|   C*
+|   C                     EXSR R2E00
+|   C*
+|   C           TAG#21    TAG
+| 02*C                     ELSE
+      *未處理
+|   C                     MOVELIB17      W#G03
+|   C                     EXSR R2F00
+| 02-C                     END
+      *
+|   C                     READ IB0                      45
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RINTIB....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL20PF
+     C*==============================================================*
+04===C           RINTIB    BEGSR
+|    C*--------------------------------------------------------------*
+      *公司別RE/CN/WL
+| 01-C           WIB02     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WIB02     IFEQ 'C'
+|   C                     MOVEL'CN'      JL1002
+| 02-C                     END
+| 03-C           WIB02     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 03-C                     END
+      *
+|    C                     MOVE '1'       J1002$           辦事處
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL20PF
+      *公司別R/C
+|    C                     MOVELIB02      JL2002
+      *物流點
+|    C                     MOVELIB03      JL2003
+      *原因
+|    C                     MOVELIB17      JL2014
+      *
+|    C*--------------------------------------------------------------*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB1... 計算成本檔
+     C*         處理原因...01/07/08/10/11/14/16/17/19
+     C*==============================================================*
+05===C           RTNIB1    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨成本－客戶
+|    C                     MOVEL*BLANKS   JL1004
+| 03-C           IB03L     IFNE 'B'
+|   C                     MOVEL'510104  'JL1004
+| 03*C                     ELSE
+| 04-C           WIB02     IFEQ 'R'
+|   C           WIB02     OREQ 'C'
+| 05-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'51010211'JL1004
+| 05-C                     END
+| 06-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'51010212'JL1004
+| 06-C                     END
+| 07-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'51010213'JL1004
+| 07-C                     END
+| 08-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'51010214'JL1004
+| 08-C                     END
+| 09-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'51010215'JL1004
+| 09-C                     END
+| 10-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'51010216'JL1004
+| 10-C                     END
+| 11-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'51010217'JL1004
+| 11-C                     END
+| 12-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'51010218'JL1004
+| 12-C                     END
+| 13-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'51010219'JL1004
+| 13-C                     END
+| 14-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'51010220'JL1004
+| 14-C                     END
+| 15-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'51010221'JL1004
+| 15-C                     END
+| 16-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'51010222'JL1004
+| 16-C                     END
+| 17-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'51010223'JL1004
+| 17-C                     END
+| 18-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'51010224'JL1004
+| 18-C                     END
+| 19-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'51010225'JL1004
+| 19-C                     END
+| 20-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'51010226'JL1004
+| 20-C                     END
+| 21-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'51010227'JL1004
+| 21-C                     END
+| 22-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'51010228'JL1004
+| 22-C                     END
+| 23-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'51010229'JL1004
+| 23-C                     END
+| 24-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'51010230'JL1004
+| 24-C                     END
+| 04*C                     ELSE
+      *WIB02='W'
+| 25-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'510111  'JL1004
+| 25-C                     END
+| 26-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'510112  'JL1004
+| 26-C                     END
+| 27-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'510113  'JL1004
+| 27-C                     END
+| 28-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'510114  'JL1004
+| 28-C                     END
+| 29-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'510115  'JL1004
+| 29-C                     END
+| 30-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'510116  'JL1004
+| 30-C                     END
+| 31-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'510117  'JL1004
+| 31-C                     END
+| 32-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'510118  'JL1004
+| 32-C                     END
+| 33-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'510119  'JL1004
+| 33-C                     END
+| 34-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'510120  'JL1004
+| 34-C                     END
+| 35-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'510121  'JL1004
+| 35-C                     END
+| 36-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'510122  'JL1004
+| 36-C                     END
+| 37-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'510123  'JL1004
+| 37-C                     END
+| 38-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'510124  'JL1004
+| 38-C                     END
+| 39-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'510125  'JL1004
+| 39-C                     END
+| 40-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'510126  'JL1004
+| 40-C                     END
+| 41-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'510127  'JL1004
+| 41-C                     END
+| 42-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'510128  'JL1004
+| 42-C                     END
+| 43-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'510129  'JL1004
+| 43-C                     END
+| 44-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'510130  'JL1004
+| 44-C                     END
+| 04-C                     END
+| 03-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 45-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 45*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 45-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB2... 計算成本檔
+     C*         處理原因...02/03
+     C*==============================================================*
+06===C           RTNIB2    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－盤存損失
+|    C                     MOVEL*BLANKS   JL1004
+| 01-C           IB03L     IFEQ 'B'
+      *盤存損失－中信
+| 02-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'730511  'JL1004
+| 02-C                     END
+      *盤存損失－統領
+| 03-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'730512  'JL1004
+| 03-C                     END
+      *盤存損失－環亞
+| 04-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'730513  'JL1004
+| 04-C                     END
+| 05-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'730514  'JL1004
+| 05-C                     END
+| 06-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'730515  'JL1004
+| 06-C                     END
+| 07-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'730516  'JL1004
+| 07-C                     END
+| 08-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'730517  'JL1004
+| 08-C                     END
+| 09-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'730518  'JL1004
+| 09-C                     END
+| 10-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'730519  'JL1004
+| 10-C                     END
+| 11-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'730520  'JL1004
+| 11-C                     END
+| 12-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'730521  'JL1004
+| 12-C                     END
+| 13-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'730522  'JL1004
+| 13-C                     END
+| 14-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'730523  'JL1004
+| 14-C                     END
+| 15-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'730524  'JL1004
+| 15-C                     END
+| 16-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'730525  'JL1004
+| 16-C                     END
+| 17-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'730526  'JL1004
+| 17-C                     END
+| 18-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'730527  'JL1004
+| 18-C                     END
+| 19-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'730528  'JL1004
+| 19-C                     END
+| 20-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'730529  'JL1004
+| 20-C                     END
+| 21-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'730530  'JL1004
+| 21-C                     END
+      *
+| 01*C                     ELSE
+      *盤存損失－匯東
+| 22-C           WIB02     IFEQ 'R'
+|   C                     MOVEL'730501  'JL1004
+| 22-C                     END
+      *盤存損失－康齡
+| 23-C           WIB02     IFEQ 'C'
+|   C                     MOVEL'730503  'JL1004
+| 23-C                     END
+      *盤存損失－匯齡
+| 24-C           WIB02     IFEQ 'W'
+|   C                     MOVEL'730502  'JL1004
+| 24-C                     END
+      *
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 25-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 25-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 26-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 26*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 26-C                     END
+|    C*
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 27-C           WCOST     IFGT 0
+|   C                     Z-ADDWCOST     W01
+| 27*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 27-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB3... 計算成本檔
+     C*         處理原因...04
+     C*==============================================================*
+07===C           RTNIB3    BEGSR
+      *----------------------------------------------------------------
+| 01-C           WCOST     IFGT 0
+|   C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 02-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 02*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 02-C                     END
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）二................庫存異動傳票
+      *會計科目－盤存利益
+|   C                     MOVEL*BLANKS   JL1004
+| 04-C           IB03L     IFEQ 'B'
+      *盤存利益－中信
+| 05-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'710511  'JL1004
+| 05-C                     END
+      *盤存利益－統領
+| 06-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'710512  'JL1004
+| 06-C                     END
+      *盤存利益－環亞
+| 07-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'710513  'JL1004
+| 07-C                     END
+| 08-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'710514  'JL1004
+| 08-C                     END
+| 09-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'710515  'JL1004
+| 09-C                     END
+| 10-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'710516  'JL1004
+| 10-C                     END
+| 11-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'710517  'JL1004
+| 11-C                     END
+| 12-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'710518  'JL1004
+| 12-C                     END
+| 13-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'710519  'JL1004
+| 13-C                     END
+| 14-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'710520  'JL1004
+| 14-C                     END
+| 15-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'710521  'JL1004
+| 15-C                     END
+| 16-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'710522  'JL1004
+| 16-C                     END
+| 17-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'710523  'JL1004
+| 17-C                     END
+| 18-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'710524  'JL1004
+| 18-C                     END
+| 19-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'710525  'JL1004
+| 19-C                     END
+| 20-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'710526  'JL1004
+| 20-C                     END
+| 21-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'710527  'JL1004
+| 21-C                     END
+| 22-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'710528  'JL1004
+| 22-C                     END
+| 23-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'710529  'JL1004
+| 23-C                     END
+| 24-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'710530  'JL1004
+| 24-C                     END
+      *
+| 04*C                     ELSE
+      *盤存利益－匯東
+| 25-C           WIB02     IFEQ 'R'
+|   C                     MOVEL'710501  'JL1004
+| 25-C                     END
+      *盤存利益－康齡
+| 26-C           WIB02     IFEQ 'C'
+|   C                     MOVEL'710503  'JL1004
+| 26-C                     END
+      *盤存利益－匯齡
+| 27-C           WIB02     IFEQ 'W'
+|   C                     MOVEL'710502  'JL1004
+| 27-C                     END
+      *
+| 04-C                     END
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 28-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 28*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 28-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+|   C*
+| 01-C                     END
+      *================================================================
+| 29-C           WCOST     IFLT 0
+|   C                     MULT -1        WCOST
+      *----------------------------------------------------------------
+|   C*（１）一................庫存異動傳票
+      *會計科目－盤存損失
+|   C                     MOVEL*BLANKS   JL1004
+| 30-C           IB03L     IFEQ 'B'
+      *盤存損失－中信
+| 31-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'730511  'JL1004
+| 31-C                     END
+      *盤存損失－統領
+| 32-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'730512  'JL1004
+| 32-C                     END
+      *盤存損失－環亞
+| 33-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'730513  'JL1004
+| 33-C                     END
+| 34-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'730514  'JL1004
+| 34-C                     END
+| 35-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'730515  'JL1004
+| 35-C                     END
+| 36-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'730516  'JL1004
+| 36-C                     END
+| 37-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'730517  'JL1004
+| 37-C                     END
+| 38-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'730518  'JL1004
+| 38-C                     END
+| 39-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'730519  'JL1004
+| 39-C                     END
+| 40-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'730520  'JL1004
+| 40-C                     END
+| 41-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'730521  'JL1004
+| 41-C                     END
+| 42-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'730522  'JL1004
+| 42-C                     END
+| 43-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'730523  'JL1004
+| 43-C                     END
+| 44-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'730524  'JL1004
+| 44-C                     END
+| 45-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'730525  'JL1004
+| 45-C                     END
+| 46-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'730526  'JL1004
+| 46-C                     END
+| 47-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'730527  'JL1004
+| 47-C                     END
+| 48-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'730528  'JL1004
+| 48-C                     END
+| 49-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'730529  'JL1004
+| 49-C                     END
+| 50-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'730530  'JL1004
+| 50-C                     END
+      *
+| 30*C                     ELSE
+      *盤存損失－匯東
+| 51-C           WIB02     IFEQ 'R'
+|   C                     MOVEL'730501  'JL1004
+| 51-C                     END
+      *盤存損失－康齡
+| 52-C           WIB02     IFEQ 'C'
+|   C                     MOVEL'730503  'JL1004
+| 52-C                     END
+      *盤存損失－匯齡
+| 53-C           WIB02     IFEQ 'W'
+|   C                     MOVEL'730502  'JL1004
+| 53-C                     END
+      *
+| 30-C                     END
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 54-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 54*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 54-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 55-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 55*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 55-C                     END
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 56-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 56*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 56-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+|   C*還原
+|   C                     MULT -1        WCOST
+| 29-C                     END
+07===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB4... 計算成本檔
+     C*         處理原因...06
+     C*==============================================================*
+08===C           RTNIB4    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－盤存利益
+|    C                     MOVEL*BLANKS   JL1004
+| 03-C           IB03L     IFEQ 'B'
+      *盤存利益－中信
+| 04-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'710511  'JL1004
+| 04-C                     END
+      *盤存利益－統領
+| 05-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'710512  'JL1004
+| 05-C                     END
+      *盤存利益－環亞
+| 06-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'710513  'JL1004
+| 06-C                     END
+| 07-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'710514  'JL1004
+| 07-C                     END
+| 08-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'710515  'JL1004
+| 08-C                     END
+| 09-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'710516  'JL1004
+| 09-C                     END
+| 10-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'710517  'JL1004
+| 10-C                     END
+| 11-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'710518  'JL1004
+| 11-C                     END
+| 12-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'710519  'JL1004
+| 12-C                     END
+| 13-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'710520  'JL1004
+| 13-C                     END
+| 14-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'710521  'JL1004
+| 14-C                     END
+| 15-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'710522  'JL1004
+| 15-C                     END
+| 16-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'710523  'JL1004
+| 16-C                     END
+| 17-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'710524  'JL1004
+| 17-C                     END
+| 18-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'710525  'JL1004
+| 18-C                     END
+| 19-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'710526  'JL1004
+| 19-C                     END
+| 20-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'710527  'JL1004
+| 20-C                     END
+| 21-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'710528  'JL1004
+| 21-C                     END
+| 22-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'710529  'JL1004
+| 22-C                     END
+| 23-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'710530  'JL1004
+| 23-C                     END
+      *
+| 03*C                     ELSE
+      *盤存利益－匯東
+| 24-C           WIB02     IFEQ 'R'
+|   C                     MOVEL'710501  'JL1004
+| 24-C                     END
+      *盤存利益－康齡
+| 25-C           WIB02     IFEQ 'C'
+|   C                     MOVEL'710503  'JL1004
+| 25-C                     END
+      *盤存利益－匯齡
+| 26-C           WIB02     IFEQ 'W'
+|   C                     MOVEL'710502  'JL1004
+| 26-C                     END
+      *
+| 03-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 27-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 27*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 27-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+08===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB5... 計算成本檔
+     C*         處理原因...12
+     C*==============================================================*
+09===C           RTNIB5    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨跌價損失準備
+|    C                     MOVEL'1142    'JL1004
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 01-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 01*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 01-C                     END
+|    C*
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 02-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 02*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 02-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+09===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB6... 計算成本檔
+     C*         處理原因...13
+     C*==============================================================*
+10===C           RTNIB6    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－其他損失
+| 03-C           IB03L     IFNE 'B'
+| 04-C           WIB02     IFEQ 'W'
+|   C                     MOVEL'730902  'JL1004
+| 04*C                     ELSE
+| 05-C           WIB02     IFEQ 'C'
+|   C                     MOVEL'73090202'JL1004
+| 05*C                     ELSE
+|   C                     MOVEL'730901  'JL1004
+| 05-C                     END
+| 04-C                     END
+| 03*C                     ELSE
+      *
+| 06-C           IB03      IFEQ 'B0001'
+|   C                     MOVEL'73090211'JL1004
+| 06-C                     END
+| 07-C           IB03      IFEQ 'B0002'
+|   C                     MOVEL'73090212'JL1004
+| 07-C                     END
+| 08-C           IB03      IFEQ 'B0003'
+|   C                     MOVEL'73090213'JL1004
+| 08-C                     END
+| 09-C           IB03      IFEQ 'B0004'
+|   C                     MOVEL'73090214'JL1004
+| 09-C                     END
+| 10-C           IB03      IFEQ 'B0005'
+|   C                     MOVEL'73090215'JL1004
+| 10-C                     END
+| 11-C           IB03      IFEQ 'B0006'
+|   C                     MOVEL'73090216'JL1004
+| 11-C                     END
+| 12-C           IB03      IFEQ 'B0007'
+|   C                     MOVEL'73090217'JL1004
+| 12-C                     END
+| 13-C           IB03      IFEQ 'B0008'
+|   C                     MOVEL'73090218'JL1004
+| 13-C                     END
+| 14-C           IB03      IFEQ 'B0009'
+|   C                     MOVEL'73090219'JL1004
+| 14-C                     END
+| 15-C           IB03      IFEQ 'B0010'
+|   C                     MOVEL'73090220'JL1004
+| 15-C                     END
+| 16-C           IB03      IFEQ 'B0011'
+|   C                     MOVEL'73090221'JL1004
+| 16-C                     END
+| 17-C           IB03      IFEQ 'B0012'
+|   C                     MOVEL'73090222'JL1004
+| 17-C                     END
+| 18-C           IB03      IFEQ 'B0013'
+|   C                     MOVEL'73090223'JL1004
+| 18-C                     END
+| 19-C           IB03      IFEQ 'B0014'
+|   C                     MOVEL'73090224'JL1004
+| 19-C                     END
+| 20-C           IB03      IFEQ 'B0015'
+|   C                     MOVEL'73090225'JL1004
+| 20-C                     END
+| 21-C           IB03      IFEQ 'B0016'
+|   C                     MOVEL'73090226'JL1004
+| 21-C                     END
+| 22-C           IB03      IFEQ 'B0017'
+|   C                     MOVEL'73090227'JL1004
+| 22-C                     END
+| 23-C           IB03      IFEQ 'B0018'
+|   C                     MOVEL'73090228'JL1004
+| 23-C                     END
+| 24-C           IB03      IFEQ 'B0019'
+|   C                     MOVEL'73090229'JL1004
+| 24-C                     END
+| 25-C           IB03      IFEQ 'B0020'
+|   C                     MOVEL'73090230'JL1004
+| 25-C                     END
+      *
+| 03-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 26-C           IB10      IFLE 0
+|   C           IB10      MULT -1        W01
+| 26*C                     ELSE
+|   C                     Z-ADDIB10      W02
+| 26-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C                     MOVELARR,1     JL1007
+|    C*（１）三................庫存異動傳票
+      *會計科目－國外運費
+|    C                     MOVEL'212202  'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 27-C           IB11      IFLE 0
+|   C           IB11      MULT -1        W01
+| 27*C                     ELSE
+|   C                     Z-ADDIB11      W02
+| 27-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）三................庫存異動傳票
+      *會計科目－公賣利益
+|    C                     MOVEL'115101  'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 28-C           IB12      IFLE 0
+|   C           IB12      MULT -1        W01
+| 28*C                     ELSE
+|   C                     Z-ADDIB12      W02
+| 28-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1007
+|    C*
+10===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB7... 計算成本檔
+     C*         處理原因...20
+     C*==============================================================*
+11===C           RTNIB7    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－應收帳－國內買回貨款
+|    C                     MOVEL'212215  'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 03-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 03*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 03-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+11===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB8... 計算成本檔
+     C*         處理原因...21
+     C*==============================================================*
+12===C           RTNIB8    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－產品促銷－其他－人頭馬／其他品牌
+| 01-C           IB01A     IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080109'JL1004
+|   C                     MOVELIB01      JL1006
+| 01*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080209'JL1004
+|   C                     MOVELIB01A     JL1006
+| 01-C                     END
+      **MA11 FOR A&P --------
+|    C                     MOVEL*BLANKS   MA11
+|    C           IB01      CHAINMA0                  40
+      *10人頭馬品牌
+| 02-C           MA11      IFEQ '10'
+|   C                     MOVEL'460'     JL1007
+| 02*C                     ELSE
+      *11其他品牌
+| 03-C           MA11      IFEQ '11'
+|   C                     MOVEL'410'     JL1007
+| 03*C                     ELSE
+      *12ＪＱ
+| 04-C           MA11      IFEQ '12'
+|   C                     MOVEL'100'     JL1007
+| 04*C                     ELSE
+      *20威士忌21調酒22其他白蘭地
+| 05-C           MA11      IFEQ '20'
+|   C           MA11      OREQ '21'
+|   C           MA11      OREQ '22'
+|   C                     MOVEL'390'     JL1007
+| 05*C                     ELSE
+      *30葡萄酒
+| 06-C           MA11      IFEQ '30'
+|   C                     MOVEL'350'     JL1007
+|   C*
+      *專櫃酒
+| 06*C                     ELSE
+|   C                     MOVEL'370'     JL1007
+| 06-C                     END
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 07-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 07*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 07-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 08-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 08*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 08-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 09-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 09*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 09-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+12===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIB9... 計算成本檔
+     C*         處理原因...22
+     C*==============================================================*
+13===C           RTNIB9    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+|    C                     MOVELARR,1     JL1007
+      *會計科目－應付帳款－國外運費
+|    C                     MOVEL'212202  'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 03-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 03*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 03-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANK    JL1007
+|    C*
+13===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIBA... 計算成本檔
+     C*         處理原因...23
+     C*==============================================================*
+14===C           RTNIBA    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIB02     IFNE 'W'
+|   C           IB03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－應付帳款－國外運費
+|    C                     MOVEL'212202  'JL1004
+|    C                     MOVELARR,1     JL1007
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 03-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 03*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 03-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1007
+|    C*
+14===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIC .計算良壞轉換檔
+     C*==============================================================*
+15===C           RTNIC     BEGSR
+|    C*
+|    C           *LOVAL    SETLLIC0
+|    C                     READ IC0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+|   C                     MOVELIC02      W#G01
+B2000C                     Z-ADDIC05      W#G02
+|   C*
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#22
+|   C*
+      *INITIAL檔案共同欄位WFJL10PF/WFJL20PF KEY VALUES
+|   C                     EXSR RINTIC
+|   C           IC02      SETLLID0
+|   C           IC02      READEID0                      46
+| 02-C           *IN46     DOWEQ'0'
+      *
+      *WCOST成本
+|   C                     Z-ADD0         MA31
+|   C                     Z-ADD0         MA32
+|   C                     Z-ADD0         MA33
+|   C                     Z-ADD0         MA34
+|   C           ID03      CHAINMA0                  40
+|   C           ID04      MULT MA34      WCOST
+      *傳票WFJL10PF
+      *良轉壞
+| 03-C           IC04      IFEQ '1'
+      *
+|   C                     EXSR RTNIC1
+| 03*C                     ELSE
+      *------------
+| 04-C           IC04      IFEQ '2'
+|   C                     EXSR RTNIC2
+| 04-C                     END
+| 03-C                     END
+      *銷貨成本彙總WFJL20PF
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C                     Z-ADD0         W03
+|   C                     Z-ADD0         W04
+|   C                     Z-ADD0         W05
+|   C                     Z-ADD0         W06
+|   C                     Z-ADD0         W07
+|   C                     Z-ADD0         W08
+      *產品代號
+|   C                     MOVELID03      JL2004
+| 05-C           IC04      IFEQ '2'
+|   C*W01數量
+|   C                     Z-ADDID04      W01
+|   C*W02成本ＦＯＢ
+|   C           ID04      MULT MA31      W02
+|   C*W03成本ＦＨＩ
+|   C           ID04      MULT MA32      W03
+|   C*W04成本ＤＵＴＹ
+|   C           ID04      MULT MA33      W04
+      *
+| 05*C                     ELSE
+|   C*W05數量
+|   C                     Z-ADDID04      W05
+|   C*W06成本ＦＯＢ
+|   C           ID04      MULT MA31      W06
+|   C*W07成本ＦＨＩ
+|   C           ID04      MULT MA32      W07
+|   C*W08成本ＤＵＴＹ
+|   C           ID04      MULT MA33      W08
+      *
+| 05-C                     END
+      *----------------------------------------------------------------
+|   C                     EXSR R2C00
+|   C*
+|   C           IC02      READEID0                      46
+| 02-C                     END
+|   C                     EXSR R2E00
+|   C*
+|   C           TAG#22    TAG
+      *
+|   C                     READ IC0                      45
+| 01-C                     END
+|    C*
+15===C                     ENDSR
+     C*==============================================================*
+     C*          RINTIC....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL20PF
+     C*==============================================================*
+16===C           RINTIC    BEGSR
+|    C*--------------------------------------------------------------*
+|    C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+      *公司別RE/CN/WL
+| 01-C           WIC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WIC01     IFEQ 'C'
+|   C                     MOVEL'CN'      JL1002
+| 02-C                     END
+| 03-C           WIC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 03-C                     END
+      *
+|    C                     MOVE '1'       J1002$           辦事處
+|    C                     MOVEL'8'       JL1003
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+      *公司別R/C
+|    C                     MOVELIC01      JL2002
+|    C                     MOVEL'8'       JL2013
+      *物流點
+|    C                     MOVELIC03      JL2003
+      *原因
+|    C                     MOVEL*BLANKS   JL2014
+      *
+|    C*--------------------------------------------------------------*
+16===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIC1... 計算良轉壞
+     C*==============================================================*
+17===C           RTNIC1    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－其他損失
+| 01-C           WIC01     IFEQ 'W'
+|   C                     MOVEL'730902  'JL1004
+| 01*C                     ELSE
+| 02-C           WIC01     IFEQ 'C'
+|   C                     MOVEL'73090202'JL1004
+| 02*C                     ELSE
+|   C                     MOVEL'730901  'JL1004
+| 02-C                     END
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *借
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+      *
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨跌價損失準備
+|    C                     MOVEL'1142    'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *貸
+| 04-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 04*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+17===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIC2... 計算壞轉良
+     C*==============================================================*
+18===C           RTNIC2    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨跌價損失準備
+|    C                     MOVEL'1142    'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *借
+| 01-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 01*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 01-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－其他損失
+| 02-C           WIC01     IFEQ 'W'
+|   C                     MOVEL'730902  'JL1004
+| 02*C                     ELSE
+| 03-C           WIC01     IFEQ 'C'
+|   C                     MOVEL'73090202'JL1004
+| 03*C                     ELSE
+|   C                     MOVEL'730901  'JL1004
+| 03-C                     END
+| 02-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *貸
+| 04-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 04*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 04-C                     END
+      *
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+18===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIE .計算報廢檔
+     C*==============================================================*
+19===C           RTNIE     BEGSR
+|    C*
+|    C           *LOVAL    SETLLIE0
+|    C                     READ IE0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+|   C                     MOVELIE02      W#G01
+B2000C                     Z-ADDIE05      W#G02
+|   C*
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#23
+|   C*
+      *INITIAL檔案共同欄位WFJL10PF/WFJL20PF KEY VALUES
+|   C                     EXSR RINTIE
+|   C           IE02      SETLLIF0
+|   C           IE02      READEIF0                      46
+| 02-C           *IN46     DOWEQ'0'
+      *
+      *WCOST成本
+|   C           IF08      ADD  IF09      WCOST
+|   C                     ADD  IF10      WCOST
+      *傳票WFJL10PF
+      *
+|   C                     EXSR RTNIE1
+      *銷貨成本彙總WFJL20PF
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C                     Z-ADD0         W03
+|   C                     Z-ADD0         W04
+      *產品代號
+|   C                     MOVELIF03      JL2004
+|   C*W05數量
+|   C                     Z-ADDIF04      W05
+|   C*W06成本ＦＯＢ
+|   C                     Z-ADDIF08      W06
+|   C*W07成本ＦＨＩ
+|   C                     Z-ADDIF09      W07
+|   C*W08成本ＤＵＴＹ
+|   C                     Z-ADDIF10      W08
+      *
+      *----------------------------------------------------------------
+|   C                     EXSR R2C00
+|   C*
+|   C           IE02      READEIF0                      46
+| 02-C                     END
+|   C*
+|   C                     EXSR R2E00
+|   C           TAG#23    TAG
+      *
+|   C                     READ IE0                      45
+| 01-C                     END
+|    C*
+19===C                     ENDSR
+     C*==============================================================*
+     C*          RINTIE....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL20PF
+     C*==============================================================*
+20===C           RINTIE    BEGSR
+|    C*--------------------------------------------------------------*
+|    C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+      *公司別RE/CN/WL
+| 01-C           WIE01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WIE01     IFEQ 'C'
+|   C                     MOVEL'CN'      JL1002
+| 02-C                     END
+| 03-C           WIE01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 03-C                     END
+      *
+|    C                     MOVE '1'       J1002$           辦事處
+|    C                     MOVEL'5'       JL1003
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+      *公司別R/C
+|    C                     MOVELIE01      JL2002
+|    C                     MOVEL'5'       JL2013
+      *物流點
+|    C                     MOVELIE03      JL2003
+      *原因
+|    C                     MOVEL*BLANKS   JL2014
+      *
+|    C*--------------------------------------------------------------*
+20===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIE1... 計算報廢
+     C*==============================================================*
+21===C           RTNIE1    BEGSR
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨跌價損失準備
+|    C                     MOVEL'1142    'JL1004
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *借
+| 01-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 01*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 01-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 02-C           WIE01     IFNE 'W'
+|   C           IE03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 02*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 02-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *貸
+| 03-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 03*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 03-C                     END
+      *
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+|    C*
+21===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG .計算調整檔
+     C*==============================================================*
+22===C           RTNIG     BEGSR
+|    C*
+|    C           *LOVAL    SETLLIG0
+|    C                     READ IG0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+|   C                     MOVELIG02      W#G01
+B2000C                     Z-ADDIG05      W#G02
+|   C*
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#24
+      *
+| 02-C           IG06      IFEQ '01'
+|   C           IG06      OREQ '02'
+|   C           IG06      OREQ '03'
+|   C           IG06      OREQ '04'
+|   C           IG06      OREQ '06'
+|   C           IG06      OREQ '07'
+|   C           IG06      OREQ '08'
+|   C           IG06      OREQ '10'
+|   C           IG06      OREQ '11'
+|   C           IG06      OREQ '12'
+|   C           IG06      OREQ '13'
+|   C           IG06      OREQ '14'
+|   C           IG06      OREQ '16'
+|   C           IG06      OREQ '17'
+|   C           IG06      OREQ '19'
+|   C           IG06      OREQ '20'
+|   C           IG06      OREQ '21'
+|   C           IG06      OREQ '22'
+|   C           IG06      OREQ '23'
+|   C*
+      *INITIAL檔案共同欄位WFJL10PF/WFJL20PF KEY VALUES
+|   C                     EXSR RINTIG
+|   C           IG02      SETLLIH0
+|   C           IG02      READEIH0                      46
+| 03-C           *IN46     DOWEQ'0'
+      *
+      *WCOST成本
+|   C           IH08      ADD  IH09      WCOST
+|   C                     ADD  IH10      WCOST
+      *傳票WFJL10PF
+| 04-C           IG06      IFEQ '01'
+|   C           IG06      OREQ '07'
+|   C           IG06      OREQ '08'
+|   C           IG06      OREQ '10'
+|   C           IG06      OREQ '11'
+|   C           IG06      OREQ '14'
+|   C           IG06      OREQ '16'
+|   C           IG06      OREQ '17'
+|   C           IG06      OREQ '19'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'1'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'1'       JL2013
+      *
+|   C                     EXSR RTNIG1
+| 04*C                     ELSE
+      *------------
+| 05-C           IG06      IFEQ '02'
+|   C           IG06      OREQ '03'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'2'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'2'       JL2013
+|   C                     EXSR RTNIG2
+| 05*C                     ELSE
+      *------------
+| 06-C           IG06      IFEQ '04'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'3'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'3'       JL2013
+|   C                     EXSR RTNIG3
+| 06*C                     ELSE
+      *------------
+| 07-C           IG06      IFEQ '06'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'4'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'4'       JL2013
+|   C                     EXSR RTNIG4
+| 07*C                     ELSE
+      *------------
+| 08-C           IG06      IFEQ '12'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'5'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'5'       JL2013
+|   C                     EXSR RTNIG5
+| 08*C                     ELSE
+      *------------
+| 09-C           IG06      IFEQ '13'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIG05      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIG05      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIG6
+      *------------
+| 09*C                     ELSE
+| 10-C           IG06      IFEQ '20'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIG05      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIG05      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIG7
+| 10*C                     ELSE
+| 11-C           IG06      IFEQ '21'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+|   C                     MOVEL'9'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+|   C                     MOVEL'9'       JL2013
+|   C                     EXSR RTNIG8
+| 11*C                     ELSE
+| 12-C           IG06      IFEQ '22'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIG05      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIG05      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIG9
+| 12*C                     ELSE
+| 13-C           IG06      IFEQ '23'
+|   C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDIG05      JL1001
+|   C                     MOVEL'6'       JL1003
+|   C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDIG05      JL2001
+|   C                     MOVEL'6'       JL2013
+|   C                     EXSR RTNIGA
+| 13-C                     END
+| 12-C                     END
+| 11-C                     END
+| 10-C                     END
+| 09-C                     END
+| 08-C                     END
+| 07-C                     END
+| 06-C                     END
+| 05-C                     END
+| 04-C                     END
+      *銷貨成本彙總WFJL20PF
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C                     Z-ADD0         W03
+|   C                     Z-ADD0         W04
+|   C                     Z-ADD0         W05
+|   C                     Z-ADD0         W06
+|   C                     Z-ADD0         W07
+|   C                     Z-ADD0         W08
+      *產品代號
+| 14-C           IH04      IFNE *BLANKS
+|   C                     MOVELIH04      JL2004
+|   C*W01數量
+|   C                     Z-ADDIH05      W01
+|   C*W02成本ＦＯＢ
+|   C                     Z-ADDIH08      W02
+|   C*W03成本ＦＨＩ
+|   C                     Z-ADDIH09      W03
+|   C*W04成本ＤＵＴＹ
+|   C                     Z-ADDIH10      W04
+|   C                     EXSR R2C00
+| 14-C                     END
+      *
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C                     Z-ADD0         W03
+|   C                     Z-ADD0         W04
+|   C                     Z-ADD0         W05
+|   C                     Z-ADD0         W06
+|   C                     Z-ADD0         W07
+|   C                     Z-ADD0         W08
+      *產品代號
+| 15-C           IH03      IFNE *BLANKS
+|   C                     MOVELIH03      JL2004
+|   C*W05數量
+|   C                     Z-ADDIH05      W05
+|   C*W06成本ＦＯＢ
+|   C                     Z-ADDIH08      W06
+|   C*W07成本ＦＨＩ
+|   C                     Z-ADDIH09      W07
+|   C*W08成本ＤＵＴＹ
+|   C                     Z-ADDIH10      W08
+|   C                     EXSR R2C00
+      *
+| 15-C                     END
+      *----------------------------------------------------------------
+|   C*
+|   C           IG02      READEIH0                      46
+| 03-C                     END
+|   C                     EXSR R2E00
+|   C*
+|   C           TAG#24    TAG
+| 02*C                     ELSE
+      *未處理
+|   C                     MOVELIG06      W#G03
+|   C                     EXSR R2F00
+| 02-C                     END
+      *
+|   C                     READ IG0                      45
+| 01-C                     END
+|    C*
+22===C                     ENDSR
+     C*==============================================================*
+     C*          RINTIG....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL20PF
+     C*==============================================================*
+23===C           RINTIG    BEGSR
+|    C*--------------------------------------------------------------*
+      *公司別RE/CN/WL
+| 01-C           WIG01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WIG01     IFEQ 'C'
+|   C                     MOVEL'CN'      JL1002
+| 02-C                     END
+| 03-C           WIG01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 03-C                     END
+      *
+|    C                     MOVE '1'       J1002$           辦事處
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL20PF
+      *公司別R/C
+|    C                     MOVELIG01      JL2002
+      *物流點
+|    C                     MOVELIG03      JL2003
+      *原因
+|    C                     MOVELIG06      JL2014
+      *
+|    C*--------------------------------------------------------------*
+23===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG1... 計算調整檔
+     C*         處理原因...01/07/08/10/11/14/16/17/19
+     C*==============================================================*
+24===C           RTNIG1    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *IH04借
+| 02-C           IH04      IFNE *BLANKS
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+| 02-C                     END
+      *IH03貸
+| 04-C           IH03      IFNE *BLANKS
+| 05-C           WCOST     IFLT 0
+|   C           WCOST     MULT -1        W01
+| 05*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨成本－客戶
+|    C                     MOVEL*BLANKS   JL1004
+| 06-C           IG03L     IFNE 'B'
+|   C                     MOVEL'510104  'JL1004
+| 06*C                     ELSE
+| 07-C           WIG01     IFEQ 'R'
+|   C           WIG01     OREQ 'C'
+| 08-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'51010211'JL1004
+| 08-C                     END
+| 09-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'51010212'JL1004
+| 09-C                     END
+| 10-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'51010213'JL1004
+| 10-C                     END
+| 11-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'51010214'JL1004
+| 11-C                     END
+| 12-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'51010215'JL1004
+| 12-C                     END
+| 13-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'51010216'JL1004
+| 13-C                     END
+| 14-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'51010217'JL1004
+| 14-C                     END
+| 15-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'51010218'JL1004
+| 15-C                     END
+| 16-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'51010219'JL1004
+| 16-C                     END
+| 17-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'51010220'JL1004
+| 17-C                     END
+| 18-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'51010221'JL1004
+| 18-C                     END
+| 19-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'51010222'JL1004
+| 19-C                     END
+| 20-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'51010223'JL1004
+| 20-C                     END
+| 21-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'51010224'JL1004
+| 21-C                     END
+| 22-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'51010225'JL1004
+| 22-C                     END
+| 23-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'51010226'JL1004
+| 23-C                     END
+| 24-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'51010227'JL1004
+| 24-C                     END
+| 25-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'51010228'JL1004
+| 25-C                     END
+| 26-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'51010229'JL1004
+| 26-C                     END
+| 27-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'51010230'JL1004
+| 27-C                     END
+| 07*C                     ELSE
+      *WIG01='W'
+| 28-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'510111  'JL1004
+| 28-C                     END
+| 29-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'510112  'JL1004
+| 29-C                     END
+| 30-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'510113  'JL1004
+| 30-C                     END
+| 31-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'510114  'JL1004
+| 31-C                     END
+| 32-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'510115  'JL1004
+| 32-C                     END
+| 33-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'510116  'JL1004
+| 33-C                     END
+| 34-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'510117  'JL1004
+| 34-C                     END
+| 35-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'510118  'JL1004
+| 35-C                     END
+| 36-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'510119  'JL1004
+| 36-C                     END
+| 37-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'510120  'JL1004
+| 37-C                     END
+| 38-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'510121  'JL1004
+| 38-C                     END
+| 39-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'510122  'JL1004
+| 39-C                     END
+| 40-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'510123  'JL1004
+| 40-C                     END
+| 41-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'510124  'JL1004
+| 41-C                     END
+| 42-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'510125  'JL1004
+| 42-C                     END
+| 43-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'510126  'JL1004
+| 43-C                     END
+| 44-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'510127  'JL1004
+| 44-C                     END
+| 45-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'510128  'JL1004
+| 45-C                     END
+| 46-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'510129  'JL1004
+| 46-C                     END
+| 47-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'510130  'JL1004
+| 47-C                     END
+| 07-C                     END
+| 06-C                     END
+|    C*
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+      *IH03借
+| 48-C           IH03      IFNE *BLANKS
+| 49-C           WCOST     IFGT 0
+|   C                     Z-ADDWCOST     W01
+| 49*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 49-C                     END
+| 48-C                     END
+      *IH04貸
+| 50-C           IH04      IFNE *BLANKS
+| 51-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 51*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 51-C                     END
+| 50-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+24===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG2... 計算調整檔
+     C*         處理原因...02/03
+     C*==============================================================*
+25===C           RTNIG2    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－盤存損失
+|    C                     MOVEL*BLANKS   JL1004
+| 01-C           IG03L     IFEQ 'B'
+      *盤存損失－中信
+| 02-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'730511  'JL1004
+| 02-C                     END
+      *盤存損失－統領
+| 03-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'730512  'JL1004
+| 03-C                     END
+      *盤存損失－環亞
+| 04-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'730513  'JL1004
+| 04-C                     END
+| 05-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'730514  'JL1004
+| 05-C                     END
+| 06-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'730515  'JL1004
+| 06-C                     END
+| 07-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'730516  'JL1004
+| 07-C                     END
+| 08-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'730517  'JL1004
+| 08-C                     END
+| 09-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'730518  'JL1004
+| 09-C                     END
+| 10-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'730519  'JL1004
+| 10-C                     END
+| 11-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'730520  'JL1004
+| 11-C                     END
+| 12-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'730521  'JL1004
+| 12-C                     END
+| 13-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'730522  'JL1004
+| 13-C                     END
+| 14-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'730523  'JL1004
+| 14-C                     END
+| 15-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'730524  'JL1004
+| 15-C                     END
+| 16-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'730525  'JL1004
+| 16-C                     END
+| 17-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'730526  'JL1004
+| 17-C                     END
+| 18-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'730527  'JL1004
+| 18-C                     END
+| 19-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'730528  'JL1004
+| 19-C                     END
+| 20-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'730529  'JL1004
+| 20-C                     END
+| 21-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'730530  'JL1004
+| 21-C                     END
+      *
+| 01*C                     ELSE
+      *盤存損失－匯東
+| 22-C           WIG01     IFEQ 'R'
+|   C                     MOVEL'730501  'JL1004
+| 22-C                     END
+      *盤存損失－康齡
+| 23-C           WIG01     IFEQ 'C'
+|   C                     MOVEL'730503  'JL1004
+| 23-C                     END
+      *盤存損失－匯齡
+| 24-C           WIG01     IFEQ 'W'
+|   C                     MOVEL'730502  'JL1004
+| 24-C                     END
+      *
+| 01-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 25-C           IH03      IFNE *BLANKS
+| 26-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 26*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 26-C                     END
+| 25-C                     END
+|    C*IH04貸
+| 27-C           IH04      IFNE *BLANKS
+| 28-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 28*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 28-C                     END
+| 27-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 29-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 29*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 29-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 30-C           IH04      IFNE *BLANKS
+| 31-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 31*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 31-C                     END
+| 30-C                     END
+|    C*IH03貸
+| 32-C           IH03      IFNE *BLANKS
+| 33-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 33*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 33-C                     END
+| 32-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+25===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG3... 計算成本檔
+     C*         處理原因...04
+     C*==============================================================*
+26===C           RTNIG3    BEGSR
+      *----------------------------------------------------------------
+| 01-C           IH04      IFNE *BLANKS
+|   C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 02-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 02*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 02-C                     END
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C*IH04借
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）二................庫存異動傳票
+      *會計科目－盤存利益
+|   C                     MOVEL*BLANKS   JL1004
+| 04-C           IG03L     IFEQ 'B'
+      *盤存利益－中信
+| 05-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'710511  'JL1004
+| 05-C                     END
+      *盤存利益－統領
+| 06-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'710512  'JL1004
+| 06-C                     END
+      *盤存利益－環亞
+| 07-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'710513  'JL1004
+| 07-C                     END
+| 08-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'710514  'JL1004
+| 08-C                     END
+| 09-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'710515  'JL1004
+| 09-C                     END
+| 10-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'710516  'JL1004
+| 10-C                     END
+| 11-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'710517  'JL1004
+| 11-C                     END
+| 12-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'710518  'JL1004
+| 12-C                     END
+| 13-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'710519  'JL1004
+| 13-C                     END
+| 14-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'710520  'JL1004
+| 14-C                     END
+| 15-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'710521  'JL1004
+| 15-C                     END
+| 16-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'710522  'JL1004
+| 16-C                     END
+| 17-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'710523  'JL1004
+| 17-C                     END
+| 18-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'710524  'JL1004
+| 18-C                     END
+| 19-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'710525  'JL1004
+| 19-C                     END
+| 20-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'710526  'JL1004
+| 20-C                     END
+| 21-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'710527  'JL1004
+| 21-C                     END
+| 22-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'710528  'JL1004
+| 22-C                     END
+| 23-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'710529  'JL1004
+| 23-C                     END
+| 24-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'710530  'JL1004
+| 24-C                     END
+      *
+| 04*C                     ELSE
+      *盤存利益－匯東
+| 25-C           WIG01     IFEQ 'R'
+|   C                     MOVEL'710501  'JL1004
+| 25-C                     END
+      *盤存利益－康齡
+| 26-C           WIG01     IFEQ 'C'
+|   C                     MOVEL'710503  'JL1004
+| 26-C                     END
+      *盤存利益－匯齡
+| 27-C           WIG01     IFEQ 'W'
+|   C                     MOVEL'710502  'JL1004
+| 27-C                     END
+      *
+| 04-C                     END
+|   C*IH04貸
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 28-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 28*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 28-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+|   C*
+| 01-C                     END
+      *================================================================
+| 29-C           IH03      IFNE *BLANKS
+      *----------------------------------------------------------------
+|   C*（１）一................庫存異動傳票
+      *會計科目－盤存損失
+|   C                     MOVEL*BLANKS   JL1004
+| 30-C           IG03L     IFEQ 'B'
+      *盤存損失－中信
+| 31-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'730511  'JL1004
+| 31-C                     END
+      *盤存損失－統領
+| 32-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'730512  'JL1004
+| 32-C                     END
+      *盤存損失－環亞
+| 33-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'730513  'JL1004
+| 33-C                     END
+| 34-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'730514  'JL1004
+| 34-C                     END
+| 35-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'730515  'JL1004
+| 35-C                     END
+| 36-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'730516  'JL1004
+| 36-C                     END
+| 37-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'730517  'JL1004
+| 37-C                     END
+| 38-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'730518  'JL1004
+| 38-C                     END
+| 39-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'730519  'JL1004
+| 39-C                     END
+| 40-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'730520  'JL1004
+| 40-C                     END
+| 41-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'730521  'JL1004
+| 41-C                     END
+| 42-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'730522  'JL1004
+| 42-C                     END
+| 43-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'730523  'JL1004
+| 43-C                     END
+| 44-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'730524  'JL1004
+| 44-C                     END
+| 45-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'730525  'JL1004
+| 45-C                     END
+| 46-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'730526  'JL1004
+| 46-C                     END
+| 47-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'730527  'JL1004
+| 47-C                     END
+| 48-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'730528  'JL1004
+| 48-C                     END
+| 49-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'730529  'JL1004
+| 49-C                     END
+| 50-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'730530  'JL1004
+| 50-C                     END
+      *
+| 30*C                     ELSE
+      *盤存損失－匯東
+| 51-C           WIG01     IFEQ 'R'
+|   C                     MOVEL'730501  'JL1004
+| 51-C                     END
+      *盤存損失－康齡
+| 52-C           WIG01     IFEQ 'C'
+|   C                     MOVEL'730503  'JL1004
+| 52-C                     END
+      *盤存損失－匯齡
+| 53-C           WIG01     IFEQ 'W'
+|   C                     MOVEL'730502  'JL1004
+| 53-C                     END
+      *
+| 30-C                     END
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C*IH03借
+| 54-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 54*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 54-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 55-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 55*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 55-C                     END
+|   C*IH03貸
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 56-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 56*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 56-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+|   C*
+| 29-C                     END
+26===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG4... 計算成本檔
+     C*         處理原因...06
+     C*==============================================================*
+27===C           RTNIG4    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 02-C           IH04      IFNE *BLANKS
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+| 02-C                     END
+|    C*
+|    C*IH03貸
+| 04-C           IH03      IFNE *BLANKS
+| 05-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 05*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－盤存利益
+|    C                     MOVEL*BLANKS   JL1004
+| 06-C           IG03L     IFEQ 'B'
+      *盤存利益－中信
+| 07-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'710511  'JL1004
+| 07-C                     END
+      *盤存利益－統領
+| 08-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'710512  'JL1004
+| 08-C                     END
+      *盤存利益－環亞
+| 09-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'710513  'JL1004
+| 09-C                     END
+| 10-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'710514  'JL1004
+| 10-C                     END
+| 11-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'710515  'JL1004
+| 11-C                     END
+| 12-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'710516  'JL1004
+| 12-C                     END
+| 13-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'710517  'JL1004
+| 13-C                     END
+| 14-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'710518  'JL1004
+| 14-C                     END
+| 15-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'710519  'JL1004
+| 15-C                     END
+| 16-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'710520  'JL1004
+| 16-C                     END
+| 17-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'710521  'JL1004
+| 17-C                     END
+| 18-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'710522  'JL1004
+| 18-C                     END
+| 19-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'710523  'JL1004
+| 19-C                     END
+| 20-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'710524  'JL1004
+| 20-C                     END
+| 21-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'710525  'JL1004
+| 21-C                     END
+| 22-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'710526  'JL1004
+| 22-C                     END
+| 23-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'710527  'JL1004
+| 23-C                     END
+| 24-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'710528  'JL1004
+| 24-C                     END
+| 25-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'710529  'JL1004
+| 25-C                     END
+| 26-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'710530  'JL1004
+| 26-C                     END
+      *
+| 06*C                     ELSE
+      *盤存利益－匯東
+| 27-C           WIG01     IFEQ 'R'
+|   C                     MOVEL'710501  'JL1004
+| 27-C                     END
+      *盤存利益－康齡
+| 28-C           WIG01     IFEQ 'C'
+|   C                     MOVEL'710503  'JL1004
+| 28-C                     END
+      *盤存利益－匯齡
+| 29-C           WIG01     IFEQ 'W'
+|   C                     MOVEL'710502  'JL1004
+| 29-C                     END
+      *
+| 06-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 30-C           IH03      IFNE *BLANKS
+| 31-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 31*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 31-C                     END
+| 30-C                     END
+|    C*IH04貸
+| 32-C           IH04      IFNE *BLANKS
+| 33-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 33*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 33-C                     END
+| 32-C                     END
+|    C*
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+27===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG5... 計算成本檔
+     C*         處理原因...12
+     C*==============================================================*
+28===C           RTNIG5    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨跌價損失準備
+|    C                     MOVEL'1142    'JL1004
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 01-C           IH03      IFNE *BLANKS
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+| 01-C                     END
+|    C*IH04貸
+| 03-C           IH04      IFNE *BLANKS
+| 04-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 04*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 04-C                     END
+| 03-C                     END
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 05-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 05*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 05-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*
+|    C*IH04借
+| 06-C           IH04      IFNE *BLANKS
+| 07-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 07*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 07-C                     END
+| 06-C                     END
+|    C*IH03貸
+| 08-C           IH03      IFNE *BLANKS
+| 09-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 09*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 09-C                     END
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+28===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG6... 計算調整檔
+     C*         處理原因...13
+     C*==============================================================*
+29===C           RTNIG6    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 02-C           IH04      IFNE *BLANKS
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+| 02-C                     END
+|    C*IH03貸
+| 04-C           IH03      IFNE *BLANKS
+| 05-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 05*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－其他損失
+| 06-C           IG03L     IFNE 'B'
+| 07-C           WIG01     IFEQ 'W'
+|   C                     MOVEL'730902  'JL1004
+| 07*C                     ELSE
+| 08-C           WIG01     IFEQ 'C'
+|   C                     MOVEL'73090202'JL1004
+| 08*C                     ELSE
+|   C                     MOVEL'730901  'JL1004
+| 08-C                     END
+| 07-C                     END
+| 06*C                     ELSE
+      *
+| 09-C           IG03      IFEQ 'B0001'
+|   C                     MOVEL'73090211'JL1004
+| 09-C                     END
+| 10-C           IG03      IFEQ 'B0002'
+|   C                     MOVEL'73090212'JL1004
+| 10-C                     END
+| 11-C           IG03      IFEQ 'B0003'
+|   C                     MOVEL'73090213'JL1004
+| 11-C                     END
+| 12-C           IG03      IFEQ 'B0004'
+|   C                     MOVEL'73090214'JL1004
+| 12-C                     END
+| 13-C           IG03      IFEQ 'B0005'
+|   C                     MOVEL'73090215'JL1004
+| 13-C                     END
+| 14-C           IG03      IFEQ 'B0006'
+|   C                     MOVEL'73090216'JL1004
+| 14-C                     END
+| 15-C           IG03      IFEQ 'B0007'
+|   C                     MOVEL'73090217'JL1004
+| 15-C                     END
+| 16-C           IG03      IFEQ 'B0008'
+|   C                     MOVEL'73090218'JL1004
+| 16-C                     END
+| 17-C           IG03      IFEQ 'B0009'
+|   C                     MOVEL'73090219'JL1004
+| 17-C                     END
+| 18-C           IG03      IFEQ 'B0010'
+|   C                     MOVEL'73090220'JL1004
+| 18-C                     END
+| 19-C           IG03      IFEQ 'B0011'
+|   C                     MOVEL'73090221'JL1004
+| 19-C                     END
+| 20-C           IG03      IFEQ 'B0012'
+|   C                     MOVEL'73090222'JL1004
+| 20-C                     END
+| 21-C           IG03      IFEQ 'B0013'
+|   C                     MOVEL'73090223'JL1004
+| 21-C                     END
+| 22-C           IG03      IFEQ 'B0014'
+|   C                     MOVEL'73090224'JL1004
+| 22-C                     END
+| 23-C           IG03      IFEQ 'B0015'
+|   C                     MOVEL'73090225'JL1004
+| 23-C                     END
+| 24-C           IG03      IFEQ 'B0016'
+|   C                     MOVEL'73090226'JL1004
+| 24-C                     END
+| 25-C           IG03      IFEQ 'B0017'
+|   C                     MOVEL'73090227'JL1004
+| 25-C                     END
+| 26-C           IG03      IFEQ 'B0018'
+|   C                     MOVEL'73090228'JL1004
+| 26-C                     END
+| 27-C           IG03      IFEQ 'B0019'
+|   C                     MOVEL'73090229'JL1004
+| 27-C                     END
+| 28-C           IG03      IFEQ 'B0020'
+|   C                     MOVEL'73090230'JL1004
+| 28-C                     END
+      *
+| 06-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 29-C           IH03      IFNE *BLANKS
+| 30-C           IH08      IFGE 0
+|   C                     Z-ADDIH08      W01
+| 30*C                     ELSE
+|   C           IH08      MULT -1        W02
+| 30-C                     END
+| 29-C                     END
+|    C*
+|    C*IH04貸
+| 31-C           IH04      IFNE *BLANKS
+| 32-C           IH08      IFLE 0
+|   C           IH08      MULT -1        W01
+| 32*C                     ELSE
+|   C                     Z-ADDIH08      W02
+| 32-C                     END
+| 31-C                     END
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C                     MOVELARR,1     JL1007
+|    C*（１）三................庫存異動傳票
+      *會計科目－國外運費
+|    C                     MOVEL'212202  'JL1004
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 33-C           IH03      IFNE *BLANKS
+| 34-C           IH09      IFGE 0
+|   C                     Z-ADDIH09      W01
+| 34*C                     ELSE
+|   C           IH09      MULT -1        W02
+| 34-C                     END
+| 33-C                     END
+|    C*IH04貸
+| 35-C           IH04      IFNE *BLANKS
+| 36-C           IH09      IFLE 0
+|   C           IH09      MULT -1        W01
+| 36*C                     ELSE
+|   C                     Z-ADDIH09      W02
+| 36-C                     END
+| 35-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）三................庫存異動傳票
+      *會計科目－公賣利益
+|    C                     MOVEL'115101  'JL1004
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 37-C           IH03      IFNE *BLANKS
+| 38-C           IH10      IFGE 0
+|   C                     Z-ADDIH10      W01
+| 38*C                     ELSE
+|   C           IH10      MULT -1        W02
+| 38-C                     END
+| 37-C                     END
+|    C*IH04貸
+| 39-C           IH04      IFNE *BLANKS
+| 40-C           IH10      IFLE 0
+|   C           IH10      MULT -1        W01
+| 40*C                     ELSE
+|   C                     Z-ADDIH10      W02
+| 40-C                     END
+| 39-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1007
+|    C*
+29===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG7... 計算調整檔
+     C*         處理原因...20
+     C*==============================================================*
+30===C           RTNIG7    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 02-C           IH04      IFNE *BLANKS
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+| 02-C                     END
+|    C*IH03貸
+| 04-C           IH03      IFNE *BLANKS
+| 05-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 05*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－應收帳－國內買回貨款
+|    C                     MOVEL'212215  'JL1004
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 06-C           IH03      IFNE *BLANKS
+| 07-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 07*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 07-C                     END
+| 06-C                     END
+|    C*
+|    C*IH04貸
+| 08-C           IH04      IFNE *BLANKS
+| 09-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 09*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 09-C                     END
+| 08-C                     END
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+30===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG8... 計算調整檔
+     C*         處理原因...21
+     C*==============================================================*
+31===C           RTNIG8    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－產品促銷－其他－人頭馬／其他品牌
+| 01-C           IH03      IFNE *BLANKS
+|   C                     MOVELIH03      IH034
+| 01*C                     ELSE
+|   C                     MOVELIH04      IH034
+| 01-C                     END
+      *
+| 02-C           IH034A    IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080109'JL1004
+|   C                     MOVELIH034     JL1006
+| 02*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080209'JL1004
+|   C                     MOVELIH034A    JL1006
+| 02-C                     END
+      **MA11 FOR A&P --------
+|    C                     MOVEL*BLANKS   MA11
+|    C           IH034     CHAINMA0                  40
+      *10人頭馬品牌
+| 03-C           MA11      IFEQ '10'
+|   C                     MOVEL'460'     JL1007
+| 03-C                     END
+      *11其他品牌
+| 04-C           MA11      IFEQ '11'
+|   C                     MOVEL'410'     JL1007
+| 04-C                     END
+      *12ＪＱ
+| 05-C           MA11      IFEQ '12'
+|   C                     MOVEL'100'     JL1007
+| 05-C                     END
+      *20威士忌21調酒22其他白蘭地
+| 06-C           MA11      IFEQ '20'
+|   C           MA11      OREQ '21'
+|   C           MA11      OREQ '22'
+|   C                     MOVEL'390'     JL1007
+| 06-C                     END
+      *30葡萄酒
+| 07-C           MA11      IFEQ '30'
+|   C                     MOVEL'350'     JL1007
+| 07-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 08-C           IH03      IFNE *BLANKS
+| 09-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 09*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 09-C                     END
+| 08-C                     END
+|    C*IH04貸
+| 10-C           IH04      IFNE *BLANKS
+| 11-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 11*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 11-C                     END
+| 10-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－存貨
+| 12-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 12*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 12-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 13-C           IH04      IFNE *BLANKS
+| 14-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 14*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 14-C                     END
+| 13-C                     END
+|    C*IH03貸
+| 15-C           IH03      IFNE *BLANKS
+| 16-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 16*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 16-C                     END
+| 15-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+31===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIG9... 計算調整檔
+     C*         處理原因...22
+     C*==============================================================*
+32===C           RTNIG9    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 02-C           IH04      IFNE *BLANKS
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+| 02-C                     END
+|    C*IH03貸
+| 04-C           IH03      IFNE *BLANKS
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 05-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 05*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+|    C                     MOVELARR,1     JL1007
+      *會計科目－應付帳款－國外運費
+|    C                     MOVEL'212202  'JL1004
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 06-C           IH03      IFNE *BLANKS
+| 07-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 07*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 07-C                     END
+| 06-C                     END
+|    C*IH04貸
+| 08-C           IH04      IFNE *BLANKS
+| 09-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 09*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 09-C                     END
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANK    JL1007
+|    C*
+32===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIGA... 計算調整檔
+     C*         處理原因...23
+     C*==============================================================*
+33===C           RTNIGA    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           WIG01     IFNE 'W'
+|   C           IG03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH04借
+| 02-C           IH04      IFNE *BLANKS
+| 03-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 03*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 03-C                     END
+| 02-C                     END
+|    C*IH03貸
+| 04-C           IH03      IFNE *BLANKS
+| 05-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 05*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－應付帳款－國外運費
+|    C                     MOVEL'212202  'JL1004
+|    C                     MOVELARR,1     JL1007
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+|    C*IH03借
+| 06-C           IH03      IFNE *BLANKS
+| 07-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 07*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 07-C                     END
+| 06-C                     END
+|    C*IH04貸
+| 08-C           IH04      IFNE *BLANKS
+| 09-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 09*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 09-C                     END
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1007
+|    C*
+33===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIU .計算盤盈虧
+     C*==============================================================*
+34===C           RTNIU     BEGSR
+|    C*
+|    C           *LOVAL    SETLLIU0
+|    C                     READ IU0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+|   C                     MOVELIU02      W#G01
+B2000C                     Z-ADDIU04      W#G02
+|   C*
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#25
+      *INITIAL檔案共同欄位WFJL10PF/WFJL20PF KEY VALUES
+|   C                     EXSR RINTIU
+      *
+      *WQTY數量
+|   C           IU06      ADD  IU07      WQTY
+      *WCOST成本
+|   C           IU08      ADD  IU09      WCOST
+|   C                     ADD  IU10      WCOST
+      *傳票WFJL10PF
+| 02-C           WCOST     IFGE 0
+      *
+|   C                     EXSR RTNIU1
+| 02*C                     ELSE
+      *------------
+|   C                     EXSR RTNIU2
+| 02-C                     END
+      *銷貨成本彙總WFJL20PF
+      *產品代號
+|   C                     MOVELIU05      JL2004
+      *----------------------------------------------------------------
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+|   C                     Z-ADD0         W03
+|   C                     Z-ADD0         W04
+|   C                     Z-ADD0         W05
+|   C                     Z-ADD0         W06
+|   C                     Z-ADD0         W07
+|   C                     Z-ADD0         W08
+| 03-C           WCOST     IFGT 0
+      *調入
+|   C*W01數量
+|   C                     Z-ADDWQTY      W01
+|   C*W02成本ＦＯＢ
+|   C                     Z-ADDIU08      W02
+|   C*W03成本ＦＨＩ
+|   C                     Z-ADDIU09      W03
+|   C*W04成本ＤＵＴＹ
+|   C                     Z-ADDIU10      W04
+| 03*C                     ELSE
+      *調出
+|   C*W05數量
+|   C           WQTY      MULT -1        W05
+|   C*W06成本ＦＯＢ
+|   C           IU08      MULT -1        W06
+|   C*W07成本ＦＨＩ
+|   C           IU09      MULT -1        W07
+|   C*W08成本ＤＵＴＹ
+|   C           IU10      MULT -1        W08
+      *
+| 03-C                     END
+|   C*
+|   C                     EXSR R2C00
+|   C*
+|   C                     EXSR R2E00
+|   C*
+|   C           TAG#25    TAG
+      *
+|   C                     READ IU0                      45
+| 01-C                     END
+|    C*
+34===C                     ENDSR
+     C*==============================================================*
+     C*          RINTIU....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL20PF
+     C*==============================================================*
+35===C           RINTIU    BEGSR
+|    C*--------------------------------------------------------------*
+|    C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDADYMD     JL1001
+      *公司別RE/CN/WL
+| 01-C           IU01      IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           IU01      IFEQ 'C'
+|   C                     MOVEL'CN'      JL1002
+| 02-C                     END
+| 03-C           IU01      IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 03-C                     END
+      *
+|    C                     MOVE '1'       J1002$           辦事處
+|    C                     MOVEL'7'       JL1003
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL20PF
+B2000C                     Z-ADDADYMD     JL2001
+      *公司別R/C
+|    C                     MOVELIU01      JL2002
+|    C                     MOVEL'7'       JL2013
+      *物流點
+|    C                     MOVELIU03      JL2003
+      *原因
+|    C                     MOVEL*BLANKS   JL2014
+      *
+|    C*--------------------------------------------------------------*
+35===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIU1... 計算盤盈虧
+     C*==============================================================*
+36===C           RTNIU1    BEGSR
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－存貨
+| 01-C           IU01      IFNE 'W'
+|   C           IU03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 01*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 02-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 02*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 02-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+      *會計科目－盤存利益
+|    C                     MOVEL*BLANKS   JL1004
+| 03-C           IU03L     IFEQ 'B'
+      *盤存利益－中信
+| 04-C           IU03      IFEQ 'B0001'
+|   C                     MOVEL'710511  'JL1004
+| 04-C                     END
+      *盤存利益－統領
+| 05-C           IU03      IFEQ 'B0002'
+|   C                     MOVEL'710512  'JL1004
+| 05-C                     END
+      *盤存利益－環亞
+| 06-C           IU03      IFEQ 'B0003'
+|   C                     MOVEL'710513  'JL1004
+| 06-C                     END
+| 07-C           IU03      IFEQ 'B0004'
+|   C                     MOVEL'710514  'JL1004
+| 07-C                     END
+| 08-C           IU03      IFEQ 'B0005'
+|   C                     MOVEL'710515  'JL1004
+| 08-C                     END
+| 09-C           IU03      IFEQ 'B0006'
+|   C                     MOVEL'710516  'JL1004
+| 09-C                     END
+| 10-C           IU03      IFEQ 'B0007'
+|   C                     MOVEL'710517  'JL1004
+| 10-C                     END
+| 11-C           IU03      IFEQ 'B0008'
+|   C                     MOVEL'710518  'JL1004
+| 11-C                     END
+| 12-C           IU03      IFEQ 'B0009'
+|   C                     MOVEL'710519  'JL1004
+| 12-C                     END
+| 13-C           IU03      IFEQ 'B0010'
+|   C                     MOVEL'710520  'JL1004
+| 13-C                     END
+| 14-C           IU03      IFEQ 'B0011'
+|   C                     MOVEL'710521  'JL1004
+| 14-C                     END
+| 15-C           IU03      IFEQ 'B0012'
+|   C                     MOVEL'710522  'JL1004
+| 15-C                     END
+| 16-C           IU03      IFEQ 'B0013'
+|   C                     MOVEL'710523  'JL1004
+| 16-C                     END
+| 17-C           IU03      IFEQ 'B0014'
+|   C                     MOVEL'710524  'JL1004
+| 17-C                     END
+| 18-C           IU03      IFEQ 'B0015'
+|   C                     MOVEL'710525  'JL1004
+| 18-C                     END
+| 19-C           IU03      IFEQ 'B0016'
+|   C                     MOVEL'710526  'JL1004
+| 19-C                     END
+| 20-C           IU03      IFEQ 'B0017'
+|   C                     MOVEL'710527  'JL1004
+| 20-C                     END
+| 21-C           IU03      IFEQ 'B0018'
+|   C                     MOVEL'710528  'JL1004
+| 21-C                     END
+| 22-C           IU03      IFEQ 'B0019'
+|   C                     MOVEL'710529  'JL1004
+| 22-C                     END
+| 23-C           IU03      IFEQ 'B0020'
+|   C                     MOVEL'710530  'JL1004
+| 23-C                     END
+      *
+| 03*C                     ELSE
+      *盤存利益－匯東
+| 24-C           IU01      IFEQ 'R'
+|   C                     MOVEL'710501  'JL1004
+| 24-C                     END
+      *盤存利益－康齡
+| 25-C           IU01      IFEQ 'C'
+|   C                     MOVEL'710503  'JL1004
+| 25-C                     END
+      *盤存利益－匯齡
+| 26-C           IU01      IFEQ 'W'
+|   C                     MOVEL'710502  'JL1004
+| 26-C                     END
+      *
+| 03-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 27-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 27*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 27-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+36===C                     ENDSR
+     C*==============================================================*
+     C*          RTNIU2... 計算盤盈虧
+     C*==============================================================*
+37===C           RTNIU2    BEGSR
+|    C                     MULT -1        WCOST
+      *----------------------------------------------------------------
+|    C*（１）一................庫存異動傳票
+      *會計科目－盤存損失
+|    C                     MOVEL*BLANKS   JL1004
+| 01-C           IU03L     IFEQ 'B'
+      *盤存損失－中信
+| 02-C           IU03      IFEQ 'B0001'
+|   C                     MOVEL'730511  'JL1004
+| 02-C                     END
+      *盤存損失－統領
+| 03-C           IU03      IFEQ 'B0002'
+|   C                     MOVEL'730512  'JL1004
+| 03-C                     END
+      *盤存損失－環亞
+| 04-C           IU03      IFEQ 'B0003'
+|   C                     MOVEL'730513  'JL1004
+| 04-C                     END
+| 05-C           IU03      IFEQ 'B0004'
+|   C                     MOVEL'730514  'JL1004
+| 05-C                     END
+| 06-C           IU03      IFEQ 'B0005'
+|   C                     MOVEL'730515  'JL1004
+| 06-C                     END
+| 07-C           IU03      IFEQ 'B0006'
+|   C                     MOVEL'730516  'JL1004
+| 07-C                     END
+| 08-C           IU03      IFEQ 'B0007'
+|   C                     MOVEL'730517  'JL1004
+| 08-C                     END
+| 09-C           IU03      IFEQ 'B0008'
+|   C                     MOVEL'730518  'JL1004
+| 09-C                     END
+| 10-C           IU03      IFEQ 'B0009'
+|   C                     MOVEL'730519  'JL1004
+| 10-C                     END
+| 11-C           IU03      IFEQ 'B0010'
+|   C                     MOVEL'730520  'JL1004
+| 11-C                     END
+| 12-C           IU03      IFEQ 'B0011'
+|   C                     MOVEL'730521  'JL1004
+| 12-C                     END
+| 13-C           IU03      IFEQ 'B0012'
+|   C                     MOVEL'730522  'JL1004
+| 13-C                     END
+| 14-C           IU03      IFEQ 'B0013'
+|   C                     MOVEL'730523  'JL1004
+| 14-C                     END
+| 15-C           IU03      IFEQ 'B0014'
+|   C                     MOVEL'730524  'JL1004
+| 15-C                     END
+| 16-C           IU03      IFEQ 'B0015'
+|   C                     MOVEL'730525  'JL1004
+| 16-C                     END
+| 17-C           IU03      IFEQ 'B0016'
+|   C                     MOVEL'730526  'JL1004
+| 17-C                     END
+| 18-C           IU03      IFEQ 'B0017'
+|   C                     MOVEL'730527  'JL1004
+| 18-C                     END
+| 19-C           IU03      IFEQ 'B0018'
+|   C                     MOVEL'730528  'JL1004
+| 19-C                     END
+| 20-C           IU03      IFEQ 'B0019'
+|   C                     MOVEL'730529  'JL1004
+| 20-C                     END
+| 21-C           IU03      IFEQ 'B0020'
+|   C                     MOVEL'730530  'JL1004
+| 21-C                     END
+      *
+| 01*C                     ELSE
+      *盤存損失－匯東
+| 22-C           IU01      IFEQ 'R'
+|   C                     MOVEL'730501  'JL1004
+| 22-C                     END
+      *盤存損失－康齡
+| 23-C           IU01      IFEQ 'C'
+|   C                     MOVEL'730503  'JL1004
+| 23-C                     END
+      *盤存損失－匯齡
+| 24-C           IU01      IFEQ 'W'
+|   C                     MOVEL'730502  'JL1004
+| 24-C                     END
+      *
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 25-C           WCOST     IFGE 0
+|   C                     Z-ADDWCOST     W01
+| 25*C                     ELSE
+|   C           WCOST     MULT -1        W02
+| 25-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（１）二................庫存異動傳票
+|    C*
+      *會計科目－存貨
+| 26-C           IU01      IFNE 'W'
+|   C           IU03L     ANDEQ'B'
+|   C                     MOVEL'1143    'JL1004
+| 26*C                     ELSE
+|   C                     MOVEL'1141    'JL1004
+| 26-C                     END
+|    C*
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 27-C           WCOST     IFLE 0
+|   C           WCOST     MULT -1        W01
+| 27*C                     ELSE
+|   C                     Z-ADDWCOST     W02
+| 27-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *還原
+|    C                     MULT -1        WCOST
+37===C                     ENDSR
+     C*==============================================================*
+     C*          R2C00 ... 寫入暫存檔－銷貨成本彙總
+     C*==============================================================*
+38===C           R2C00     BEGSR
+|    C*
+|    C           KEYW20    CHAINWFJL20R              41
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADDW01       JL2005
+|   C                     Z-ADDW02       JL2006
+|   C                     Z-ADDW03       JL2007
+|   C                     Z-ADDW04       JL2008
+|   C                     Z-ADDW05       JL2009
+|   C                     Z-ADDW06       JL2010
+|   C                     Z-ADDW07       JL2011
+|   C                     Z-ADDW08       JL2012
+|   C                     WRITEWFJL20R
+| 01*C                     ELSE
+|   C                     ADD  W01       JL2005
+|   C                     ADD  W02       JL2006
+|   C                     ADD  W03       JL2007
+|   C                     ADD  W04       JL2008
+|   C                     ADD  W05       JL2009
+|   C                     ADD  W06       JL2010
+|   C                     ADD  W07       JL2011
+|   C                     ADD  W08       JL2012
+|   C                     UPDATWFJL20R
+| 01-C                     END
+|    C*
+38===C                     ENDSR
+     C*==============================================================*
+     C*          RWF10 ... 寫入．更新傳票暫存檔WFJL10PF
+     C*==============================================================*
+39===C           RWF10     BEGSR
+|    C*
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADDW01       JL1012
+|   C                     Z-ADDW02       JL1013
+      *判別借貸方
+|   C           JL1012    SUB  JL1013    WAMT
+| 02-C           WAMT      IFGT 0
+|   C                     MOVEL'1'       J1003$
+| 02-C                     END
+| 03-C           WAMT      IFLT 0
+|   C                     MOVEL'2'       J1003$
+| 03-C                     END
+      *金額不為０才寫入
+| 04-C           WAMT      IFNE 0
+|   C                     WRITEWFJL10R
+| 04-C                     END
+      *
+| 01*C                     ELSE
+|   C                     ADD  W01       JL1012
+|   C                     ADD  W02       JL1013
+      *判別借貸方
+|   C           JL1012    SUB  JL1013    WAMT
+| 05-C           WAMT      IFGT 0
+|   C                     MOVEL'1'       J1003$
+|   C                     Z-ADDWAMT      JL1012
+|   C                     Z-ADD0         JL1013
+| 05-C                     END
+| 06-C           WAMT      IFLT 0
+|   C                     MOVEL'2'       J1003$
+|   C                     Z-ADD0         JL1012
+|   C           WAMT      MULT -1        JL1013
+| 06-C                     END
+      *金額為０不產生傳票
+| 07-C           WAMT      IFNE 0
+|   C                     UPDATWFJL10R
+| 07*C                     ELSE
+|   C                     DELETWFJL10R
+| 07-C                     END
+| 01-C                     END
+|    C*
+39===C                     ENDSR
+     C*==============================================================*
+     C*          R2E00 ... READ FILE  =>WRITE PA#GPF
+     C*==============================================================*
+40===C           R2E00     BEGSR
+|    C*
+|    C*
+|    C                     MOVELW#G01     #G01
+B2000C                     Z-ADDW#G02     #G02
+B2000C                     Z-ADD$ADYMD    #GXX
+B2000C                     TIME           #GYY
+|    C                     MOVEL$USER     #GZZ
+|    C                     WRITE#G0
+|    C                     WRITEWF#GR
+|    C*
+40===C                     ENDSR
+     C*==============================================================*
+     C*          R2F00 ... READ FILE  =>WRITE WF#GPF01
+     C*==============================================================*
+41===C           R2F00     BEGSR
+|    C*
+|    C                     MOVELW#G01     #G01
+B2000C                     Z-ADDW#G02     #G02
+|    C                     MOVELW#G03     #G03
+B2000C                     Z-ADD$ADYMD    #GXX
+B2000C                     TIME           #GYY
+|    C                     MOVEL$USER     #GZZ
+|    C                     WRITEWF#GR1
+|    C*
+41===C                     ENDSR
+     C*==============================================================*
+     C*          R4000 .產生銷售傳票
+     C*==============================================================*
+42===C           R4000     BEGSR
+|    C*
+B2000C                     MOVEL*BLANKS   WL1001
+|    C                     MOVEL*BLANKS   WL1002
+|    C                     MOVEL*BLANKS   W1002$
+|    C                     MOVEL*BLANKS   WL1003
+      *
+B2000C           *LOVAL    SETLLWFJL10L
+|    C                     READ WFJL10L                  46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     EXSR R4100
+      *
+|   C                     READ WFJL10L                  46
+| 01-C                     END
+|    C*
+42===C           E4000     ENDSR
+     C*==============================================================*
+     C*          R4100 .  產生銷售傳票
+     C*==============================================================*
+43===C           R4100     BEGSR
+|    C*
+|    C* <<清除傳票檔部份欄位 >>
+|    C                     EXSR R40XX
+      *----------------------------------------------------------------
+      *傳票日期
+|    C                     Z-ADD*ZEROS    AH10
+|    C                     CALL 'P31'
+B2MODC                     PARM JL1001    P310I1 100
+|    C                     PARM '1'       P310I2  1
+|    C                     PARM '1'       P310I3  1
+|    C                     PARM '2'       P310I4  1
+|    C                     PARM '1'       P310I5  1
+|    C           AH10      PARM           P311O1  80
+      *1994年6月前公司別不變，以後ＲＥ－＞ＲＭ，ＷＬ－＞ＷＮ
+| 01-C           AH10      IFGE 19940601
+| 02-C           JL1002    IFEQ 'RE'
+|   C                     MOVEL'RM'      JL1002
+| 02-C                     END
+| 03-C           JL1002    IFEQ 'WL'
+|   C                     MOVEL'WH'      JL1002
+| 03-C                     END
+| 01-C                     END
+|    C                     MOVELJL1002    AH01
+      *1994年6月前公司別不變，以後ＲＥ－＞ＲＭ，ＷＬ－＞ＷＮ
+|    C*
+|    C*傳票號碼
+B2000C           JL1001    IFNE WL1001
+|   C           JL1002    ORNE WL1002
+|   C           J1002$    ORNE W1002$
+|   C           JL1003    ORNE WL1003
+|   C                     MOVEL*BLANKS   AH02
+|   C                     CALL 'GLS002'
+|   C                     PARM AH01      P002I1  2
+|   C                     PARM AH10      P002I2  80
+|   C                     PARM 'F'       P002I3  1
+|   C           AH02      PARM           P002O1  9
+B2000C                     MOVELJL1001    WL1001
+|   C                     MOVELJL1002    WL1002
+|   C                     MOVELJ1002$    W1002$
+|   C                     MOVELJL1003    WL1003
+|   C                     Z-ADD0         WAH03
+| 04-C                     END
+      *
+|    C                     MOVELJL1004    AH04
+|    C           KEYAF     CHAINAF0                  40
+| 05-C           *IN40     IFEQ '0'
+      *
+| 06-C           AF11      IFNE *BLANK
+|   C                     MOVELJL1005    AH05
+| 06-C                     END
+      *
+| 07-C           AF12      IFNE *BLANK
+|   C                     MOVELJL1006    AH06
+| 07-C                     END
+      *
+| 08-C           AF13      IFNE *BLANK
+|   C                     MOVELJL1007    AH07
+| 08-C                     END
+      *
+| 09-C           AF14      IFNE *BLANK
+|   C                     MOVELJL1008    AH08
+| 09-C                     END
+      *
+| 10-C           AF15      IFNE *BLANK
+|   C                     MOVELJL1009    AH09
+| 10-C                     END
+      *
+|   C                     Z-ADDJL1012    AH12
+|   C                     Z-ADDJL1013    AH13
+      *
+| 11-C           AF16      IFNE *BLANK
+|   C                     MOVELJL1010    AH14
+| 11-C                     END
+      *
+| 12-C           AF17      IFNE *BLANK
+|   C                     MOVELJL1011    AH15
+| 12-C                     END
+      *
+|   C                     MOVEL'IM'      AH17
+|   C                     MOVEL*BLANKS   AH18
+|   C                     MOVEL'V'       AH19
+|   C                     MOVEL*BLANKS   AH20
+|   C                     Z-ADD*ZEROS    AH21
+|   C                     MOVEL*BLANKS   AH22
+|   C                     Z-ADD*ZEROS    AH23
+|   C                     MOVEL*BLANKS   AH24
+|   C                     Z-ADDADYYMD    AH25
+|   C                     MOVEL$USER     AH26
+B2000C                     TIME           AH97
+|   C                     Z-ADDADYYMD    AH98
+|   C                     MOVEL$USER     AH99
+|   C* <<取得會計科目資料 >>
+|   C                     EXSR R40YY
+|   C* <<寫入傳票檔 >>
+|   C                     EXSR R40ZZ
+| 05-C                     END
+|    C*
+43===C           E4A00     ENDSR
+     C*==============================================================*
+     C*          R40XX ...清除傳票檔部份欄位
+     C*==============================================================*
+44===C           R40XX     BEGSR
+|    C*
+|    C                     MOVEL*BLANKS   AH04
+|    C                     MOVEL*BLANKS   AH05
+|    C                     MOVEL*BLANKS   AH05A
+|    C                     MOVEL*BLANKS   AH06
+|    C                     MOVEL*BLANKS   AH06A
+|    C                     MOVEL*BLANKS   AH07
+|    C                     MOVEL*BLANKS   AH07A
+|    C                     MOVEL*BLANKS   AH08
+|    C                     MOVEL*BLANKS   AH08A
+|    C                     Z-ADD*ZEROS    AH09
+|    C                     MOVEL*BLANKS   AH09A
+|    C                     Z-ADD*ZEROS    AH12
+|    C                     Z-ADD*ZEROS    AH13
+|    C                     MOVEL*BLANKS   AH14
+|    C                     MOVEL*BLANKS   AH14A
+|    C                     MOVEL*BLANKS   AH15
+|    C                     MOVEL*BLANKS   AH15A
+|    C                     MOVEL*BLANKS   AH16
+|    C                     MOVEL'IM'      AH17
+|    C                     MOVEL*BLANKS   AH18
+|    C                     MOVEL'V'       AH19
+|    C                     MOVEL*BLANKS   AH20
+|    C                     Z-ADD*ZEROS    AH21
+|    C                     MOVEL*BLANKS   AH22
+|    C                     Z-ADD*ZEROS    AH23
+|    C                     MOVEL*BLANKS   AH24
+|    C                     Z-ADDADYYMD    AH25
+|    C                     MOVEL$USER     AH26
+B2000C                     TIME           AH97
+|    C                     Z-ADDADYYMD    AH98
+|    C                     MOVEL$USER     AH99
+|    C*
+44===C                     ENDSR
+     C*==============================================================*
+     C*          R40YY ...取得會計科目資料
+     C*==============================================================*
+45===C           R40YY     BEGSR
+|    C*
+|    C                     MOVEA*BLANKS   CHK1
+|    C                     MOVEA*BLANKS   CHK2
+|    C                     MOVEA*BLANKS   CHK3
+|    C*<<取得會計科目各欄位名稱>>
+|    C           KEYAF     CHAINAF0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVELAF11      AH05A
+|   C                     MOVELAF12      AH06A
+|   C                     MOVELAF13      AH07A
+|   C                     MOVELAF14      AH08A
+|   C                     MOVELAF15      AH09A
+|   C                     MOVELAF16      AH14A
+|   C                     MOVELAF17      AH15A
+|   C*
+|   C                     MOVELAF11      CHK1,1
+|   C                     MOVELAF12      CHK1,2
+|   C                     MOVELAF13      CHK1,3
+|   C                     MOVELAF14      CHK1,4
+|   C                     MOVELAF15      CHK1,5
+|   C                     MOVELAF16      CHK1,6
+|   C                     MOVELAF17      CHK1,7
+| 01-C                     END
+|    C* << 輸入欄位說明CHK3 >>
+|    C*
+|    C                     MOVELAH05      CHK2,1
+|    C                     MOVELAH06      CHK2,2
+|    C                     MOVELAH07      CHK2,3
+|    C                     MOVELAH08      CHK2,4
+| 02-C                     DO   4         I       10
+| 03-C           CHK2,I    IFNE *BLANKS
+|   C           KEYAA     CHAINAA0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C           AA04      ANDNE*BLANKS
+|   C*
+|   C                     MOVELCHK2,I    WPARM1
+|   C                     MOVELAA05      WPARM2
+|   C                     MOVEL'0'       WCHK
+|   C                     CALL AA04
+|   C                     PARM           CHKPGM
+|   C                     PARM           TORN    1
+|   C           CHK3,I    PARM           DESE   20
+| 04*C                     ELSE
+|   C                     MOVELCHK2,I    CHK3,I
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+|    C*
+| 05-C           AH09      IFNE 0
+|   C                     CALL 'P56'                      *P56(GET'/')
+|   C                     PARM AH09      P5601I  80
+|   C                     PARM           P5601O 10
+|   C                     MOVELP5601O    CHK3,5
+| 05-C                     END
+|    C*
+| 06-C           AH14      IFNE 0
+|   C                     CALL 'P55'                      *P55(GET,.)
+|   C                     PARM AH14      P5501I 185
+|   C                     PARM 2         P5502I  10
+|   C                     PARM           P5501O 24
+|   C                     MOVELP5501O    CHK3,6
+| 06-C                     END
+|    C*
+| 07-C           AH15      IFNE *BLANK
+|   C                     Z-ADD7         I
+|   C           KEYAA     CHAINAA0                  40
+| 08-C           *IN40     IFEQ '0'
+|   C           AA04      ANDNE*BLANKS
+|   C*
+|   C                     MOVELAH15      WPARM1
+|   C                     MOVELAA05      WPARM2
+|   C                     MOVEL'0'       WCHK
+|   C                     CALL AA04
+|   C                     PARM           CHKPGM
+|   C                     PARM           TORN    1
+|   C           CHK3,7    PARM           DESE   20
+| 08*C*                    ELSE
+|   C                     MOVELAH15      CHK3,7
+| 08-C                     END
+| 07-C                     END
+|    C*<<摘要 >>
+| 09-C                     DO   7         K       10
+| 10-C           CHK3,K    IFNE *BLANKS
+|   C                     CALL 'GLS001'
+|   C                     PARM AH16      S001I1 80
+|   C                     PARM CHK3,K    S001I2 80
+|   C                     PARM 49        S001I3  30
+|   C           AH16      PARM           S001O1 80
+| 10-C                     END
+| 09-C                     END
+|    C*
+45===C                     ENDSR
+     C*==============================================================*
+     C*          R40ZZ ... WRITE GLAHPF
+     C*==============================================================*
+46===C           R40ZZ     BEGSR
+|    C*
+|    C                     ADD  1         WAH03
+|    C                     Z-ADDWAH03     AH03
+|    C                     WRITEAH0
+|    C*
+46===C                     ENDSR
+**
+D00000000001
+

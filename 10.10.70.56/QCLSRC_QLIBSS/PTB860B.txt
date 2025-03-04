@@ -1,0 +1,152 @@
+ /*   1. AUTHOR      : SANDY_LAIW                                    */
+ /*   2. CREATE DATE : 04/10/1990                                    */
+ /*   3. FUNCTION    : TRANSLATE MAP TO PRTF  (CLP)                  */
+ /*------------------------------------------------------------------*/
+             PGM       PARM(&MBR &TOMBR &TOFILE &TOLIB &TRANS &COMPILE)
+ /*------------------------------------------------------------------*/
+ /*   DECLARE  SECTION                                               */
+ /*------------------------------------------------------------------*/
+             DCL        VAR(&MBR)          TYPE(*CHAR)     LEN(10)
+             DCL        VAR(&TOMBR)        TYPE(*CHAR)     LEN(10)
+             DCL        VAR(&TOFILE)       TYPE(*CHAR)     LEN(10)
+             DCL        VAR(&TOLIB)        TYPE(*CHAR)     LEN(10)
+             DCL        VAR(&TRANS)        TYPE(*CHAR)     LEN(1)
+             DCL        VAR(&COMPILE)      TYPE(*CHAR)     LEN(1)
+
+             DCL        VAR(&USERNAME)     TYPE(*CHAR)     LEN(10)
+             DCL        VAR(&JOBNBR)       TYPE(*CHAR)     LEN(6)
+             DCL        VAR(&MBRNAME)      TYPE(*CHAR)     LEN(7)
+             DCL        VAR(&RQSDTA)       TYPE(*CHAR)     LEN(80)
+             DCL        VAR(&RQSDTA1)      TYPE(*CHAR)     LEN(21)
+             DCL        VAR(&RQSDTA2)      TYPE(*CHAR)     LEN(21)
+             DCL        VAR(&MSGDTA)       TYPE(*CHAR)     LEN(60)
+             DCL        VAR(&MSGID)        TYPE(*CHAR)     LEN(7)
+             DCL        VAR(&JOBQ)         TYPE(*CHAR)     LEN(10)   +
+                        VALUE(QBATCH)
+             DCL        VAR(&LIBNAME)      TYPE(*CHAR)     LEN(10)   +
+                        VALUE(XLIB)
+ /*------------------------------------------------------------------*/
+ /*   MONITOR  MESSAGE  SECTION                                      */
+ /*------------------------------------------------------------------*/
+             MONMSG     MSGID(CPF0000)
+ /*------------------------------------------------------------------*/
+ /*   MAIN   SECTION                                                 */
+ /*------------------------------------------------------------------*/
+             RTVJOBA    USER(&USERNAME)          NBR(&JOBNBR)
+ /*------------------------------------------------------------------*/
+ /*   1. EDIT MAP & CHECK IF EXIST ? & IF TRANSLATE TO PRTF SOURCE ? */
+ /*------------------------------------------------------------------*/
+             STRSEU     SRCFILE(&TOLIB/QTXT) SRCMBR(&MBR) TYPE(TXT)
+
+ CHKOBJ:     CHKOBJ     OBJ(&TOLIB/QTXT) OBJTYPE(*FILE) MBR(&MBR)
+
+             MONMSG     MSGID(CPF0000)           EXEC(DO)
+             RCVMSG     MSGTYPE(*EXCP)                               +
+                        MSGID(&MSGID)            MSGDTA(&MSGDTA)
+
+             SNDPGMMSG  MSGID(&MSGID)            MSGF(QCPFMSG.QSYS)  +
+                        MSGDTA(&MSGDTA)          MSGTYPE(*ESCAPE)
+
+             GOTO       DLCOBJ
+             ENDDO
+
+ TRANS:      IF         COND(&TRANS *NE 'Y')     THEN(DO)
+             GOTO       DLCOBJ
+             ENDDO
+
+             CHGVAR     VAR(&MBRNAME)           VALUE('X' *CAT &JOBNBR)
+
+             ADDPFM     FILE(XK09P.XLIB)         MBR(&MBRNAME)
+
+             MONMSG     MSGID(CPF0000)                               +
+                        EXEC(CLRPFM FILE(XK09P.XLIB) MBR(&MBRNAME))
+
+             OVRDBF     FILE(XIGC1)              TOFILE(XIGC1.XLIB)   +
+                        MBR(&MBR)                SHARE(*YES)
+
+             OVRDBF     FILE(XK09P)              TOFILE(XK09P.XLIB)  +
+                        MBR(&MBRNAME)            SHARE(*YES)
+ /*------------------------------------------------------------------*/
+ /*   2. USE XKD018C-PGM TO TRANSLATE MAP TO PRTF SOURCE             */
+ /*------------------------------------------------------------------*/
+ XKD018C:    CALL       PGM(XKD018C.XLIB)
+
+             DLTOVR     XIGC1                     /*  MUST PUT HERE  */
+
+             CPYF       FROMFILE(XK09P.XLIB)                         +
+                        TOFILE(&TOFILE.&TOLIB)                       +
+                        TOMBR(&TOMBR)            MBROPT(*ADD)        +
+                        FMTOPT(*CVTSRC)
+
+             DLTOVR     XK09P
+
+             RMVM       FILE(XK09P.XLIB)         MBR(&MBRNAME)
+ /*------------------------------------------------------------------*/
+ /*   3. EDIT PRTF & CHECK IF COMPILE PRTF TO OBJ ?                  */
+ /*------------------------------------------------------------------*/
+             EDTSRC     SRCFILE(&TOFILE.&TOLIB)  SRCMBR(&TOMBR)      +
+                        TYPE(*PRTF)
+
+ COMPILE:    IF         COND(&COMPILE *NE 'Y')   THEN(DO)
+             GOTO       DLCOBJ
+             ENDDO
+ /*------------------------------------------------------------------*/
+ /*   4. COMPILE OBJ IF OLD OBJ OF PRTF NOT FOUND ?                  */
+ /*------------------------------------------------------------------*/
+             CHGVAR     VAR(&RQSDTA1)                                +
+                        VALUE(&TOMBR *TCAT '.' *TCAT &TOLIB)
+
+             CHGVAR     VAR(&RQSDTA2)                                +
+                        VALUE(&TOFILE *TCAT '.' *TCAT &TOLIB)
+
+             CHGVAR     VAR(&RQSDTA)                                 +
+                        VALUE('CRTPRTF FILE(' *CAT &RQSDTA1 *TCAT ')' +
+                              *BCAT 'SRCFILE(' *CAT &RQSDTA2 *TCAT ')')
+
+             CHKOBJ     OBJ(&TOMBR.&TOLIB)      OBJTYPE(*FILE)
+
+             MONMSG     MSGID(CPF0000)           EXEC(DO)
+
+             SBMJOB     JOB(&TOMBR)              RQSDTA(&RQSDTA)
+
+             CHGVAR     VAR(&MSGDTA)                                 +
+                        VALUE(&TOMBR *CAT &USERNAME *CAT &JOBNBR     +
+                              *CAT &JOBQ *CAT &LIBNAME)
+
+             SNDPGMMSG  MSGID(CPC1221)           MSGF(QCPFMSG.QSYS)  +
+                        MSGDTA(&MSGDTA)
+
+             GOTO       DLCOBJ
+             ENDDO
+ /*------------------------------------------------------------------*/
+ /*   5. COMPILE OBJ IF OLD OBJ OF PRTF EXIST?                       */
+ /*------------------------------------------------------------------*/
+             DLTF       FILE(&TOMBR.&TOLIB)
+
+ SBMJOB:     SBMJOB     JOB(&TOMBR)             RQSDTA(&RQSDTA)
+
+             CHGVAR     VAR(&MSGDTA)                                 +
+                        VALUE(&TOMBR *CAT &TOLIB *CAT 'FILE')
+
+             SNDPGMMSG  MSGID(CPC2191)           MSGF(QCPFMSG.QSYS)  +
+                        MSGDTA(&MSGDTA)
+
+             CHGVAR     VAR(&MSGDTA)                                 +
+                        VALUE(&TOMBR *CAT &USERNAME *CAT &JOBNBR     +
+                              *CAT &JOBQ *CAT &LIBNAME)
+
+             SNDPGMMSG  MSGID(CPC1221)           MSGF(QCPFMSG.QSYS)  +
+                        MSGDTA(&MSGDTA)
+ /*------------------------------------------------------------------*/
+ /*   6. DEALLOCATE OBJECT (&MBR IN XIGC1.XLIB)                      */
+ /*      DEALLOCATE OBJECT (&TOMBR IN &TOFILE.&TOLIB)                */
+ /*------------------------------------------------------------------*/
+ DLCOBJ:     DLCOBJ     OBJ((XIGC1.XLIB *FILE *SHRNUP &MBR))
+
+             DLCOBJ     OBJ((&TOFILE.&TOLIB *FILE *SHRNUP &TOMBR))
+ /*------------------------------------------------------------------*/
+ /*   ENDPGM   SECTION                                               */
+ /*------------------------------------------------------------------*/
+ ENDPGM:     RETURN
+             ENDPGM
+

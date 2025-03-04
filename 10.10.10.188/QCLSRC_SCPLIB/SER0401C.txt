@@ -1,0 +1,87 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1388  WIND                               */
+     /*    CREATE DATE  : 97/11/07                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : SER0401C                                  */
+     /*    SYSTEM       :                                           */
+     /*    SUBSYSTEM    :銷售系統                                 */
+     /*    REMARK       :產品銷貨收入彙總表                       */
+     /***************************************************************/
+     /*00A需求單號: 1081470                                       */
+     /*00A IRIS 2019/12/10產出的報表，對應的產品顯示對應的產品歸屬*/
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DATA)     TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DHA01)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DHA02)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&A03)      TYPE(*CHAR) LEN(8)
+             DCL        VAR(&A04)      TYPE(*CHAR) LEN(8)
+             DCL        VAR(&HA04S)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&HA04E)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&NC09S)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&NC09E)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&@K01)     TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SELECT)   TYPE(*CHAR) LEN(1024)
+    /*00A*/  DCL        VAR(&FILE)    TYPE(*CHAR) LEN(10)
+
+             CHGVAR     VAR(&DHA01)    VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DHA02)    VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&A03)      VALUE(%SST(*LDA 661 8))
+             CHGVAR     VAR(&A04)      VALUE(%SST(*LDA 671 8))
+             CHGVAR     VAR(&HA04S)    VALUE(%SST(*LDA 618 5))
+             CHGVAR     VAR(&HA04E)    VALUE(%SST(*LDA 623 5))
+             CHGVAR     VAR(&NC09S)    VALUE(%SST(*LDA 628 2))
+             CHGVAR     VAR(&NC09E)    VALUE(%SST(*LDA 630 2))
+
+             OVRPRTF    FILE(SER040P) USRDTA('產銷彙總')
+             OVRDBF     FILE(SCWK07) TOFILE(SEHAPF) SHARE(*YES)
+    /*00A  PRINT WORKFILE CPYF QTEMP */
+    /*00A*/
+    /*00A*/  CPYF       FROMFILE(SCWK19) TOFILE(QTEMP/SCWK19) +
+    /*00A*/             CRTFILE(*YES)
+    /*00A*/  MONMSG     MSGID(CPF2817)
+    /*00A*/             CLRPFM FILE(QTEMP/SCWK19)
+    /*00A*/  CHGPF      FILE(QTEMP/SCWK19) SIZE(*NOMAX)
+    /*00A*/  OVRDBF     FILE(SCWK19) TOFILE(QTEMP/SCWK19) SHARE(*YES)
+    /*00A*/
+             CHGVAR     VAR(&SELECT) VALUE('HA01 = "' || &DHA01 || +
+                          '" *and HA02 = "' || &DHA02 || '" *and +
+                          HA03 = %RANGE(' || &A03 || ' ' || &A04 || +
+                          ') *AND NC09 = %RANGE("' || &NC09S || '" +
+                          "' || &NC09E || '") *AND HA10="P" ')
+             OPNQRYF    FILE((SEHAPF) (MANCPF)) FORMAT(SCWK07) +
+                          QRYSLT(&SELECT) KEYFLD((HA01) (HA05) +
+                          (HA02) (HA03)) JFLD((HA05 NC02) (HA01 NC01))
+
+             CLRPFM     FILE(SCWK19)
+             CALL       PGM(SER0402)
+             CHGVAR     VAR(&@K01)     VALUE(%SST(*LDA 550 1))
+             CLOF       OPNID(SEHAPF)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             CHGVAR     VAR(&P6601I) VALUE('SER040P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+    /*00A*/
+    /*00A*/ /*將SCWK19轉換成CSV FILE AND FTP TO PC */
+    /*00A*/ CALL       PGM(ECL100C) PARM('QTEMP' 'SCWK19')
+
+             ENDPGM
+

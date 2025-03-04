@@ -1,0 +1,167 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR0471                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/02/14                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :訂單系統                                     *
+      * REMARK       :送貨未確認明細表                             *
+      ****************************************************************
+     FSOSEPF  IP  E           K        DISK
+     FSOSFPF  IF  E           K        DISK
+     FSOSCPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOR047P O   E             39     PRINTER
+     ISE0
+     I                                              SE02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 605 DSE07S
+     I                                      606 610 DSE07E
+     I*(MM/DD/YY)送貨日期
+     I                                      611 6160DSE06S
+     I                                      617 6220DSE06E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           SE04
+     C                     KFLD           SE05
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C                     EXSR RTN150                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN100
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C                     SETON                         30
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....WRITE SUBTOT
+      *==============================================================*
+02===C           RTN100    BEGSR
+     C   39                EXSR RTN900                     *OVERFLOW
+|    C                     SETON                         30
+|    C   31                WRITEPD2
+|    C                     Z-ADD0         SUBTOT
+     C                     SETOF                     31
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN150....READE DETAIL
+      *==============================================================*
+03===C           RTN150    BEGSR
+|    C*
+|    C           SE02      SETLLSF0
+|    C           SE02      READESF0                      44
+|    C*
+| 01-C           *IN44     DOWEQ'0'
+|   C                     EXSR RTN200                     *CHAIN DATA
+|   C                     EXSR RTN300                     *ADD SUBTOT ENDTOT
+|   C                     EXSR RTN400                     *WRITE DETAIL
+|   C           SE02      READESF0                      44
+| 01-C                     END
+|    C*
+|    C                     SETOF                     44
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN200....CHECK DETAIL
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*送貨日期
+M001AC                     Z-ADDSE06      PSE06   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SE06      S001I2  80
+M001AC                     PARM PSE06     S001I2  60
+|    C           PSE06     PARM           S001O1  60
+|    C*客戶簡稱
+|    C           KEYME     CHAINME0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 01-C                     END
+|    C*訂單日期
+|    C           SE29      CHAINSC0                  41
+| 02-C           *IN41     IFEQ '1'
+B2CHKC                     MOVE 0         SC07
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2INF *CVR0004 sev.00 Assumed to be the update of a date field in the zone
+B2INF *   that does not contain a year
+| 02*C                     ELSE
+M001AC                     Z-ADDSC07      PSC07   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SC07      S001I2  80
+M001AC                     PARM PSC07     S001I2  60
+|   C           PSC07     PARM           S001O1  60
+| 02-C                     END
+|    C*產品名稱＆單位
+|    C           SF03      CHAINMA0                  43
+| 03-C           *IN43     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+|   C                     MOVE *BLANK    MA13
+| 03-C                     END
+|    C*派車日期
+M001AC                     Z-ADDSE21      PSE21   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SE21      S001I2  80
+M001AC                     PARM PSE21     S001I2  60
+|    C           PSE21     PARM           S001O1  60
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN300....ADD SUBTOT ENDTOT
+      *==============================================================*
+05===C           RTN300    BEGSR
+|    C                     ADD  SF07      SUBTOT
+|    C                     ADD  SF07      ENDTOT
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE DETAIL
+      *==============================================================*
+06===C           RTN400    BEGSR
+     C   39                EXSR RTN900                     *OVERFLOW
+|    C                     WRITEPD1
+     C                     SETON                     31
+|    C                     SETOF                         30
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+07===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+08===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|    C                     WRITEPE9
+| 01-C                     END
+     C   39                EXSR RTN900                     *OVERFLOW
+|    C                     WRITEPD3
+|    C                     WRITEPE2
+08===C                     ENDSR
+

@@ -1,0 +1,109 @@
+     /**************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250  */
+     /*                                                            */
+     /*    PROGRAM ID   : VOU003C1                                 */
+     /*    PROGRAM NAME :庫存異動傳票批次                        */
+     /*    AUTHOR       : A1492 TERRY                              */
+     /*    CREATE DATE  : 2009.01.21                               */
+     /*    UPDATE DATE  :                                          */
+     /*    SYSTEM       :進銷存收TO總帳                        */
+     /**************************************************************/
+             PGM
+
+             DCL        VAR(&D01)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&MBR)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&F01)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&F02)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             CHGVAR     VAR(&D01)   VALUE(%SST(*LDA 625 1))
+             CHGVAR     VAR(&F01)   VALUE(%SST(*LDA 601 8))
+             CHGVAR     VAR(&F02)   VALUE(%SST(*LDA 609 8))
+             CHGVAR     VAR(&MBR)   VALUE('M' *CAT %SST(&F02 1 6))
+
+             RMVLIBLE   LIB(QTEMP)
+             MONMSG   MSGID(CPF2104)
+             ADDLIBLE LIB(QTEMP) POSITION(*LAST)
+
+     /**** WFJR10PF ****/
+
+             CHKOBJ     OBJ(*LIBL/WFJR10PF) OBJTYPE(*FILE) MBR(&MBR)
+             MONMSG     MSGID(CPF9815) EXEC(ADDPFM FILE(WFJR10PF) +
+                          MBR(&MBR))
+             OVRDBF     FILE(WFJR1032) TOFILE(*LIBL/WFJR10PF) MBR(&MBR)
+
+             CPYF       FROMFILE(WFJR10PF) TOFILE(QTEMP/WFJR10PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJR10PF))
+             OVRDBF   FILE(WFJR10PF) TOFILE(QTEMP/WFJR10PF) SHARE(*YES)
+
+     /**** WFJR10LF ****/
+             CRTDUPOBJ  OBJ(WFJR10LF) FROMLIB(SCFLIB) OBJTYPE(*ALL) +
+                          TOLIB(QTEMP)
+             MONMSG     MSGID(CPD2104 CPF2130)
+             OVRDBF   FILE(WFJR10LF) TOFILE(QTEMP/WFJR10LF) SHARE(*YES)
+
+     /**** WFJR14PF ****/
+             CHKOBJ     OBJ(*LIBL/WFJR14PF) OBJTYPE(*FILE) MBR(&MBR)
+             MONMSG     MSGID(CPF9815) EXEC(ADDPFM FILE(WFJR14PF) +
+                          MBR(&MBR))
+         /*  CLRPFM     FILE(*LIBL/WFJR14PF) MBR(&MBR)  */
+             OVRDBF     FILE(WFJR1432) TOFILE(*LIBL/WFJR14PF) MBR(&MBR)
+
+          CPYF       FROMFILE(WFJR14PF) TOFILE(QTEMP/WFJR14PF) +
+                       CRTFILE(*YES)
+          MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJR14PF))
+          OVRDBF   FILE(WFJR14PF) TOFILE(QTEMP/WFJR14PF) SHARE(*YES)
+
+     /*存貨調整單*/
+             OVRDBF     FILE(SCWK11) TOFILE(INTIPF) SHARE(*YES)
+             OPNQRYF    FILE((INTIPF) (INTJPF)) FORMAT(SCWK11) +
+                          QRYSLT('TI01L *EQ "' *CAT &D01 *CAT '" &  +
+                          TI03 *EQ %RANGE(' *CAT &F01 *CAT ' ' *CAT +
+                          &F02 *CAT ') & TI07 *EQ "P"               +
+                          ') KEYFLD(*FILE) JFLD((TI05 TJ01)) +
+                          MAPFLD((TI01L '%SST(TI01 1 1)' *CHAR 1))
+
+     /*產品成本調整資料檔*/
+             OVRDBF     FILE(INTMPF) SHARE(*YES)
+             OPNQRYF    FILE((INTMPF)) QRYSLT('TM01L *EQ "' *CAT +
+                          &D01 *CAT '" & TM02 *EQ %RANGE(' *CAT +
+                          &F01 *CAT ' ' *CAT &F02 *CAT ') & +
+                          TM07="P" ') KEYFLD(*FILE) MAPFLD((TM01L +
+                          '%SST(TM01 1 1)' *CHAR 1))
+
+     /*產生暫存檔及傳票*/
+             CALL       VOU0032
+
+             CLOF       OPNID(INTIPF)
+             CLOF       OPNID(INTMPF)
+
+    /*把本次執行結果 COPY 到 月份 MEMBER   */
+             CPYF       FROMFILE(QTEMP/WFJR14PF) TOFILE(WFJR1432) +
+                          TOMBR(&MBR) MBROPT(*ADD) FMTOPT(*NOCHK)
+   /*報表*/
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+         /*  OVRPRTF    FILE(VOU0032P) PAGESIZE(*N 198) CPI(15) +
+                          USRDTA('庫存異動')               */
+             OVRPRTF    FILE(VOU0032P) PAGESIZE(*N 132)  +
+                          USRDTA('庫存異動')
+             CALL       VOU0033
+             CHGVAR     VAR(&P6601I) VALUE('VOU0032P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

@@ -1,0 +1,186 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : DPA0031                                       *
+      * AUTHER       : ANDY                                          *
+      * CREATE DATE  : 81/07/13                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :錯誤統一發票重開                             *
+      ****************************************************************
+     FSOSIPF  UP  E           K        DISK
+     FSOSJPF  UF  E           K        DISK
+     FSOSCPF  UF  E           K        DISK
+     FSOSEPF  UF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FDPA003P O   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      603 603 DSI03S
+     I                                      604 604 DSI03E
+     I                                      605 606 DSI04S
+     I                                      607 608 DSI04E
+     I                                      609 613 DSI05
+     I*(MM/DD/YY)
+     I                                      621 6260DSI06
+     I*(YY/MM/DD)
+B2MODI                                      640 6470WSI06
+B2MODI                                      640 6450WSI061
+     I                                      642 6470W6
+     I*
+     I            DS
+     I                                        1  10 SI02
+     I                                        2   2 SI021
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           #AKEY     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C*
+     C           SJKEY     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           PSI02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *GET HEADING
+     C*
+     C                     EXSR RTN100                     CHAIN DATA
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....GET HEADING
+      *==============================================================*
+     C           RTN010    BEGSR
+     C*
+     C                     MOVE *BLANK    #A01
+     C                     MOVE *BLANK    #A02
+     C                     MOVEL'STORAGE' #A01
+     C                     MOVELDSI05     #A02
+     C*
+     C           #AKEY     CHAIN#A0                  40
+     C*
+     C           *IN40     IFEQ '1'
+     C                     MOVE *BLANK    #A03
+     C                     END
+     C*
+     C                     EXSR RTN900                     *PROC SKIP
+     C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTN100....CHAIN DATA
+      *==============================================================*
+     C           RTN100    BEGSR
+     C*
+     C                     MOVE *BLANK    ERR     1
+     C*
+     C                     MOVE SI02      PSI02
+     C*
+     C                     Z-ADDWSI061    WYM     40
+     C                     CALL 'RES014'
+     C                     PARM SI01      S014I1  2
+B2MODC                     PARM WYM       S014I2  40
+B2MODC                     PARM W6        S014I3  60
+     C           SI02      PARM           S014O1 10
+     C           SI07      PARM           S014O2  4
+     C           ERR       PARM           S014O3  1
+     C*
+     C           SI021     IFGE '1'
+     C           SI021     ANDLE'9'
+     C                     MOVE 'Y'       SI16
+     C                     MOVE *BLANK    SI07
+     C                     END
+     C*
+     C           SI01      CHAIN#B0                  40
+     C   40                MOVE *BLANK    #B03
+     C*
+     C           ERR       IFEQ *BLANK
+     C*
+     C*UPDAT SOSIPF
+     C                     UPDATSI0
+     C*
+     C*UPDAT SOSJPF
+     C           SJKEY     CHAINSJ0                  40
+     C*
+     C           *IN40     DOWEQ'0'
+     C                     MOVE SI02      SJ02
+     C                     UPDATSJ0
+     C           SJKEY     READESJ0                      40
+     C                     END
+     C*
+     C*UPDAT SOSCPF
+     C           SI10      CHAINSC0                  41
+     C*
+     C           *IN41     IFEQ '0'
+     C*
+|    C*(CHANGE TO CHINESE DATE)
+M002AC                     Z-ADDSC07      WSC07   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM WSC07     S001I2  60
+B2???C           PSC07     PARM           S001OI  60
+     C*
+     C                     MOVE SI02      SC30
+     C                     UPDATSC0
+     C                     END
+     C*
+     C*UPDAT SOSEPF
+     C           SI11      CHAINSE0                  42
+     C*
+     C           *IN42     IFEQ '0'
+     C                     MOVE SI02      SE30
+     C                     UPDATSE0
+     C                     END
+     C*
+     C                     ELSE
+     C                     MOVE *BLANK    SI02
+     C                     Z-ADD0         PSC07
+     C                     MOVE *BLANK    SC02
+     C                     MOVE *BLANK    SE02
+     C                     SETON                     70
+     C                     END
+     C*
+     C                     EXSR RTN900                     *PROC SKIP
+     C                     WRITEPD1
+     C                     SETOF                     70
+     C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+     C           RTN900    BEGSR
+     C*
+     C           *IN10     IFEQ '0'
+     C                     WRITEPH1
+     C                     SETON                     10
+     C                     SETOF                     39
+     C                     END
+     C*
+     C           *IN39     IFEQ '1'
+     C                     WRITEPE1
+     C                     WRITEPH1
+     C                     SETOF                     39
+     C                     END
+     C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTN999....END DATA
+      *==============================================================*
+     C           RTN999    BEGSR
+     C*
+     C           *IN10     IFEQ '0'
+     C                     WRITEPH1
+     C                     WRITEPE31
+     C                     WRITEPE2
+     C                     ELSE
+     C                     WRITEPE2
+     C                     END
+     C*
+     C                     ENDSR
+

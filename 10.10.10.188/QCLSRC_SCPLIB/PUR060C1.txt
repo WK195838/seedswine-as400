@@ -1,0 +1,124 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1388  WIND                               */
+     /*    CREATE DATE  : 97/11/03                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : PUR060C1                                  */
+     /*    SYSTEM       :                                           */
+     /*    SUBSYSTEM    :採購系統                                 */
+     /*    REMARK       :驗收月報表                               */
+     /*    NOTES        : 98/03/30玉蕙要求為對帳，不列入陳列驗收單*/
+     /*                                                             */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DCL01)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DCM02S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DCM02E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DCL04S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DCL04E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DCL07S) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DCL07E) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&SELECT) TYPE(*CHAR) LEN(1024)
+
+             CHGVAR     VAR(&DCL01)  VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DCM02S) VALUE(%SST(*LDA 618 5))
+             CHGVAR     VAR(&DCM02E) VALUE(%SST(*LDA 623 5))
+             CHGVAR     VAR(&DCL04S) VALUE(%SST(*LDA 628 5))
+             CHGVAR     VAR(&DCL04E) VALUE(%SST(*LDA 633 5))
+             CHGVAR     VAR(&DCL07S) VALUE(%SST(*LDA 641 8))
+             CHGVAR     VAR(&DCL07E) VALUE(%SST(*LDA 651 8))
+             CHGVAR     VAR(&SELECT) VALUE('                       +
+                               CL01 = "' || &DCL01 || '"           +
+                          *AND CM02 = %RANGE("' || &DCM02S || '"   +
+                                             "' || &DCM02E || '")  +
+                          *AND CL04 = %RANGE("' || &DCL04S || '"   +
+                                             "' || &DCL04E || '")  +
+                          *AND CL07 = %RANGE(' || &DCL07S || '     +
+                                             ' || &DCL07E || ')    +
+                          *AND (CL14 *EQ "P" *OR CL14 *EQ "R")     +
+                          *AND CL06 *NE "C3" ')
+
+          /* OVRDBF     FILE(SCWK04) TOFILE(POCLPF) SHARE(*YES) */
+          /* OPNQRYF    FILE((POCLPF) (POCMPF)) FORMAT(SCWK04) +
+                          QRYSLT(&SELECT) KEYFLD((CL01) (CM02) +
+                          (CL02) (CL07)) JFLD((CL05 CM01)) */
+
+             CPYF       FROMFILE(SCWK04) TOFILE(QTEMP/SCWK04) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/SCWK04))
+             OVRDBF     FILE(SCWK04) TOFILE(QTEMP/SCWK04) SHARE(*YES)
+
+             OVRDBF     FILE(SCWK040) TOFILE(POCLPF) SHARE(*YES)
+             OPNQRYF    FILE((POCLPF) (POCMPF)) FORMAT(SCWK040) +
+                          QRYSLT(&SELECT) KEYFLD((CL01) (CM02) +
+                          (CL02) (CL07)) JFLD((CL05 CM01))
+
+             CALL       PUR06001
+             CLOF       OPNID(POCLPF)
+             DLTOVR     FILE(SCWK040)
+   /*  */
+                DLTF       FILE(QTEMP/INTXTM)
+                MONMSG     MSGID(CPF2105)
+                CRTDUPOBJ  OBJ(INTXTM) FROMLIB(*LIBL) OBJTYPE(*FILE) +
+                             TOLIB(QTEMP) NEWOBJ(INTXTM) DATA(*NO) +
+                             CST(*NO) TRG(*NO)
+
+                OVRDBF     FILE(INTXTM) TOFILE(QTEMP/INTXTM)
+             CALL       PGM(PUR900) PARM(&DCL01 &DCL07S &DCL07E 'R')
+                DLTOVR     FILE(INTXTM)
+
+/*  */
+             OVRDBF     FILE(INTXTM) TOFILE(QTEMP/INTXTM) SHARE(*YES)
+             OPNQRYF    FILE(QTEMP/INTXTM)   OPTION(*INP)                  +
+                         QRYSLT('TX01 = "' || &DCL01  || '"          +
+                         & TX06 = %RANGE(  '|| &DCL07S ||'           +
+                                           '|| &DCL07E ||')          +
+                         & TX07 = %RANGE("' || &DCM02S || '"         +
+                                         "' || &DCM02E || '")        +
+                         & TX12 = %RANGE("' || &DCL04S || '"         +
+                                         "' || &DCL04E || '")        +
+                         & TX15 *NE 0                                +
+                         & (TX03  = "B1")                  ')        +
+                        KEYFLD(*FILE)
+
+             CALL       PGM(PUR0600)
+             CLOF       OPNID(INTXTM)
+             DLTOVR     FILE(*ALL)
+
+             OVRDBF     FILE(SCWK04) TOFILE(QTEMP/SCWK04) SHARE(*YES)
+             OPNQRYF    FILE((SCWK04)) QRYSLT(*ALL) KEYFLD((CL01) +
+                          (CM02) (CL02) (CL07))
+
+          /* OVRPRTF    FILE(PUR060P) USRDTA('驗收月報') */
+             OVRPRTF    FILE(PUR060P) PAGESIZE(*N 120) CPI(15) +
+                          USRDTA('驗收月報')
+             CLRPFM     FILE(SCWK15)
+             CALL       PUR0601
+
+          /* CLOF       OPNID(POCLPF)*/
+          /* DLTOVR     FILE(SCWK04) */
+             CLOF       OPNID(SCWK04)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             CHGVAR     VAR(&P6601I) VALUE('PUR060P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             ENDPGM
+

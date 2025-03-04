@@ -1,0 +1,188 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARI022                                     *
+     A*    AUTHOR       : A1139  JANE                                *
+     A*    DATE WRITTEN : 81/04/08                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收子系統                                *
+     A*    PROCEDURE    :產品銷售查詢(I)                           *
+     A****************************************************************
+     FSOSJLF03IF  E           K        DISK
+     FSOSIPF  IF  E           K        DISK
+     FARI022D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+B2MODC           *LIKE     DEFN DBGN5     DBGN5M+ 2
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYSJ2    KLIST
+     C                     KFLD           DBGN2
+     C                     KFLD           DBGN3
+     C                     KFLD           DBGN4
+     C                     KFLD           DBGN5M
+     C                     KFLD           DBGN6
+     C*
+     C           KEYSI     KLIST
+     C                     KFLD           SJ01
+     C                     KFLD           SJ02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+  02-C           *IN25     CASEQ'1'       RTN100           *下一頁
+    C                     CAS            RTN400           *START KEY
+  02-C                     END
+    C                     EXSR RTN500                     *EXFMTSFL
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*=============================================================*
+     C*          RTN100....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+01===C           RTN100    BEGSR
+|    C*
+| 03-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                         98*LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 03*C                     ELSE
+|   C                     EXSR RTN810                     *ADD SFL DTA
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+     C*=============================================================*
+     C*          RTN400....SFL MAIN RUTINE (START KEY)
+     C*=============================================================*
+02===C           RTN400    BEGSR
+|    C*
+|    C                     EXSR RTN405                     *INIT SFL
+|    C                     EXSR RTN810                     *ADD SFL DTA
+|    C*
+02===C                     ENDSR
+     C*=============================================================*
+     C*          RTN405....SFL INITIAL
+     C*=============================================================*
+03===C           RTN405    BEGSR
+|    C*
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         DSPRCD
+|    C                     Z-ADD12        WPRCD            *PAG RCD
+|    C                     MOVE 'N'       WBOTOM  1        *BOTTOM
+|    C*
+|    C                     SETON                     52    *SFLCLR
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C                     SETON                     51    *SFLDSPCTL
+CC   C*
+|    C*發票日期
+M001AC                     Z-ADD0         XBGN5M  60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+M001DC*                    PARM DBGN5     S001I2  80
+M001AC                     PARM DBGN5     S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+M001DC*          DBGN5M    PARM           S001O1  80
+M001AC           XBGN5M    PARM           S001O1  60
+M001AC                     MOVE XBGN5M    HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    DBGN5M
+|    C*
+B2000C           KEYSJ2    SETLLSJ0
+03===C                     ENDSR
+     C*=============================================================*
+     C*          RTN500....EXFMT DSPF
+     C*=============================================================*
+04===C           RTN500    BEGSR
+|    C*
+| 01-C           RRN       IFGT 0
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     94    *NO DTA
+| 01-C                     END
+|    C*
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     50
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+04===C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA
+     C*=============================================================*
+05===C           RTN810    BEGSR
+|    C*
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C                     READ SJ0                      46*NF/EOF
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|    C           KEYSI     CHAINSI0                  40
+     C           *IN40     IFEQ '0'
+     C           SI18      ANDEQ*BLANKS
+|   C                     EXSR RTN811                     *DTA->SFL
+|   C                     EXSR RTN812                     *SELECT-DATA
+     C                     END
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVE 'Y'       WBOTOM
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN       DRRN
+05===C                     ENDSR
+     C*=============================================================*
+     C*          RTN811....MOVE DTA TO SFL
+     C*=============================================================*
+06===C           RTN811    BEGSR
+|    C*
+     C                     Z-ADD0         QTY
+     C                     Z-ADD0         PRICE
+|    C*發票日期
+M001AC                     Z-ADDSJ16      XSJ16   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SJ16      S001I2  80
+M001AC                     PARM XSJ16     S001I2  60
+M001DC*          DSJ16     PARM           S001O1  80
+M001AC           DSJ16     PARM           S001O1  60
+|    C*
+|    C*
+|    C*計算數量
+|    C*
+|    C           SJ04      SUB  SJ13      QTY
+|    C*
+|    C*淨售價
+|   C           SJ06      SUB  SJ07      PRICE
+|    C*
+06===C                     ENDSR
+     C*=============================================================*
+     C*          RTN812....SELECT DATA TO SFL
+     C*=============================================================*
+07===C           RTN812    BEGSR
+|    C**
+|    C*(IF CONDITION)
+|    C**
+|    C                     ADD  1         RRN
+|    C                     WRITESFLSR
+|    C*
+07===C                     ENDSR
+     C/COPY HBP2CVTR
+

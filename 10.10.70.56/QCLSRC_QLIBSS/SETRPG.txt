@@ -1,0 +1,192 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *--------------------------------------------------------------*
+      *    PROGRAM ID   : FPR02                                      *
+      *    PROCEDURE    : FPR02C                                     *
+      *    WRITTEN BY   : A1084   CHARLES                            *
+      *    DATE WRITTEN : 79/11/20                                   *
+      *    UPDATE DATE  :                                            *
+      *    SYSTEM       :第一產物火險系統                          *
+      *    SUBSYSTEM    :　　　　　　　　　                        *
+      *    PURPOSE      :火險明細表列印                            *
+      ****************************************************************
+     FSETDSP  CF  E                    WORKSTN
+      *
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      111 1160$CHYMD
+     I                                      111 1120$CHY
+     I                                      111 1140$CHYM
+     I                                      113 1160$CHMD
+      *
+     I                                      501 513 DPARM
+     I                                      501 501 ZON
+     I                                      501 5060DDATE
+     I                                      501 5040CHKMD
+     I                                      505 5060CHKYY
+     I                                      507 507 BNK
+     I                                      508 508 ZON1
+     I                                      508 5130DTME
+     I                                      508 5090THH
+     I                                      510 5110TMM
+     I                                      512 5130TSS
+     I                                      514 514 INT
+     I            DS
+     I                                        1   60DATE
+     I                                        1   20YY
+     I                                        3   40MM
+     I                                        3   60MD
+     I                                        5   60DD
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN97     PARM *IN97     IN97    1
+     C           ENDINT    PARM ENDINT    ENDINT
+     C           OPTLIB    PARM OPTLIB    OPTLIB
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C           *NAMVAR   DEFN *LDA      LDA
+     C                     IN   LDA
+     C*
+     C  N10                EXSR RTN010
+     C                     SETON                     10
+      *
+     C           *IN03     DOUEQ'1'
+     C           *IN99     OREQ '0'
+      *
+     C                     EXFMTDSPC1
+     C                     MOVEA*ALL'0'   *IN,60
+     C                     EXSR RTN100                     *CHK FIELD  N
+     C           ZON       IFEQ *BLANKS
+     C                     MOVE '0'       ZON
+     C                     END
+     C*
+     C           ZON1      IFEQ *BLANKS
+     C                     MOVE '0'       ZON1
+     C                     END
+     C*
+     C                     END
+      *
+     C                     OUT  LDA
+     C   03                SETON                     LR
+     C                     RETRN
+      *==============================================================*
+      *          RTN010....INITIAL VALUE
+      *==============================================================*
+     C           RTN010    BEGSR
+     C                     MOVE *BLANKS   BNK
+     C                     Z-ADD0         DATE
+     C                     Z-ADD$CHYMD    DATE
+     C                     Z-ADD0         DDATE
+     C                     MOVE *BLANKS   DTME
+     C                     ADD  11        YY
+      *
+     C                     Z-ADD0         WEEK    10
+     C                     CALL 'P40'
+     C                     PARM $CHYMD    P4001I  60
+     C           WEEK      PARM           P4011O  10
+      *
+     C           WEEK      IFEQ 1
+     C           WEEK      OREQ 3
+     C           WEEK      OREQ 5
+     C                     MOVE 'Y'       INT
+     C                     ELSE
+     C                     MOVE 'N'       INT
+     C                     END
+      *
+     C           WEEK      IFEQ 6
+     C                     ADD  1         DD
+     C                     END
+     C                     ADD  1         DD
+      *
+     C                     Z-ADD0         DATES   20
+     C                     Z-ADD0         P2211O
+     C                     CALL 'P22'
+     C                     PARM $CHYM     P2201I  40
+     C                     PARM           P2201O  1
+     C           DATES     PARM           P2211O  20
+      *
+     C           DD        IFGT DATES
+     C           DD        SUB  DATES     DD
+     C                     ADD  1         MM
+     C           MM        IFGT 12
+     C                     SUB  12        MM
+     C                     ADD  1         YY
+     C                     END
+     C                     END
+      *
+     C           MD        MULT 100       DDATE
+     C                     ADD  YY        DDATE
+     C                     Z-ADD072000    DTME
+     C                     MOVE 'Y'       CHK     1
+     C                     ENDSR
+      *==============================================================*
+      *          RTN100....CHECK SCREEN FIELDS
+      *==============================================================*
+     CSR         RTN100    BEGSR
+     C*
+     C                     CALL 'P09'
+     C                     PARM DDATE     P0401I  60
+     C           CHK       PARM           P0411O  1
+     C           CHK       IFEQ 'N'
+     C                     SETON                     609899
+     C                     END
+     C   99                GOTO END100
+     C*
+     C           CHKYY     SUB  11        CHKY    20
+     C           CHKY      MULT 10000     CHKYMD  60
+     C                     ADD  CHKMD     CHKYMD
+     C           $CHYMD    IFGE CHKYMD
+     C                     SETON                     609699
+     C                     END
+     C   99                GOTO END100
+     C*大於兩年
+     C           CHKY      SUB  $CHY      CHK1    20
+     C           CHK1      IFGE 2
+     C                     SETON                     609599
+     C                     END
+     C   99                GOTO END100
+     C*
+     C           CHK1      IFEQ 1                          一年
+     C           $CHMD     IFGT CHKMD
+     C           $CHMD     SUB  CHKMD     CHK2    40
+      *
+     C           CHK2      IFLE 100
+     C                     SETON                     609599
+     C   99                GOTO END100
+     C                     END
+      *
+     C                     ELSE
+     C                     SETON                     609599
+     C   99                GOTO END100
+     C                     END
+     C                     END
+     C   99                GOTO END100
+     C*
+     C           CHK1      IFEQ 0
+     C           CHKMD     SUB  $CHMD     CHK2    40
+     C           CHK2      IFGT 1100
+     C                     SETON                     609599
+     C                     END
+     C                     END
+     C*
+     C           THH       IFGE 24
+     C                     SETON                     619499
+     C                     END
+     C   99                GOTO END100
+     C*
+     C           TMM       IFGE 60
+     C                     SETON                     619499
+     C                     END
+     C   99                GOTO END100
+     C*
+     C           THH       IFGE 60
+     C                     SETON                     619499
+     C                     END
+     C   99                GOTO END100
+     C*
+     C           END100    ENDSR
+

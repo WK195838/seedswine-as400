@@ -1,0 +1,269 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : PIA001                                        *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/04/22                                      *
+      * UPDATE DATE  : 11/16/92                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :盤點系統                                     *
+      * REMARK       :盤點資料產生                                 *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.16 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FIMIOPF  UF  E           K        DISK                      A
+     FIMITLF01IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#FLF  IF  E           K        DISK
+     F                                              KINFDS #FRCDN
+     F            #A0                               KRENAME#F0L
+     F            MD0                               KRENAMEMD0L
+     FPIA001D CF  E                    WORKSTN
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+M001AI                                      201 2080DATE
+ @   I*                                     140 140 $RMK02
+ @   I*                                     141 141 $RMK03
+     I*                                     162 1620$EVR
+     I*                                     125 1270$CPY
+     I*                                     598 5990$LPRT
+     I                                      501 505 $WRHUS
+     I*                                     506 506 $PURID
+     I*                                     507 508 $TRNID
+     I*                                     509 513 $APAUT
+     I                                      513 513 $WRHTY
+     I*                                     514 521 $#101
+     I            DS
+     I                                        1   1 WIT01
+     I            DS
+     I                                        1   9 WIO03
+     I                                        1   1 WIO03L
+     I                                        2   9 WIO03R
+     I                                        2   90NIO03
+     I            DS
+     I                                        1   5 DIO02
+     I                                        1   1 DIO02L
+     I#FRCDN      DS
+     I                                     *RECORD  RCDN
+     I*
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C*          *LIKE     DEFN IT01      KIT01
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYIO     KLIST
+     C                     KFLD           DIO02
+     C*                    KFLD           DIO01
+     C           KEYIT     KLIST
+     C                     KFLD           DIO02
+     C*                    KFLD           DIO01
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRM
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+    C*
+    C                     EXSR RTN100                     *CHECK SCR01?
+  02-C           *IN14     IFEQ '1'
+    C           *IN99     ANDEQ'0'
+    C                     EXSR RTN200                     *PROCESS    ?
+    C                     SETON                     98                ?
+  02-C                     END
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*                    MOVE *BLANK    DIO01
+|    C                     MOVE *BLANK    DIO02
+|    C                     Z-ADD0         NIO03
+|    C                     MOVE '00000001'DIO03
+|    C                     Z-ADD0         DNUM
+|    C*
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+|    C*                    PARM $EGMDY    S001I2  60
+B2MODC*M001D     DATE      PARM           S001O1  80
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*物流點權限檢查
+| 01-C           DIO02     IFEQ *BLANK
+|   C                     SETON                     619599
+| 01-C                     END
+|    C   99                GOTO END100
+      *
+| 02-C           $WRHUS    IFNE '*ALL  '
+| 03-C           $WRHUS    IFNE *BLANKS
+| 04-C           DIO02     IFNE $WRHUS
+|   C                     SETON                     619699
+| 04-C                     END
+| 03*C                     ELSE
+| 05-C           DIO02L    IFNE $WRHTY
+|   C                     SETON                     619699
+| 05-C                     END
+| 03-C                     END
+| 02-C                     END
+     C*物流點不可是'BXXXX'
+     C*          DIO02L    IFEQ 'B'
+|   C*                    SETON                     618899
+     C*                    END
+|    C*  99                GOTO END100
+|    C* GET物流點
+| 06-C           *IN99     IFEQ '0'
+|   C           DIO02     CHAINPA#FLF               40
+| 07-C           RCDN      IFEQ 'MD0L'
+|   C           DIO02     CHAINME0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVELME04      DSTOR
+| 07*C                     ELSE
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELDIO02     #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVEL#A03      DSTOR
+| 07-C                     END
+| 08-C           DSTOR     IFEQ *BLANKS
+|   C                     SETON                     619499
+| 08-C                     END
+| 06-C                     END
+|    C*公司別檢查
+| 09-C*          DIO01     IFEQ *BLANK
+|   C*                    SETON                     609599
+| 09*C*                    ELSE
+|   C*                    MOVE *BLANKS   #A01
+|   C*                    MOVE *BLANKS   #A02
+|   C*                    MOVEL'COMPANY' #A01
+|   C*                    MOVELDIO01     #A02
+|   C*          KEY#A     CHAIN#A0                  40
+| 10-C*          *IN40     IFEQ '1'
+|   C*                    SETON                     609499
+| 10-C*                    END
+| 09-C*                    END
+|    C*  99                GOTO END100
+|    C*
+|    C*公司別＆物流點檢查
+|    C           KEYIO     CHAINIO0                  40
+| 11-C           *IN40     IFEQ '0'
+|   C                     SETON                     6061
+|   C                     SETON                     9099
+| 11-C                     END
+|    C   99                GOTO END100
+|    C*盤點單號起檢查
+| 12-C           DIO03     IFEQ *BLANK
+|   C                     SETON                     629599
+| 12-C                     END
+|    C   99                GOTO END100
+|    C                     TESTN          DIO03      70
+| 13-C           *IN70     IFEQ '0'
+|   C                     SETON                     628999
+| 13-C                     END
+|    C   99                GOTO END100
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTN200....DATA PROCESS
+      *===============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C*                    MOVELDIO01     KIO01
+|    C                     MOVE *BLANKS   WIT01
+|    C           KEYIT     SETLLIT0
+|    C           KEYIT     READEIT0                      44
+| 01-C           *IN44     DOWEQ'0'
+| 02-C           WIT01     IFNE IT01
+| 03-C           WIT01     IFNE *BLANK
+|   C                     EXSR RTN210                     * 空白盤點單
+| 03-C                     END
+|   C                     MOVE IT01      WIT01
+|   C                     MOVE IT01      WIO03L
+|   C                     MOVELDIO03     WIO03R
+| 02-C                     END
+|   C*
+|   C                     MOVE DIO02     IO02
+|   C                     MOVE WIT01     IO01
+|   C                     MOVE WIO03     IO03
+|   C                     MOVE IT03      IO04
+|   C                     Z-ADD0         IO05
+|   C                     Z-ADD0         IO06
+|   C                     Z-ADD0         IO07
+|   C                     Z-ADD0         IO08
+|   C                     MOVE *BLANKS   IO09
+|   C                     MOVE '1'       IO10
+|   C                     MOVE *BLANKS   IO11
+|   C*
+B2000C                     Z-ADDDATE      IOXX
+B2000C                     TIME           IOYY
+|   C                     MOVE $USER     IOZZ
+|   C**
+|   C                     WRITEIO0
+|   C* 續編盤點單號
+|   C                     ADD  1         NIO03
+|   C*
+|   C           KEYIT     READEIT0                      44
+| 01-C                     END
+|    C                     EXSR RTN210
+03===C                     ENDSR
+      *===============================================================*
+      *          RTN210....DATA PROCESS
+      *===============================================================*
+04===C           RTN210    BEGSR
+|    C*
+|    C** 新增空白張數
+| 01-C                     DO   DNUM
+|   C*
+|   C                     MOVE DIO02     IO02
+|   C                     MOVE WIT01     IO01
+|   C                     MOVE WIO03     IO03
+|   C                     MOVE *BLANKS   IO04
+|   C                     Z-ADD0         IO05
+|   C                     Z-ADD0         IO06
+|   C                     Z-ADD0         IO07
+|   C                     Z-ADD0         IO08
+|   C                     MOVE *BLANKS   IO09
+|   C                     MOVE '2'       IO10
+|   C                     MOVE *BLANKS   IO11
+|   C*
+B2000C                     Z-ADDDATE      IOXX
+B2000C                     TIME           IOYY
+|   C                     MOVE $USER     IOZZ
+|   C**
+|   C                     WRITEIO0
+|   C* 續編盤點單號
+|   C                     ADD  1         NIO03
+|   C*
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+

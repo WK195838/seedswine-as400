@@ -1,0 +1,200 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : SOR0433                                    *
+     A*    AUTHOR       : ANDY                                       *
+     A*    DATE WRITTEN : 81/10/05                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :銷售訂單系統                              *
+     A*    PROCEDURE    :                                            *
+     A*    REMARK       :客戶報價單                                *
+     A*                                                              *
+     A****************************************************************
+     FREWF031 O   E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FSOR043D1CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 601 DMD07S
+     I                                      602 602 DMD07E
+     I                                      603 604 DMD08S
+     I                                      605 606 DMD08E
+     I                                      607 611 DMD01S
+     I                                      612 616 DMD01E
+     I                                      617 6220DATE
+     I                                      629 630 DME07S
+     I                                      631 632 DME07E
+     I                                      633 6380CDATE
+     I                                      641 649 DSA01S
+     I                                      651 659 DSA01E
+     I                                      661 669 DSA011
+     I                                      671 679 DSA012
+     I*
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           RTCD    1
+     C*
+     C           *LIKE     DEFN RRN       DSPRC
+     C           *LIKE     DEFN MA01      BMA01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C                     EXSR RTN191                     *INIT SFL
+     C                     EXSR RTN194                     *EXFMT SFL
+     C*
+     C           *IN12     DOWEQ'0'
+     C           *IN99     ANDEQ'0'                        *PRESS ENTER
+     C*
+     C           *IN25     IFEQ '1'
+     C                     EXSR RTN192                     *ROLLUP
+     C                     EXSR RTN194                     *EXFMT
+     C                     ELSE
+     C                     SETON                     99
+     C                     END
+     C*
+     C                     END
+     C*
+     C           *IN12     IFEQ '1'
+     C                     MOVE '1'       RTCD
+     C                     ELSE
+     C                     MOVE '0'       RTCD
+     C                     EXSR RTN200                     *READC
+     C                     END
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+      *==============================================================*
+      *          RTN010....INIT
+      *==============================================================*
+     C           RTN010    BEGSR
+     C*
+     C                     MOVE '0'       RTCD
+     C*
+     C           DSA01S    SETLLMA0
+     C*
+     C                     ENDSR
+      *=========================================================*
+      *          RTN191....INITIAL SFL                          *
+      *=========================================================*
+03===C           RTN191    BEGSR
+     C*
+     C                     MOVE *BLANK    MA01
+     C                     MOVE *BLANK    MA03
+|    C*
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         DSPRC
+|    C                     MOVE 'N'       BOTTOM  1
+|    C                     SETON                     52
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+     C*
+     C                     MOVE DSA01S    BMA01
+     C                     EXSR RTN192
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP UP
+      *=========================================================*
+04===C           RTN192    BEGSR
+|    C*
+|    C           BMA01     SETLLMA0
+     C*
+     C                     EXSR RTN193                     *ADD SFL
+|    C*
+04===C                     ENDSR
+      *=========================================================*
+      *          RTN193....ADD SFL
+      *=========================================================*
+04===C           RTN193    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT
+|    C                     ADD  20        DSPRC
+|   C                     READ MA0                      46
+     C*
+| 01-C           RRN       DOWLTDSPRC
+| 02-C           *IN46     ANDEQ'0'
+     C           MA01      ANDLEDSA01E
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+     C                     MOVE MA01      BMA01
+|   C                     READ MA0                      46
+     C                     MOVE MA01      BMA01
+| 02-C                     END
+     C*
+     C           *IN46     IFEQ '1'
+     C           MA01      ORGT DSA01E
+     C                     MOVE 'Y'       BOTTOM
+     C                     MOVE *HIVAL    BMA01
+     C                     SETON                     53
+     C                     END
+     C*
+     C                     Z-ADDRRN       DRRN
+|    C*
+09===C                     ENDSR
+      *=========================================================*
+      *          RTN194....EXFMT
+      *=========================================================*
+04===C           RTN194    BEGSR
+|    C*
+| 01-C           RRN       IFLE *ZEROS
+|   C                     SETON                     98    *NODATA
+| 01*C                     ELSE
+|   C                     SETON                     50
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+     C           BOTTOM    IFEQ 'Y'
+     C                     SETON                     97
+     C                     END
+|    C*
+11===C                     ENDSR
+      *=========================================================*
+      *          RTN200....READC
+      *=========================================================*
+04===C           RTN200    BEGSR
+|    C*
+|    C                     READCSFLSR                  5757*NF
+| 01-C           *IN57     DOWEQ'0'                        *40 LOOP
+|   C*
+| 03-C           DOPT      IFEQ '/'
+|   C                     EXSR RTN210                     *WRITE WF
+| 05-C                     END
+|   C*
+|   C                     READCSFLSR                    57*NF
+| 01-C                     END                             *40 END
+|    C*
+05===C                     ENDSR
+      *=========================================================*
+      *          RTN210....WRITE WF
+      *=========================================================*
+04===C           RTN210    BEGSR
+     C*
+     C           MA01      IFLT DSA011
+     C                     MOVELMA01      DSA011
+     C                     END
+     C           MA01      IFGT DSA012
+     C                     MOVELMA01      DSA012
+     C                     END
+     C*
+     C                     MOVE MA01      WF3101
+     C                     WRITERE31
+     C*
+     C                     ENDSR
+

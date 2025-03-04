@@ -1,0 +1,226 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : IMR0731                                       *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 04/16/93                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :普銷送貨揀料彙總表                           *
+      ****************************************************************
+     FREWF68  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FIMR073P O   E             39     PRINTER
+     E*
+     E                    WA01     9999 24
+     IWF680
+     I                                              WF6807L4
+     I                                              WF6817L3
+     I                                              WF6816L2
+     I                                              WF6815L1
+     I                                              WF6813L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*                                     601 602 DSE01
+     I                                      603 603 DSEL
+     I*(MM/DD/YY)
+     I                                      621 6260DSE06
+     I*(YY/MM/DD)
+     I                                      640 6450YSE06
+     I*(MM/DD/YY)訂單日期
+     I                                      627 6320DSE39
+     I*(YY/MM/DD)
+     I                                      633 6380YSE39
+     I                                      750 750 IN20
+     I            DS
+     I                                        1  24 WF99
+     I                                        1  12 WF6815
+     I                                       13  24 WF6813
+     I*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+  01*C                     ELSE
+  02-C           *INL4     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     EXSR RTN200                     *READE DETAIL
+     C                     SETOF                     303132
+     C*
+     CL1 10                SETON                     30
+     CL2 10                EXSR RTN666
+     CL3 10                EXSR RTN777
+     CL4 10                EXSR RTN888
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+     C           IN20      IFEQ '1'
+     C                     SETON                     20
+     C                     ELSE
+     C                     SETOF                     20
+     C                     END
+|    C*物流點
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELWF6807    #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 03-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    #A031
+| 03*C                     ELSE
+|   C                     MOVEL#A03      #A031
+| 03-C                     END
+|    C*
+| 04-C           DSEL      IFEQ '1'
+|   C                     SETON                     21
+| 04*C                     ELSE
+| 05-C           DSEL      IFEQ '2'
+|   C                     SETON                     22
+| 05*C                     ELSE
+|   C                     SETON                     23
+| 05-C                     END
+| 04-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                         39
+|    C                     SETON                         10
+|    C                     SETON                     303132
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     EXSR RTN300                     *CHAIN DATA
+|    C                     EXSR RTN400                     *ADD SUBTOT L
+|    C                     EXSR RTN500                     *WRITE DETAIL
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*(CLEAR KEY#A)
+|    C                     MOVE *BLANK    #A01
+|    C                     MOVE *BLANK    #A02
+|    C*
+|    C*產品識別
+|    C                     MOVEL'ID'      #A01
+|    C                     MOVELWF6817    #A02
+|    C           KEY#A     CHAIN#A0                  46
+| 01-C           *IN46     IFEQ '1'
+|   C                     MOVE *BLANK    #A032
+| 01*C                     ELSE
+|   C                     MOVEL#A03      #A032
+| 01-C                     END
+|    C*產品簡稱＆單位
+|    C           WF6816    CHAINMA0                  47
+| 02-C           *IN47     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+|   C                     MOVE *BLANK    MA13
+| 02-C                     END
+|    C*數量
+|    C           WF6818    ADD  WF6819    PTOT
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....ADD SUBTOT
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*
+|    C                     ADD  PTOT      PRTOT
+|    C*
+|    C                     Z-ADD1         WI      50
+|    C           WF99      LOKUPWA01,WI                  80
+| 01-C           *IN80     IFEQ '0'                        *NE EQ
+|   C                     ADD  1         PSF02
+|   C                     Z-ADDPSF02     I       50
+|   C                     MOVE WF99      WA01,I
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN500....WRITE DETAIL
+      *==============================================================*
+05===C           RTN500    BEGSR
+|    C                     WRITEPD1
+|    C                     SETOF                     303132
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     303132
+|    C                     SETOF                     39
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN666....(L1)
+      *==============================================================*
+07===C           RTN666    BEGSR
+|    C*
+|    C                     WRITEPD2
+|    C  NLR                WRITEPE4
+|    C                     ADD  PRTOT     PRTOT1
+|    C                     Z-ADD0         PRTOT
+|    C                     SETON                     303132
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN777....(L2)
+      *==============================================================*
+07===C           RTN777    BEGSR
+|    C*
+|    C                     WRITEPD3
+|    C  NLR                WRITEPE4
+|    C                     ADD  PRTOT1    PRRTOT
+|    C                     Z-ADD0         PRTOT1
+|    C                     SETON                     303132
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN888....(L3)
+      *==============================================================*
+08===C           RTN888    BEGSR
+|    C*
+|    C                     WRITEPE3
+|    C                     WRITEPD4
+|    C  NLR                WRITEPE4
+     C                     Z-ADD0         PSF02
+     C                     Z-ADD0         PRRTOT
+|    C                     SETON                     303132
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+09===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|    C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+09===C                     ENDSR
+

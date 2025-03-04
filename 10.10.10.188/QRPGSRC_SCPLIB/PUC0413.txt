@@ -1,0 +1,162 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM-ID   : PUC0413                                    *
+     H*    PROGRAM NAME :運費月結處理--運費分攤                  *
+     H*    AUTHOR       : A1491 EASON                                *
+     H*    CREATE DATE  : 98/11/16                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :採購管理                                  *
+     H****************************************************************
+     FPOCKPF  IF  E           K        DISK
+     FPOCKLF05UF  E           K        DISK
+     F            CK0                               KRENAMECKX
+     FSCWK20  UF  E           K        DISK                      A
+     E*---------------------------------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      203 2080DDATE
+     I                                      125 1270$CPY
+     I                                      201 2080$EG8
+     I                                      217 218 $PRTCD
+     I                                      219 219 $PENV
+     I                                      500 500 $DATA
+      *
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+      *
+     C           KEYWF     KLIST
+     C                     KFLD           CK01
+     C                     KFLD           CK02
+     C                     KFLD           CK03
+     C                     KFLD           CK07
+     C                     KFLD           CK09
+     C                     KFLD           CK10
+      *
+     C           KEYCK     KLIST
+     C                     KFLD           W2001
+     C                     KFLD           W2002
+     C                     KFLD           W2003
+     C                     KFLD           W2004
+     C                     KFLD           W2005
+     C                     KFLD           W2006
+      *
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010
+      *
+     C                     EXSR RTN300
+      *
+     C                     EXSR RTN400
+      *
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010... INITIAL
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|     *
+|     *
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN300.. 更新資料以及計算
+     C*==============================================================*
+02===C           RTN300    BEGSR
+|     *
+|    C                     MOVEL*BLANK    TEMP
+|     *
+|    C           *LOVAL    SETLLCK0
+|    C                     READ CK0                      46
+|     *
+| 01-C           *IN46     DOWEQ'0'
+|    *
+| 02-C           CK12      IFNE 0
+|    *  箱數合併計算
+|   C           KEYWF     CHAINW20                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     ADD  CK12      W2008
+|    *取得單件運費
+|   C                     CALL 'GET005'
+|   C                     PARM CK07      G00001  1
+|   C                     PARM CK09      G00002  1
+|   C                     PARM CK03      G00003  80
+|   C                     PARM           G00004  40
+|    *
+|   C           W2008     MULT G00004    W2010
+|    *
+| 04-C           TEMP      IFNE CK08
+|   C                     ADD  1         W2007
+|   C                     MOVELCK08      TEMP
+| 04-C                     ENDIF
+|    *
+|   C                     UPDATW20
+|    *
+| 03*C                     ELSE
+|    *
+|   C                     MOVELCK01      W2001
+|   C                     MOVELCK02      W2002
+|   C                     Z-ADDCK03      W2003
+|   C                     MOVELCK07      W2004
+|   C                     MOVELCK09      W2005
+|   C                     MOVELCK10      W2006
+|   C                     Z-ADD1         W2007
+|   C                     MOVELCK08      TEMP    5
+|   C                     Z-ADDCK12      W2008
+|    *
+|   C                     CALL 'GET005'
+|   C                     PARM CK07      G00001  1
+|   C                     PARM CK09      G00002  1
+|   C                     PARM CK03      G00003  80
+|   C                     PARM           G00004  40
+|    *
+|   C                     Z-ADDG00004    W2009
+|    *
+|   C           W2008     MULT G00004    W2010
+|   C                     WRITEW20
+|    *
+| 03-C                     ENDIF
+| 02-C                     ENDIF
+|    *
+|   C                     READ CK0                      46
+| 01-C                     ENDDO
+|     *
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN400.. 計算是否達到最低運費
+     C*==============================================================*
+03===C           RTN400    BEGSR
+|     *
+|    C           *LOVAL    SETLLW20
+|    C                     READ W20                      46
+| 01-C           *IN46     DOWEQ'0'
+|    *
+|   C                     CALL 'GET006'
+|   C                     PARM W2004     G00001  1
+|   C                     PARM W2005     G00002  1
+|   C                     PARM W2003     G00003  80
+|   C                     PARM           G00004  40
+|    *
+| 02-C           W2010     IFLT G00004
+|   C           G00004    DIV  W2007     AVG     40H
+|    *
+|   C           KEYCK     SETLLCKX
+|   C           KEYCK     READECKX                      47
+| 03-C           *IN47     DOWEQ'0'
+| 04-C           CK12      IFNE 0
+|   C                     Z-ADDAVG       CK14
+|   C                     UPDATCKX
+| 04-C                     ENDIF
+|   C           KEYCK     READECKX                      47
+| 03-C                     ENDDO
+|    *
+| 02-C                     ENDIF
+|    *
+|   C                     READ W20                      46
+| 01-C                     ENDDO
+|     *
+03===C                     ENDSR
+

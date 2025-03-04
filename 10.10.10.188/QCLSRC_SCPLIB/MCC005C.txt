@@ -1,0 +1,104 @@
+             PGM
+             DCL        VAR(&LCK)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN96)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&DEVD)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&WEH01)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DATFM)  TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATTO)  TYPE(*CHAR) LEN(8)
+
+             RTVDTAARA  DTAARA(*LDA (163  10)) RTNVAR(&DEVD)
+             RTVDTAARA  DTAARA(*LDA (602  2)) RTNVAR(&WEH01)
+             RTVDTAARA  DTAARA(*LDA (604  8)) RTNVAR(&DATFM)
+             RTVDTAARA  DTAARA(*LDA (612  8)) RTNVAR(&DATTO)
+
+ /* LOCK CHECK */
+ CHGVAR     VAR(&LCK) VALUE('1')
+ CALL       PGM(MCC000C1) PARM(&LCK &IN96)
+ IF         COND(&IN96 *EQ '1') THEN( GOTO CMDLBL(ERR) )
+
+/* 清除 INTXPF DATA BY 公司  年月    */
+             CALL       PGM(MCC001) PARM(&WEH01)
+
+/* 取出 INTXPF DATA FROM  POCM INTD INTF INTH INTJ INTL INTM SEHA INTB  */
+             CALL       PGM(MCC002) PARM(&WEH01)
+
+/* 清除 INTB 相關欄位 TB07 08 09 10 11 12 13 14 15 16 18   */
+             CALL       PGM(MCC003) PARM(&WEH01)
+
+/* 計算調撥在途數量 TB14 15                               */
+             CALL       PGM(MCC004) PARM(&WEH01)
+
+/* 計算各欄位數量 TB 08 09 10 11 16                       */
+    OVRDBF     FILE(INTXLF01)  SHARE(*YES)
+    OPNQRYF    FILE(INTXLF01)   OPTION(*ALL) QRYSLT('           +
+               TX01 = "' || &WEH01 || '"                        +
+               & TX06C = %RANGE("' || &DATFM || '"              +
+                                "' || &DATTO || '")             +
+               &       (TX03 = "A1"                             +
+                   *OR  TX03 = "A2"                             +
+                   *OR  TX03 = "A4"                             +
+                   *OR  TX03 = "B1"                             +
+                   *OR  TX03 = "B2"                             +
+                   *OR  TX03 = "C1"                             +
+                   *OR  TX03 = "C2"                             +
+                   *OR  TX03 = "C3"                             +
+                   *OR  TX03 = "E1"                             +
+                   *OR  TX03 = "M1"                             +
+                   *OR  TX03 = "S1")                            +
+                                                           ')   +
+               KEYFLD(*FILE) MAPFLD((TX06C TX06 *CHAR 8))
+
+             CALL       PGM(MCC005) PARM(&WEH01)
+             CLOF       OPNID(INTXLF01)
+             DLTOVR     FILE(*ALL)
+
+/* 計算庫存數量(不含銷售) TB07            */
+             CALL       PGM(MCC006) PARM(&WEH01)
+
+/* 還原借貨資料     INTP INTQ INTP TX16 TX17            */
+             CALL       PGM(MCC007) PARM(&WEH01)
+
+/* 計算借貨及盤盈銷售 INTP INTQ TX15 TX16 TX17            */
+             CALL       PGM(MCC008) PARM(&WEH01)
+
+/* 負庫存數量調整                               */
+             CALL       PGM(MCC009) PARM(&WEH01)
+
+/* 計算總庫結存數量     TA10 11 12 13 14 15 16 17 19  */
+             CALL       PGM(MCC010) PARM(&WEH01)
+
+/* 更正總庫調整入/出庫量(去除調撥量) */
+             CALL       PGM(MCC011) PARM(&WEH01)
+
+/* 計算本月單位成本   TA07 TA09                        */
+             CALL       PGM(MCC012) PARM(&WEH01)
+
+/* 更新異動資料成本金額TA07 TA09                        */
+             CALL       PGM(MCC013) PARM(&WEH01)
+
+/* 尾差調整                                           */
+             CALL       PGM(MCC014) PARM(&WEH01)
+
+/* 產生新月份 INTAPF INTBPF                           */
+             CALL       PGM(MCC015) PARM(&WEH01)
+
+/* 計算調撥在途數量 TB14 15  (NEW MONTH)                  */
+             CALL       PGM(MCC004) PARM(&WEH01)
+
+              /* 執行完成,變更狀態 */
+             CHGDTAARA  DTAARA(SCDA01 (2 1)) VALUE('0')
+             SNDBRKMSG  MSG('月結處理完成！') TOMSGQ(&DEVD)
+             GOTO       CMDLBL(RLSOBJ)
+
+ ERR:        SNDBRKMSG  +
+                          MSG('檔案仍被其它人使用中，無法執行月結處+
+                          理!  ') TOMSGQ(&DEVD)
+
+ RLSOBJ:      /* DLCOBJ */
+             CHGVAR     VAR(&LCK) VALUE(' ')
+             CALL       PGM(MCC000C1) PARM(&LCK &IN96)
+
+
+             ENDPGM
+

@@ -1,0 +1,254 @@
+      ****************************************************************
+      * PROGRAM ID : P21                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :計算起日～迄日相距月數及日數                   *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P2101I    I   *DEC    6 0 起日(中國年)  *
+      *             02   P2102I    I   *DEC    6 0 迄日(中國年)  *
+      *             02   P2111O    O   *DEC    7 0 相距月數...     *
+      *                                            負數表起月大於迄月
+      *             02   P2112O    O   *DEC    2 0 相距天數...     *
+      *                                            負數表起日大於迄日
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P2101     N   *DEC    4 0 西元年          *
+      *             02   P2102     N   *CHAR   1   起小於迄(Y/N)   *
+      *             03   P2103     N   *CHAR   1   起日是月底(Y/N) *
+      *             04   P2104     N   *DEC    5 0 商數            *
+      *             05   P2105     N   *DEC    4 0 餘數            *
+      *             06   P2106     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P2107     N   *DEC    2 0 本月日數        *
+      *             08   P21DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P21DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P2106=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P2106=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P2106=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P2106=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E                    P21DAY 12  12  2 0
+     I            DS
+     I                                        1   70P21SML
+     I                                        1   30P21SYY
+     I                                        4   50P21SMM
+     I                                        6   70P21SDD
+     I            DS
+     I                                        1   60P21BIG
+     I                                        1   20P21BYY
+     I                                        3   40P21BMM
+     I                                        5   60P21BDD
+     I            DS
+     I                                        1   60PYMD
+     I                                        1   20PYY
+     I                                        3   40PMM
+     I                                        5   60PDD
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P2101I  60
+     C                     PARM           P2102I  60
+     C                     PARM           P2111O  70
+     C                     PARM           P2112O  20
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     EXSR P21INT                     *INIT VARIAB
+     C                     EXSR P21CMP                     *SMALL&LARGE
+     C                     EXSR P21LST                     *IS LAST DAY
+     C                     EXSR P21CAL                     *CACULATION
+      *
+|----C           P2102     IFEQ 'N'
+|    C           0         SUB  P2111O    P2111O
+|    C           0         SUB  P2112O    P2112O
+|----C                     END
+      *
+     C                     RETRN
+      *--------------------------------------------------------------*
+      *          P21INT....INITIAL VARIABLES                         *
+      *--------------------------------------------------------------*
+     C           P21INT    BEGSR
+      *
+     C                     Z-ADD0         P2111O
+     C                     Z-ADD0         P2112O
+     C                     Z-ADD0         P21SML
+     C                     Z-ADD0         P21BIG
+     C                     Z-ADD0         PYMD
+     C                     Z-ADD0         P2101   40
+     C                     MOVE *BLANKS   P2102   1
+     C                     MOVE *BLANKS   P2103   1
+     C                     Z-ADD0         P2104   50
+     C                     Z-ADD0         P2105   40
+     C                     MOVE *BLANKS   P2106   1
+     C                     Z-ADD0         P2107   20
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21CMP....COMPARE FROM DATE AND TO DATE WHICH LARGE *
+      *                    INPUT      P2101I                         *
+      *                    INPUT      P2102I                         *
+      *                    OUTPUT     P21SML                         *
+      *                    OUTPUT     P21BIG                         *
+      *                    OUTPUT     P2102  ( Y = P2101I <= P2102I )*
+      *--------------------------------------------------------------*
+     C           P21CMP    BEGSR
+      *
+|----C           P2101I    IFLE P2102I
+|    C                     MOVE 'Y'       P2102            *CMP CHECK
+|    C                     Z-ADDP2101I    P21SML
+|    C                     Z-ADDP2102I    P21BIG
+-    C                     ELSE
+|    C                     MOVE 'N'       P2102
+|    C                     Z-ADDP2102I    P21SML
+|    C                     Z-ADDP2101I    P21BIG
+|----C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21LST....判斷起始日是否為月底日                  *
+      *                    INPUT      P21SML                         *
+      *                    OUTPUT                                    *
+      *--------------------------------------------------------------*
+     C           P21LST    BEGSR
+      *
+     C                     Z-ADDP21SML    PYMD
+      *
+     C                     EXSR P21LDT                     *求月底日
+      *
+|----C           P21SDD    IFEQ P2107
+|    C                     MOVE 'Y'       P2103
+-    C                     ELSE
+|    C                     MOVE 'N'       P2103
+|----C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21LDT....求本月份之最後一日                      *
+      *                    INPUT      PYMD                           *
+      *                    OUTPUT     P2107                          *
+      *--------------------------------------------------------------*
+     C           P21LDT    BEGSR
+      *
+|----C           PMM       IFEQ 2
+|    C                     Z-ADDPYY       P2101
+|    C                     ADD  1911      P2101
+|    C                     EXSR P21LEP
+||---C           P2106     IFEQ 'Y'
+||   C                     Z-ADD29        P2107
+|-   C                     ELSE
+||   C                     Z-ADDP21DAY,PMMP2107
+||---C                     END
+-    C                     ELSE
+|    C                     Z-ADDP21DAY,PMMP2107
+|----C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21CAL....累加起始日之月份直到大於迄日            *
+      *--------------------------------------------------------------*
+     C           P21CAL    BEGSR
+      *
+|----C           P21SML    DOWLEP21BIG
+|    C                     ADD  1         P2111O
+|    C                     ADD  1         P21SMM
+| |--C           P21SMM    IFGT 12
+| |  C                     ADD  1         P21SYY
+| |  C                     Z-ADD1         P21SMM
+| |--C                     END
+| |--C           P2103     IFEQ 'Y'
+| |  C                     EXSR P21ADJ                     月底日調整
+| |--C                     END
+|----C                     END
+      *
+|----C           P21SML    IFNE P21BIG
+|    C                     SUB  1         P2111O
+|    C                     SUB  1         P21SMM
+| |--C           P21SMM    IFLT 1
+| |  C                     SUB  1         P21SYY
+| |  C                     Z-ADD12        P21SMM
+| |--C                     END
+| |--C           P2103     IFEQ 'Y'
+| |  C                     EXSR P21ADJ                     月底日調整
+| |--C                     END
+| |--C           P21SMM    IFEQ P21BMM
+| |  C                     Z-ADDP21BDD    P2112O
+| |  C                     SUB  P21SDD    P2112O
+| -  C                     ELSE
+| |  C                     Z-ADDP21SML    PYMD
+| |  C                     EXSR P21LDT                     *求月底日
+| |  C                     Z-ADDP2107     P2112O
+| |  C                     SUB  P21SDD    P2112O
+| |  C                     ADD  P21BDD    P2112O
+| |--C                     END
+|----C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21ADJ....月底日調整                              *
+      *                    INPUT      P21SML                         *
+      *                    OUTPUT     P21SML                         *
+      *--------------------------------------------------------------*
+     C           P21ADJ    BEGSR
+      *
+     C                     Z-ADDP21SMM    PMM
+      *
+|----C           P21SMM    IFEQ 2
+|    C                     Z-ADDP21SYY    P2101
+|    C                     ADD  1911      P2101
+|    C                     EXSR P21LEP
+||---C           P2106     IFEQ 'Y'
+||   C                     Z-ADD29        P21SDD
+|-   C                     ELSE
+||   C                     Z-ADDP21DAY,PMMP21SDD
+||---C                     END
+-    C                     ELSE
+|    C                     Z-ADDP21DAY,PMMP21SDD
+|----C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P21LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P2101 西元年                 *
+      *                    OUTPUT     P2106  (Y=潤年:N=平年)     *
+      *--------------------------------------------------------------*
+     C           P21LEP    BEGSR
+      *
+     C           P2101     DIV  400       P2104   50
+     C                     MVR            P2105   40
+|----C           P2105     IFEQ 0
+|    C                     MOVE 'Y'       P2106   1
+-    C                     ELSE
+|    C           P2101     DIV  100       P2104
+|    C                     MVR            P2105
+| |--C           P2105     IFEQ 0
+| |  C                     MOVE 'N'       P2106
+| -  C                     ELSE
+| |  C           P2101     DIV  4         P2104
+| |  C                     MVR            P2105
+| ||-C           P2105     IFEQ 0
+| || C                     MOVE 'Y'       P2106
+| |- C                     ELSE
+| || C                     MOVE 'N'       P2106
+| ||-C                     END
+| |--C                     END
+|----C                     END
+      *
+     C                     ENDSR
+**
+312831303130313130313031
+

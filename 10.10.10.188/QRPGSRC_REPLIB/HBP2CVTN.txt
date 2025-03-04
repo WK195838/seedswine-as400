@@ -1,0 +1,206 @@
+M001MC*===============================================================
+M001MC* MODI CODE | AUTHOR. |   DATE   | DESCRIPTION
+M001MC*---------------------------------------------------------------
+M001MC* M001      | MICHELLE| 99.04.26 | CHANGE BREAK LEVEL
+M001MC*===============================================================
+      * ------------------------------------------------------------------------
+      *        BYPASS-2000: ADD, REMOVE CENTURY AND SHIFT DATE
+      * ------------------------------------------------------------------------
+     E                    F          99  1
+     E                    T          99  1
+     E                    Y           4  1
+     E                    D          99  1
+     E                    W          99  1
+     E                    A9A        99  1
+     E                    A9B        99  1
+     IHB2@FA      DS
+     I                                        1   20HB2@FL
+     I                                        3   3 HB2@FT
+     I                                        4   50HB2@FP
+     I                                        6   60HB2@FS
+     IHB2@F       DS
+     I                                        1  99 F
+     IHB2@TA      DS
+     I                                        1   20HB2@TL
+     I                                        3   3 HB2@TT
+     I                                        4   50HB2@TP
+     I                                        6   60HB2@TS
+     IHB2@T       DS
+     I                                        1  99 T
+     IHB2@W       DS
+     I                                        1   4 Y
+     I                                        1   40LONGY
+     I                                        1   20CENTRY
+     I                                        3   40SHORTY
+     I                                        5 103 D
+     I                                        5 103 WD
+     I                                        5 103 W
+     I                                      104 1050WSHIFT
+     I                                      104 105 YSHIFT
+     I                                      106 204 WAPPO
+     IDS9A        DS
+     I                                        1  99 A9A
+     IDS9B        DS
+     I                                        1  99 A9B
+      * ------------------------------------------------------------------------
+     C           *ENTRY    PLIST
+     C                     PARM           HB2@OP  1        OPERATION TO DO
+     C                     PARM           HB2@FA           FR-AREA FORMAT
+     C                     PARM           HB2@F            FROM AREA
+     C                     PARM           HB2@TA           TO-AREA FORMAT
+     C                     PARM           HB2@T            TO AREA
+     C  N02                DO
+      *  year-shift is only for test purposes
+      *  it simulates future operations by increasing system dates (like UDATE)
+      *  user can select one of the following equivalent ways:
+      *
+      *  first sample - retrive value from *DTAARA named HBP2SHFY (*CHAR len 2)
+      *          *NAMVAR   DEFN HBP2SHFY  YSHIFT
+      *                    IN   YSHIFT                 04
+      *  second sample - fixed value
+      *                    Z-ADD10        WSHIFT
+      *  Bypass2000 standard way - external call
+     C                     CALL 'HBP2DTS'                  RTV Y-SHIFT
+     C                     PARM           WSHIFT
+      *
+     C                     SETON                     02
+     C                     ENDDO
+      *
+     C           HB2@FS    COMP 0                    03      *ON->SYSTE
+      *  operations to be performed
+     C           HB2@OP    CASEQ'A'       ADDCEN           ADD    CENTURY
+     C           HB2@OP    CASEQ'R'       RMVCEN           REMOVE CENTURY
+     C           HB2@OP    CASEQ'S'       SHIFTY           SHIFT  YEAR
+     C                     END
+     C                     RETRN
+      * ------------------------------------------------------------------------
+     C           ADDCEN    BEGSR                           ADD    CENTURY
+     C           100       SUB  HB2@FL    FS      20
+     C           FS        SUB  2         TS      20
+     C                     MOVE *ZERO     WD
+     C                     MOVE *ZERO     HB2@T
+     C                     MOVEAF,FS      D,FS
+      * -if spaces no conversion -----------------------               ---------
+     C                     MOVE *BLANK    WAPPO
+     C           HB2@FL    SUBSTHB2@F:FS  WAPPO
+     C           WAPPO     IFEQ *BLANK
+     C                     MOVE *BLANK    HB2@T
+     C                     GOTO ADDEND
+     C                     ENDIF
+      * -if all 0 no conversion  -----------------------               ---------
+     C           HB2@FL    IFNE 2
+     C           WD        CABEQ*ZEROS    ADDEND
+     C                     ENDIF
+      *
+     C                     MOVEAF,FS      T,TS
+      *
+     C           HB2@FP    ADD  FS        YPFR    20
+     C                     SUB  1         YPFR
+     C                     MOVEAF,YPFR    Y,3
+      *
+     C           HB2@TP    ADD  TS        YPTO    20
+     C                     SUB  1         YPTO
+      *
+CCISDC*          SHORTY    IFGT 50
+CCISAC*M001M     SHORTY    IFGE 40
+M001MC           SHORTY    IFGE 30
+     C                     Z-ADD19        CENTRY
+     C                     ELSE
+     C                     Z-ADD20        CENTRY
+     C                     ENDIF
+      *
+      * -muovo il campo FROM  nel campo di tutti 9
+     C                     MOVE 9         A9A
+     C                     MOVE 9         A9B
+      *
+     C           HB2@FL    IFNE 2
+     C                     MOVEAF,FS      A9B,FS
+     C           DS9A      IFEQ DS9B
+     C                     Z-ADD99        CENTRY
+     C                     ELSE
+     C  N03                ADD  WSHIFT    LONGY
+     C                     ENDIF
+     C                     ENDIF
+      *
+     C                     MOVEAY,1       T,YPTO
+     C           YPFR      CABGT97        ADDEND
+     C                     ADD  2         YPFR
+     C           YPTO      CABGT95        ADDEND
+     C                     ADD  4         YPTO
+     C                     MOVEAF,YPFR    T,YPTO
+     C           ADDEND    ENDSR
+      * ------------------------------------------------------------------------
+     C           RMVCEN    BEGSR                           REMOVE CENTURY
+     C           100       SUB  HB2@FL    FS      20
+     C           100       SUB  HB2@TL    TS      20
+     C                     MOVE *ZERO     WD
+     C                     MOVE *ZERO     HB2@T
+     C                     MOVEAF,FS      D,FS
+     C           HB2@TT    IFNE 'X'
+     C                     TESTN          WD         01
+     C           *IN01     CABEQ*OFF      RMVEND
+     C                     ENDIF
+     C*
+     C           HB2@FP    SUB  1         CPYTO   20
+     C           CPYTO     IFEQ 0
+     C                     ADD  2         FS
+     C                     MOVEAF,FS      T,TS
+     C                     ELSE
+     C                     MOVEAF,FS      W,TS
+     C           HB2@FP    ADD  FS        YPFR    20
+     C                     ADD  1         YPFR
+     C           HB2@TP    ADD  TS        YPTO    20
+     C                     SUB  1         YPTO
+     C                     MOVEAF,YPFR    W,YPTO
+     C                     MOVEAW,TS      T,TS
+     C                     ENDIF
+     C           RMVEND    ENDSR
+      * ------------------------------------------------------------------------
+     C           SHIFTY    BEGSR                           SHIFT  YEAR
+     C           100       SUB  HB2@FL    FS      20
+     C           100       SUB  HB2@TL    TS      20
+     C                     MOVE *ZERO     WD
+     C                     MOVE *ZERO     HB2@T
+     C                     MOVEAF,FS      D,FS
+     C                     MOVEAF,FS      W,FS
+     C           HB2@TT    IFNE 'X'
+     C                     TESTN          WD         01
+     C           *IN01     CABEQ*OFF      SHFEND
+     C                     ENDIF
+      *
+      * -if all 9 no SHIFT -----------------------------               ---------
+     C                     MOVE 9         A9A
+     C                     MOVE 9         A9B
+      *
+     C           HB2@FL    IFNE 2
+     C                     MOVEAF,FS      A9B,FS
+     C           DS9A      IFEQ DS9B
+     C                     MOVEAF,FS      T,TS
+     C                     GOTO SHFEND
+     C                     ENDIF
+     C                     ENDIF
+      *
+     C           HB2@FP    ADD  FS        YPFR    20
+     C                     SUB  1         YPFR
+     C           HB2@FS    IFEQ 2
+     C                     MOVEAF,YPFR    Y,3
+     C                     ADD  WSHIFT    SHORTY
+     C                     MOVEAY,3       F,YPFR
+     C                     ENDIF
+     C           HB2@FS    IFEQ 4
+     C                     MOVEAF,YPFR    Y,1
+     C                     ADD  WSHIFT    LONGY
+     C                     MOVEAY,1       F,YPFR
+     C                     ENDIF
+     C           HB2@TS    IFEQ 2
+     C           HB2@TL    ANDEQ2
+     C           HB2@TL    ANDNEHB2@FL
+     C           HB2@TS    ANDNEHB2@FS
+     C                     ADD  2         YPFR
+     C                     MOVEAF,YPFR    T,98
+     C                     ELSE
+     C                     MOVEAF,FS      T,TS
+     C                     ENDIF
+     C*
+     C           SHFEND    ENDSR
+

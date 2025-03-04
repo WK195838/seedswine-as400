@@ -1,0 +1,151 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : NANCY                                     */
+     /*    CREATE DATE  : 2011/03/18                                */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : INR080C1                                  */
+     /*    SYSTEM       :                                           */
+     /*    SUBSYSTEM    :庫存系統                                 */
+     /*    REMARK       :陳列品餘額彙總表－依供應商               */
+     /***************************************************************/
+      PGM
+
+      DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+      DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+      DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+      DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+      DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+      DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+      DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+      DCL        VAR(&DTN01)  TYPE(*CHAR) LEN(2)          /*公司別*/
+      DCL        VAR(&DTN03S) TYPE(*CHAR) LEN(5)          /*供應商*/
+      DCL        VAR(&DTN03E) TYPE(*CHAR) LEN(5)
+      DCL        VAR(&DTN05S) TYPE(*CHAR) LEN(9)          /*產品代號*/
+      DCL        VAR(&DTN05E) TYPE(*CHAR) LEN(9)
+/*    DCL        VAR(&PTN08 ) TYPE(*CHAR) LEN(8)  */      /*截止日*/
+      DCL        VAR(&PTN08 ) TYPE(*CHAR) LEN(8)          /*迄日*/
+      DCL        VAR(&PTN08F) TYPE(*CHAR) LEN(8)          /*起日*/
+
+      DCL        VAR(&RTNLIB) TYPE(*CHAR) LEN(10)
+
+      CHGVAR     VAR(&DTN01)  VALUE(%SST(*LDA 601 2))
+      CHGVAR     VAR(&DTN03S) VALUE(%SST(*LDA 603 5))
+      CHGVAR     VAR(&DTN03E) VALUE(%SST(*LDA 608 5))
+      CHGVAR     VAR(&DTN05S) VALUE(%SST(*LDA 613 9))
+      CHGVAR     VAR(&DTN05E) VALUE(%SST(*LDA 622 9))
+      CHGVAR     VAR(&PTN08 ) VALUE(%SST(*LDA 641 8))
+      CHGVAR     VAR(&PTN08F) VALUE(%SST(*LDA 661 8))
+
+/*CHECK FILE:SCRWK08  -----------------------------------------------*/
+    CHKOBJ     OBJ(QTEMP/SCRWK08) OBJTYPE(*FILE)
+    MONMSG     MSGID(CPF9801)      EXEC(DO)      /*FILE NOT FOUND*/
+
+    RTVOBJD    OBJ(SCRWK08) OBJTYPE(*FILE) RTNLIB(&RTNLIB)
+    CRTDUPOBJ  OBJ(SCRWK08) FROMLIB(&RTNLIB) +
+               OBJTYPE(*FILE) TOLIB(QTEMP) NEWOBJ(SCRWK08)
+    CHGPF      FILE(QTEMP/(SCRWK08)) SIZE(*NOMAX)
+    ENDDO
+
+    CLRPFM     FILE(QTEMP/SCRWK08)
+    OVRDBF     FILE(SCRWK08)   TOFILE(QTEMP/SCRWK08)   SHARE(*YES)
+
+/*CHECK FILE:SCRWK08A -----------------------------------------------*/
+    CHKOBJ     OBJ(QTEMP/SCRWK08A) OBJTYPE(*FILE)
+    MONMSG     MSGID(CPF9801)      EXEC(DO)      /*FILE NOT FOUND*/
+
+    RTVOBJD    OBJ(SCRWK08A) OBJTYPE(*FILE) RTNLIB(&RTNLIB)
+    CRTDUPOBJ  OBJ(SCRWK08A) FROMLIB(&RTNLIB) +
+               OBJTYPE(*FILE) TOLIB(QTEMP) NEWOBJ(SCRWK08A)
+    CHGPF      FILE(QTEMP/(SCRWK08A)) SIZE(*NOMAX)
+    ENDDO
+
+    CLRPFM     FILE(QTEMP/SCRWK08A)
+    OVRDBF     FILE(SCRWK08A)  TOFILE(QTEMP/SCRWK08A)   SHARE(*YES)
+
+/*挑選資料:公司別+供應商+產品代號+截止日-------------------*/
+    OVRDBF     FILE(INTNLF09)   SHARE(*YES)
+    OPNQRYF    FILE(INTNLF09)   OPTION(*ALL) QRYSLT('     +
+                    TN01 *EQ ("' *CAT &DTN01 *CAT '")        +
+                  & TN03  = %RANGE("' || &DTN03S || '"       +
+                                   "' || &DTN03E || '")      +
+                  & TN05  = %RANGE("' || &DTN05S || '"       +
+                                   "' || &DTN05E || '")      +
+                  & TN15C *LE ("' *CAT &PTN08 *CAT '")')     +
+                    KEYFLD((*FILE))  MAPFLD((TN15C TN15 *CHAR 8))
+
+    CALL       INR0801         /*產生明細*/
+    CLOF       OPNID(INTNLF09)
+
+/*挑選資料:公司別+截止日---------------------------------------*/
+    OVRDBF     FILE(INTPPF)     SHARE(*YES)
+    OPNQRYF    FILE(INTPPF)     OPTION(*ALL) QRYSLT('     +
+                    TP01 *EQ ("' *CAT &DTN01 *CAT '")        +
+                  & (TP03C = %RANGE("' || &PTN08F || '"        +
+                                   "' || &PTN08 || '")      +
+                  *OR TP15 = "I"                     ) ')    +
+                    KEYFLD((*FILE))  MAPFLD((TP03C TP03 *CHAR 8))
+  /*              & TP03C *LE ("' *CAT &PTN08 *CAT '")')     +     */
+
+    CALL       INR0802A         /*借貸,調整,盤點*/
+    CLOF       OPNID(INTPPF)
+
+/*挑選資料:公司別+截止日---------------------------------------*/
+    OVRDBF     FILE(INTHPF)     SHARE(*YES)
+    OPNQRYF    FILE(INTHPF)     OPTION(*ALL) QRYSLT('     +
+                    TH06 *EQ ("' *CAT &DTN01 *CAT '")        +
+                  & TH09C = %RANGE("' || &PTN08F || '"        +
+                                   "' || &PTN08 || '")')    +
+                    KEYFLD((*FILE))  MAPFLD((TH09C TH09 *CHAR 8))
+  /*              & TH09C *LE ("' *CAT &PTN08 *CAT '")')     +     */
+
+    CALL       INR0802B         /*轉進貨*/
+    CLOF       OPNID(INTHPF)
+
+/*挑選資料:公司別+截止日---------------------------------------*/
+    OVRDBF     FILE(INTLPF)     SHARE(*YES)
+    OPNQRYF    FILE(INTLPF)     OPTION(*ALL) QRYSLT('     +
+                    TL05 *EQ ("' *CAT &DTN01 *CAT '")        +
+                  & TL08C = %RANGE("' || &PTN08F || '"        +
+                                   "' || &PTN08 || '")')    +
+                    KEYFLD((*FILE))  MAPFLD((TL08C TL08 *CHAR 8))
+/*                & TL08C *LE ("' *CAT &PTN08 *CAT '")')     +      */
+
+    CALL       INR0802C         /*退出量*/
+    CLOF       OPNID(INTLPF)
+/*-------------------------------------------------------------------*/
+    CALL       INR0802D         /*計算剩餘量*/
+/*-------------------------------------------------------------------*/
+    OPNQRYF    FILE(QTEMP/SCRWK08) +
+               KEYFLD((WCOMP) (WSUPL) (WPROD) (WINPR))
+
+    CALL       INR0803           /*加總*/
+
+    CLOF       OPNID(SCRWK08)
+    DLTOVR     FILE(*ALL)
+/*-------------------------------------------------------------------*/
+    OPNQRYF    FILE(QTEMP/SCRWK08A) +
+               KEYFLD((WCOMP1) (WSUPL1) (WPROD1) (WINPR1))
+
+    OVRPRTF    FILE(INR080P) PAGESIZE(*N 198) CPI(15) +
+                             USRDTA('陳列彙總')
+
+    CALL       INR0804
+
+    CLOF       OPNID(SCRWK08A)
+    DLTOVR     FILE(*ALL)
+/*-------------------------------------------------------------------*/
+    RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+    RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+    RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+    CHGVAR     VAR(&P6601I) VALUE('INR080P')
+    CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+    CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+    CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+    CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+END:
+    ENDPGM
+

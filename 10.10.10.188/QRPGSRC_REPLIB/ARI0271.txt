@@ -1,0 +1,219 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARI027                                     *
+     A*    AUTHOR       : TINA                                       *
+     A*    DATE WRITTEN : 83/03/30                                   *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收系統                                  *
+     A*    REMARK       :發票未作廢重開查詢                        *
+     A****************************************************************
+     FSOSILF2 IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     F                                              KINFSR ERRSR
+     FARI0271DCF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     F                                        RRN   KSFILE SFLSR1
+     E                    WA01        6  1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+ @   I*                                     140 140 $RMK02
+ @   I*                                     141 141 $RMK03
+     I*                                     598 5990$LPRT
+     I*                                     501 505 $WRHUS
+     I*                                     506 506 $PURID
+     I*                                     507 507 $TRNID
+     I*                                     508 512 $APAU1
+     I*                                     513 513 $WRHTY
+     I*                                     514 521 $#101
+     I*                                     522 522 $APAU2
+     I                                      601 602 DSI01S
+     I                                      603 604 DSI01E
+     I                                      605 6100DSI21S
+     I                                      611 6160DSI21E
+     I                                      617 6220WSI21S
+     I                                      623 6280WSI21E
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN RRN       WRRN
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+     C           *LIKE     DEFN SI01      DSI01
+     C           *LIKE     DEFN SI02      DSI02
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYSI     KLIST
+     C                     KFLD           DSI01
+     C                     KFLD           DSI21
+     C                     KFLD           DSI02
+     C           KEYME     KLIST
+     C                     KFLD           SI12
+     C                     KFLD           SI13
+      *==============================================================*
+     C*                    MAIN ROUTIN
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+      *
+     C                     EXSR RTN191                     *INIT SFL   AGE
+     C                     EXSR RTN192                     *READ NEXT P
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN25     IFEQ '1'
+B2000C           KEYSI     SETGTSI0
+    C                     EXSR RTN192
+  02-C                     END
+    C                     EXSR RTN195
+    C*
+    C                     MOVE *ALL'0'   *IN,60
+  01-C                     END
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN010    INITIAL  VALUE
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C                     MOVE $INQ      WA01,5
+|    C                     MOVE $RMK01    WA01,6
+|    C                     MOVE 'SCR002'  APPSCR  6
+|    C                     Z-ADD0         DATE    60
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+M001DC*                    PARM $EGMDY    S001I2  80
+M001AC                     PARM $EGMDY    S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C           DATE      PARM           S001O1  60
+|    C*
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN191 .. INITIAL
+      *=========================================================*
+02===C           RTN191    BEGSR
+|    C                     Z-ADD1         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         WRRN
+|    C                     Z-ADD12        WPRCD
+|    C                     Z-ADD0         DSPRCD
+|    C                     MOVE *BLANK    WBOTOM  1
+|    C                     SETON                     52
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+B2000C           KEYSI     SETLLSI0
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+03===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+|   C                     EXSR RTN193
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+04===C           RTN193    BEGSR
+|    C*
+|    C                     SETOF                     54
+|    C                     Z-ADDWRRN      RRN
+|    C                     ADD  WPRCD     DSPRCD
+|    C***
+| 01-C           RRN       DOWLTDSPRCD
+|   C                     READ SI0                      46
+| 02-C           *IN46     IFEQ '0'
+|   C                     MOVELSI01      DSI01
+B2MODC                     Z-ADDSI21      DSI21   80
+|   C                     MOVELSI02      DSI02
+|   C                     ADD  1         RRN
+|   C                     EXSR RTN19A
+|   C                     WRITESFLSR1
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVEL'Y'       WBOTOM
+|   C                     SETON                     53
+| 02-C                     END
+| 01-C                     END
+|    C***
+|    C           *LOVAL    SETLLSI0
+|    C                     Z-ADDRRN       DRRN
+|    C                     Z-ADDRRN       WRRN
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN19A    DETAIL
+      *==============================================================*
+05===C           RTN19A    BEGSR
+|    C*
+M001AC                     Z-ADDSI21      XSI21   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI21      S001I2  80
+M001AC                     PARM XSI21     S001I2  60
+|    C           WSI21     PARM           S001O1  60
+|    C*狀態說明（Ｖ－待重開　空白－待作廢）
+| 01-C           SI19      IFEQ 'V'
+|   C                     MOVEL'待重開'TEXT
+| 01-C                     END
+| 02-C           SI19      IFEQ ' '
+|   C                     MOVEL'待作廢'TEXT
+| 02-C                     END
+     C           KEYME     CHAINME0                  45
+     C           *IN45     IFEQ '1'
+     C                     MOVEL*BLANK    ME04
+     C                     END
+|    C*
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+06===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN       IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     94    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*                    Z-ADD0         D#ROW
+|    C*                    Z-ADD0         D#COL
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          ERRSR ....DATA LOCK ROUTINE
+     C*==============================================================*
+07===C           ERRSR     BEGSR
+|    C*
+|    C                     CALL 'P50'
+|    C           DMSG      PARM           P5001O 78
+|    C                     SETON                     9799
+|    C*
+07===C                     ENDSR'*DETC'
+

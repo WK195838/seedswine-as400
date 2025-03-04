@@ -1,0 +1,264 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : CHKSDSO                                       *
+      * AUTHER       : MICHELLE                                      *
+      * CREATE DATE  : 12/02/04                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :寰盛洋酒                                     *
+      * SUBSYSTEM    :檢測試飲及收回數量檔                         *
+      * REMARK       :                                               *
+      ****************************************************************
+     FSOSCLF04IP  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FSOSNLF2 IF  E                    DISK
+     FSOS6PF  IF  E           K        DISK
+     F            S60                               KRENAMES60L
+     FSOS7PF  IF  E           K        DISK
+     F            S70                               KRENAMES70L
+     FSOS6PF2 UF  E           K        DISK                      A
+     FSOS7PF2 UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      201 2080DATE
+     I                                      598 5990$PRTID
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYS6     KLIST
+     C                     KFLD           WS602  12
+     C                     KFLD           WS603   9
+     C           KEYS7     KLIST
+     C                     KFLD           WS702  12
+     C                     KFLD           WS703   9
+     C           KEYS61    KLIST
+     C                     KFLD           WS602  12
+     C                     KFLD           WS603   9
+     C                     KFLD           WS604   9
+     C           KEYS71    KLIST
+     C                     KFLD           WS702  12
+     C                     KFLD           WS703   9
+     C                     KFLD           WS704   9
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN100
+     C*
+     CLR                   EXSR RTN200
+     C*==============================================================*
+     C*          RTN100....GET SOSCLF04
+     C*==============================================================*
+=====C           RTN100    BEGSR
+|    C*
+--01-C           SC39      IFGE 20020701
+|    C           SC03      ANDEQ'S4'
+|    C           SC10      ANDNE'F1'
+|    C*
+|    C           SC02      SETLLSD0
+|    C           SC02      READESD0                      40
+| 02-C           *IN40     DOWEQ'0'
+| |  C                     MOVELSC02      WS602
+| |  C                     MOVELSD03      WS603
+| |  C                     Z-ADD0         WDATA1
+| |  C                     Z-ADD0         WDATA2
+| |  C                     Z-ADD0         WDATA3
+| |  C                     Z-ADD0         WDATA
+| |  C           SD04      ADD  SD05      WDATA1  60
+| |  C*
+| |  C           WDATA1    IFGT 0
+| |  C                     EXSR RTN110
+| |  C                     END
+| |  C           SC02      READESD0                      40
+| 02-C                     END
+|    C*
+--01-C                     END
+=====C                     ENDSR
+      *==============================================================*
+      *          RTN110    UPDATE SOS6PF
+      *==============================================================*
+03===C           RTN110    BEGSR
+|    C                     MOVE 'N'       CHK     1
+|    C           KEYS6     SETLLS60L
+|    C           KEYS6     READES60L                     40
+| 02-C           *IN40     DOWEQ'0'
+| |  C                     ADD  S605      WDATA2  60
+| |  C                     MOVE 'Y'       CHK
+| |  C           KEYS6     READES60L                     40
+| 02-C                     END
+|    C*
+|    C           *LOVAL    SETLLS60L
+|    C*
+|    C           WDATA1    SUB  WDATA2    WDATA   60
+|    C           CHK       IFEQ 'N'
+|    C                     MOVE SC01      S601
+|    C                     MOVE SC02      S602
+|    C                     MOVELSC16      S604
+|    C                     MOVE SD03      S603
+|    C                     Z-ADDWDATA1    S605
+|    C                     Z-ADDDATE      S6XX
+|    C                     TIME           S6YY
+|    C                     MOVE $USER     S6ZZ
+|    C                     WRITES60
+|    C                     ELSE
+|03--C           WDATA     IFGE 0                          大於原確認
+      *
+     C                     MOVEL'Y'       FIRST   1
+||   C           KEYS6     SETLLS60L
+||   C           KEYS6     READES60L                     47
+||11-C           *IN47     DOWEQ'0'
+|||  C                     Z-ADDDATE      S6XX
+|||  C                     TIME           S6YY
+|||  C                     MOVE $USER     S6ZZ
+     C           FIRST     IFEQ 'Y'
+     C                     ADD  WDATA     S605
+     C                     MOVEL'N'       FIRST
+     C                     END
+      *
+||| |C                     WRITES60
+|||  C           KEYS6     READES60L                     47
+||11-C                     END
+      *
+|03-*C                     ELSE
+||05-C           WDATA     IFLT 0                          小於原確認
+||   C           WDATA     MULT -1        WDATA3  60
+     C                     Z-ADD0         WS605   60
+||   C           KEYS6     SETLLS60L
+||   C           KEYS6     READES60L                     42
+||06-C           *IN42     DOWEQ'0'
+|||  C           WS605     ANDLTWDATA1
+|||07C           WDATA3    IFNE 0
+|||08C           S605      IFGE WDATA3
+|||  C           S605      SUB  WDATA3    S605
+|||  C                     Z-ADD0         WDATA3
+|||8-C                     ELSE
+|||  C           WDATA3    SUB  S605      WDATA3
+|||  C                     Z-ADD0         S605
+|||08C                     END
+   07C                     END
+     C                     ADD  S605      WS605
+|||  C                     Z-ADDDATE      S6XX
+|||  C                     TIME           S6YY
+|||  C                     MOVE $USER     S6ZZ
+|||  C                     MOVELS604      WS604
+|||  C           KEYS61    CHAINS60                  45
+|||  C           *IN45     IFEQ '0'
+|||  C                     UPDATS60
+|||  C                     ELSE
+|||  C                     WRITES60
+|||  C                     END
+|||  C           KEYS6     READES60L                     42
+||06-C                     END
+| 05-C                     END
+|03--C                     END
+|    C                     END
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....GET SOSNLF02
+     C*==============================================================*
+=====C           RTN200    BEGSR
+|    C*
+|    C                     READ SN0                      46
+| 01-C           *IN46     DOWEQ'0'
+| 02-C           SN06      IFGE 20020701
+| |  C           SN02A     ANDEQ'R3'
+| |  C           SN16      ANDNE'F1'
+| |  C*
+| |  C                     MOVELSN02      WS702
+| |  C                     MOVELSO03      WS703
+| |  C                     Z-ADD0         WDATA1
+| |  C                     Z-ADD0         WDATA2
+| |  C                     Z-ADD0         WDATA3
+| |  C                     Z-ADD0         WDATA
+| |  C                     Z-ADDSO05      WDATA1  60
+| |  C*
+| |  C           WDATA1    IFGT 0
+| |  C                     EXSR RTN210
+| |  C                     END
+| 02-C                     END
+|    C                     READ SN0                      46
+|    C*
+--01-C                     END
+=====C                     ENDSR
+      *==============================================================*
+      *          RTN210    UPDATE SOS7PF
+      *==============================================================*
+03===C           RTN210    BEGSR
+|    C                     MOVE 'N'       CHK2    1
+|    C           KEYS7     SETLLS70L
+|    C           KEYS7     READES70L                     40
+| 02-C           *IN40     DOWEQ'0'
+| |  C                     ADD  S705      WDATA2  60
+| |  C                     MOVE 'Y'       CHK2
+| |  C           KEYS7     READES70L                     40
+| 02-C                     END
+|    C*
+|    C           *LOVAL    SETLLS70L
+|    C*
+|    C           WDATA1    SUB  WDATA2    WDATA   60
+|    C           CHK2      IFEQ 'N'
+|    C                     MOVE SN01      S701
+|    C                     MOVE SN02      S702
+|    C                     MOVE SO03      S703
+|    C                     MOVELSN03      S704
+|    C                     Z-ADDWDATA1    S705
+|    C                     Z-ADDDATE      S7XX
+|    C                     TIME           S7YY
+|    C                     MOVE $USER     S7ZZ
+|    C                     WRITES70
+|    C                     ELSE
+|03--C           WDATA     IFGE 0                          大於原確認
+     C                     MOVEL'Y'       FIRST
+||   C           KEYS7     SETLLS70L
+||   C           KEYS7     READES70L                     49
+||11-C           *IN49     DOWEQ'0'
+|||  C                     Z-ADDDATE      S7XX
+|||  C                     TIME           S7YY
+|||  C                     MOVE $USER     S7ZZ
+     C           FIRST     IFEQ 'Y'
+     C                     ADD  WDATA     S705
+     C                     MOVEL'N'       FIRST
+     C                     END
+||| |C                     WRITES70
+|||  C           KEYS7     READES70L                     49
+||11-C                     END
+|03-*C                     ELSE
+||05-C           WDATA     IFLT 0                          小於原確認
+||   C           WDATA     MULT -1        WDATA3  60
+     C                     Z-ADD0         WS705   60
+||   C           KEYS7     SETLLS70L
+||   C           KEYS7     READES70L                     42
+||06-C           *IN42     DOWEQ'0'
+|||  C           WS705     ANDLTWDATA
+|||07C           WDATA3    IFNE 0
+|||08C           S705      IFGE WDATA3
+|||  C           S705      SUB  WDATA3    S705
+|||  C                     Z-ADD0         WDATA3
+|||8-C                     ELSE
+|||  C           WDATA3    SUB  S705      WDATA3
+|||  C                     Z-ADD0         S705
+|||08C                     END
+|||07C                     END
+     C                     ADD  S705      WS705
+|||  C                     Z-ADDDATE      S7XX
+|||  C                     TIME           S7YY
+|||  C                     MOVE $USER     S7ZZ
+|||  C                     MOVELS704      WS704
+|||  C           KEYS71    CHAINS70                  45
+|||  C           *IN45     IFEQ '0'
+|||  C                     UPDATS70
+|||  C                     ELSE
+|||  C                     WRITES70
+|||  C                     END
+|||  C           KEYS7     READES70L                     42
+||06-C                     END
+||05-C                     END
+|03--C                     END
+|    C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+

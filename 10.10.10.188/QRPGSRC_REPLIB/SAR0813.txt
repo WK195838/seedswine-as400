@@ -1,0 +1,212 @@
+      ****************************************************************
+      * PROGRAM NAME : SAR0813                                       *
+      * AUTHER       : MICHELLE                                      *
+      * CREATE DATE  : 06/16/99                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :期間專櫃銷售分析表BY ITEM                    *
+      *==============================================================*
+      * CODE | AUTHOR |  DATE  | DESCRIPTION
+      *--------------------------------------------------------------
+      * M001 |MICHELLE|07.12.02| SD07為含稅金額，計算銷貨收入時，不應
+      *                         計稅．故以倒除1.05計算銷貨收入．
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMGLF1 IF  E           K        DISK
+     FIMIGPF  IF  E           K        DISK
+     FIMIHPF  IF  E           K        DISK
+     FREWFC51 UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 605 DSC04S
+     I                                      606 610 DSC04E
+      *MM/DD/YY
+     I                                      611 6160DSC39S
+     I                                      617 6220DSC39E
+      *YY/MM/DD
+     I                                      623 6280WSC39S
+     I                                      629 6340WSC39E
+      *
+     I                                      700 700 DSEL
+     I                                      701 701 DSEL2
+      *YY/MM/DD
+     I            DS
+     I                                        1   80SC39
+     I                                        1   60SC39YM
+     I            DS
+     I                                        1   80IG05
+     I                                        1   60IG05YM
+M001AIDA02        DS
+M001AI                                        1   43DUTY
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WFC504    WORK04
+     C           *LIKE     DEFN WFC505    WORK05
+     C           *LIKE     DEFN WFC506    WORK06
+     C           *LIKE     DEFN WFC510    WORK10
+     C           *LIKE     DEFN WFC511    WORK11
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WFC502
+     C                     KFLD           WFC503
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+|    C*
+M001AC           *NAMVAR   DEFN           DA02
+M001AC                     IN   *NAMVAR
+|    C*
+    C                     EXSR RTN200
+    C                     EXSR RTN210
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN200....月銷售數量及金額
+      *==============================================================*
+01===C           RTN200    BEGSR
+      *
+|    C                     READ SC0                      45
+| 03-C           *IN45     DOWEQ'0'
+|   C           SC02      SETLLSD0
+|   C           SC02      READESD0                      46
+| 04-C           *IN46     DOWEQ'0'
+     C           SD03      CHAINMG0                  90
+     C           *IN90     IFEQ '0'
+     C                     MOVELMG03      WFC502
+     C                     ELSE
+     C                     MOVE '**'      WFC502
+     C                     END
+|   C                     MOVELSD03      WFC503
+|   C           KEYWF     CHAINWFC50                40
+|   C                     EXSR RTN300
+|   C           SC02      READESD0                      46
+| 04-C                     END
+      *
+|   C                     READ SC0                      45
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN210....月搭贈數量及金額
+      *==============================================================*
+01===C           RTN210    BEGSR
+      *
+|    C                     READ IG0                      45
+| 03-C           *IN45     DOWEQ'0'
+|   C           IG02      SETLLIH0
+|   C           IG02      READEIH0                      46
+| 04-C           *IN46     DOWEQ'0'
+|   C                     MOVELIH03      WFC503
+     C           IH03      CHAINMG0                  90
+     C           *IN90     IFEQ '0'
+     C                     MOVELMG03      WFC502
+     C                     ELSE
+     C                     MOVE '**'      WFC502
+     C                     END
+|   C           KEYWF     CHAINWFC50                40
+|   C                     EXSR RTN310
+|   C           IG02      READEIH0                      46
+| 04-C                     END
+      *
+|   C                     READ IG0                      45
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE OR UPDATE REWFC5
+      *==============================================================*
+02===C           RTN300    BEGSR
+      *
+|    C                     Z-ADD0         WORK04
+|    C                     Z-ADD0         WORK05
+|    C                     Z-ADD0         WORK06
+|    C                     Z-ADD0         WORK10
+|    C                     Z-ADD0         WORK11
+|    C                     Z-ADD0         WORK
+|    C                     Z-ADD0         WORK1
+      *訂購＋搭贈WORK1
+|    C           SD04      ADD  SD05      WORK   174
+      *單位成本WORK1
+|    C           SD10      ADD  SD11      WORK1  174
+|    C                     ADD  SD12      WORK1
+      *期間
+B2000C           SC39YM    IFGE WSC39S
+|   C           SC39YM    ANDLEWSC39E
+      *期間累計數量
+|   C                     Z-ADDSD04      WORK04
+      *期間累計金額
+|   C                     Z-ADDSD07      WORK05
+M001AC           1         ADD  DUTY      WDUTY   43
+M001AC           WORK05    DIV  WDUTY     WORK05    H
+|   C           WORK      MULT WORK1     WORK06    H
+| 01-C                     END
+      *
+| 02-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK04    WFC504
+|   C                     ADD  WORK05    WFC505
+|   C                     ADD  WORK06    WFC506
+|   C                     ADD  WORK10    WFC510
+|   C                     ADD  WORK11    WFC511
+      *
+|   C                     UPDATWFC50
+| 02*C                     ELSE
+|   C                     Z-ADDWORK04    WFC504
+|   C                     Z-ADDWORK05    WFC505
+|   C                     Z-ADDWORK06    WFC506
+|   C                     Z-ADDWORK10    WFC510
+|   C                     Z-ADDWORK11    WFC511
+|   C                     WRITEWFC50
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN310....WRITE OR UPDATE REWFC5
+      *==============================================================*
+02===C           RTN310    BEGSR
+      *
+|    C                     Z-ADD0         WORK04
+|    C                     Z-ADD0         WORK05
+|    C                     Z-ADD0         WORK06
+|    C                     Z-ADD0         WORK10
+|    C                     Z-ADD0         WORK11
+|    C                     Z-ADD0         WORK
+     C                     Z-ADD0         WORK1
+      *搭贈總成本WORK1
+     C           IH08      ADD  IH09      WORK1
+     C                     ADD  IH10      WORK1
+      *期間
+B2000C           IG05YM    IFGE WSC39S
+|   C           IG05YM    ANDLEWSC39E
+      *期間累計數量
+|   C                     Z-ADDIH05      WORK10
+      *期間累計金額
+|   C                     Z-ADDWORK1     WORK11
+| 01-C                     END
+| 02-C           *IN40     IFEQ '0'                        EXIST
+|   C                     ADD  WORK04    WFC504
+|   C                     ADD  WORK05    WFC505
+|   C                     ADD  WORK06    WFC506
+|   C                     ADD  WORK10    WFC510
+|   C                     ADD  WORK11    WFC511
+      *
+|   C                     UPDATWFC50
+| 02*C                     ELSE                            NOT EXIST
+|   C                     Z-ADDWORK04    WFC504
+|   C                     Z-ADDWORK05    WFC505
+|   C                     Z-ADDWORK06    WFC506
+|   C                     Z-ADDWORK10    WFC510
+|   C                     Z-ADDWORK11    WFC511
+|   C                     WRITEWFC50
+| 02-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+

@@ -1,0 +1,160 @@
+             PGM
+
+             DCL        VAR(&DHA01)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DHA02)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&WHA03)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&QHA03)    TYPE(*CHAR) LEN(6)
+             DCL        VAR(&WHA03S)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&WHA03E)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&HA041)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&HA042)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&HA043)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&HA044)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&HA045)    TYPE(*CHAR) LEN(5)
+             DCL        VAR(&@A01)     TYPE(*CHAR) LEN(1)
+
+
+             CHGVAR     VAR(&DHA01)    VALUE(%SST(*LDA 501 2))
+             CHGVAR     VAR(&DHA02)    VALUE(%SST(*LDA 503 2))
+             CHGVAR     VAR(&WHA03)    VALUE(%SST(*LDA 510 6))
+             CHGVAR     VAR(&WHA03S)   VALUE(%SST(*LDA 520 8))
+             CHGVAR     VAR(&QHA03)    VALUE(%SST(&WHA03S 1 6))
+             CHGVAR     VAR(&WHA03E)   VALUE(%SST(*LDA 530 8))
+             CHGVAR     VAR(&HA041)    VALUE(%SST(*LDA 540 5))
+             CHGVAR     VAR(&HA042)    VALUE(%SST(*LDA 545 5))
+             CHGVAR     VAR(&HA043)    VALUE(%SST(*LDA 550 5))
+             CHGVAR     VAR(&HA044)    VALUE(%SST(*LDA 555 5))
+             CHGVAR     VAR(&HA045)    VALUE(%SST(*LDA 560 5))
+
+    /* 1. 處理指定全月份 */
+
+             IF         COND(&WHA03 *NE ' ') THEN(DO)
+             OVRDBF     FILE(SCWK03)   SHARE(*YES)
+             OPNQRYF    FILE((SCWK03)) OPTION(*ALL) QRYSLT('          +
+                          WK0301 = "' || &DHA01 || '"                 +
+                        & WK0302 = "' || &DHA02 || '"                 +
+                        & WK0303C = "' || &WHA03 || '"')              +
+                          KEYFLD((WK0301)(WK0302)(WK0303)(WK0304)     +
+                                (WK0305))                             +
+                          MAPFLD((WK0303S WK0303 *CHAR 8)             +
+                               (WK0303C '%SST(WK0303S 1 6)' *CHAR 6))
+
+             OVRDBF     FILE(SEHAPF)   SHARE(*YES)
+             OPNQRYF    FILE((SEHAPF)) OPTION(*ALL) QRYSLT('          +
+                          HA01 = "' || &DHA01 || '"                   +
+                        & HA02 = "' || &DHA02 || '"                   +
+                        & HA03C = "' || &WHA03 || '" ')               +
+                          KEYFLD((HA01)(HA02)(HA03)(HA04)(HA05))      +
+                          MAPFLD((HA03S HA03  *CHAR 8)                +
+                                (HA03C '%SST(HA03S 1 6)' *CHAR 6))
+             CALL       SEH0012
+
+             CHGVAR     VAR(&@A01)    VALUE(%SST(*LDA 565 1))
+             IF         COND(&@A01 = ' ') THEN(DO)
+             CALL       SEH0013
+             CLOF       OPNID(SEHAPF)
+                        ENDDO
+
+                        ENDDO
+
+    /* 2. 處理指定日期範圍，不指定分店 */
+
+             IF      COND(&WHA03 = ' ' & &HA041 = ' ' & &HA042 = ' '  +
+                        & &HA043 = ' ' & &HA044 = ' ' & &HA045 = ' ') +
+                        THEN(DO)
+             OVRDBF     FILE(SCWK03)   SHARE(*YES)
+             OPNQRYF    FILE((SCWK03)) OPTION(*ALL) QRYSLT('          +
+                          WK0301 = "' || &DHA01 || '"                 +
+                        & WK0302 = "' || &DHA02 || '"                 +
+                        & WK0303 = %RANGE(' || &WHA03S || '           +
+                                          ' || &WHA03E || ') ')       +
+                          KEYFLD((WK0301)(WK0302)(WK0303)(WK0304)     +
+                                (WK0305))
+
+             OVRDBF     FILE(SEHAPF)   SHARE(*YES)
+             OPNQRYF    FILE((SEHAPF)) OPTION(*ALL) QRYSLT('          +
+                          HA01 = "' || &DHA01 || '"                   +
+                        & HA02 = "' || &DHA02 || '"                   +
+                        & HA03 = %RANGE(' || &WHA03S || '             +
+                                        ' || &WHA03E || ') ')         +
+                          KEYFLD((HA01)(HA02)(HA03)(HA04)(HA05))
+
+             CALL       SEH0012
+             CLOF       OPNID(SEHAPF)
+
+             CHGVAR     VAR(&@A01)    VALUE(%SST(*LDA 565 1))
+             IF         COND(&@A01 = ' ') THEN(DO)
+
+             OVRDBF     FILE(SEHAPF)   SHARE(*YES)
+             OPNQRYF    FILE((SEHAPF)) OPTION(*ALL) QRYSLT('          +
+                          HA01 = "' || &DHA01 || '"                   +
+                        & HA02 = "' || &DHA02 || '"                   +
+                        & HA03C = "' || &QHA03 || '" ')               +
+                          KEYFLD((HA01)(HA02)(HA03)(HA04)(HA05))      +
+                          MAPFLD((HA03S HA03  *CHAR 8)                +
+                                (HA03C '%SST(HA03S 1 6)' *CHAR 6))
+
+             CALL       SEH0013
+             CLOF       OPNID(SEHAPF)
+                        ENDDO
+
+                        ENDDO
+
+    /* 3. 處理指定日期範圍，而且有指定分店 */
+
+             IF    COND(&WHA03 = ' ' & (&HA041 *NE ' ' | &HA042       +
+                         *NE ' ' | &HA043 *NE ' ' | &HA044 *NE ' '    +
+                                 | &HA045 *NE ' ')) THEN(DO)
+             OVRDBF     FILE(SCWK03)   SHARE(*YES)
+             OPNQRYF    FILE((SCWK03)) OPTION(*ALL) QRYSLT('          +
+                          WK0301 = "' || &DHA01 || '"                 +
+                        & WK0302 = "' || &DHA02 || '"                 +
+                        & WK0303 = %RANGE(' || &WHA03S || '           +
+                                          ' || &WHA03E || ')          +
+                        & (WK0304 = "' || &HA041 || '"                +
+                        |  WK0304 = "' || &HA042 || '"                +
+                        |  WK0304 = "' || &HA043 || '"                +
+                        |  WK0304 = "' || &HA044 || '"                +
+                        |  WK0304 = "' || &HA045 || '") ')            +
+                          KEYFLD((WK0301)(WK0302)(WK0303)(WK0304)     +
+                                (WK0305))
+
+             OVRDBF     FILE(SEHAPF)   SHARE(*YES)
+             OPNQRYF    FILE((SEHAPF)) OPTION(*ALL) QRYSLT('          +
+                          HA01 = "' || &DHA01 || '"                   +
+                        & HA02 = "' || &DHA02 || '"                   +
+                        & HA03 = %RANGE(' || &WHA03S || '             +
+                                        ' || &WHA03E || ')            +
+                        & (HA04 = "' || &HA041 || '"            +
+                        |  HA04 = "' || &HA042 || '"            +
+                        |  HA04 = "' || &HA043 || '"            +
+                        |  HA04 = "' || &HA044 || '"            +
+                        |  HA04 = "' || &HA045 || '") ')        +
+                          KEYFLD((HA01)(HA02)(HA03)(HA04)(HA05))
+
+             CALL       SEH0012
+             CLOF       OPNID(SEHAPF)
+
+             CHGVAR     VAR(&@A01)    VALUE(%SST(*LDA 565 1))
+             IF         COND(&@A01 = ' ') THEN(DO)
+
+             OVRDBF     FILE(SEHAPF)   SHARE(*YES)
+             OPNQRYF    FILE((SEHAPF)) OPTION(*ALL) QRYSLT('          +
+                          HA01 = "' || &DHA01 || '"                   +
+                        & HA02 = "' || &DHA02 || '"                   +
+                        & HA03C = "' || &QHA03 || '" ')               +
+                          KEYFLD((HA01)(HA02)(HA03)(HA04)(HA05))      +
+                          MAPFLD((HA03S HA03  *CHAR 8)                +
+                                (HA03C '%SST(HA03S 1 6)' *CHAR 6))
+
+             CALL       SEH0013
+             CLOF       OPNID(SEHAPF)
+                        ENDDO
+
+                        ENDDO
+
+             CLOF       OPNID(SCWK03)
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

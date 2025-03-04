@@ -1,0 +1,185 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0801                                       *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 83/12/05                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :發票日期帳齡分析表                           *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.23  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FREW201  IP  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMDLF2 IF  E           K        DISK
+     F            MD0                               KRENAMEMD0L
+     FPA#APF  IF  E           K        DISK
+B2CHKFARR090P O   E             39     PRINTER
+B2INF *CVR3009 sev.30 PRINTER file ARR090P must be converted, because
+B2INF *   field WF1011 is shared by name with other database fields which
+B2INF *   require to be expanded. Please convert ARR090P, enlarging WF1011
+B2INF *   prior to compilation, or manually insert in this source the
+B2INF *   proper RENAME and MOVE statements to avoid name-sharing.
+     E*: FUNCTION DATA :
+     E                    TEST    1   2 24
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      625 6280DSORT
+     I*
+     I                                      600 600 COMPS
+     I                                      604 604 COMPE
+     I                                      602 602 DSI01S
+     I                                      603 603 DSI01E
+     I                                      605 605 DSI03S
+     I                                      606 606 DSI03E
+     I                                      607 608 DSI04S
+     I                                      609 610 DSI04E
+M001MI*                                     617 6220YDATES
+M001MI                                      617 6240YDATES
+     I                                      629 629 DATA
+     I            DS
+     I                                        1   5 WF1012
+     I                                        1   2 WFFFFF
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    DEFN ROUTINE
+      *==============================================================*
+     C*
+M001MC*          *LIKE     DEFN YDATES    WSDATE
+M001MC           *LIKE     DEFN YDATES    WSDATE- 2
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME COP.
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         SORT
+|    C                     Z-ADD0         ENDCHK
+|    C                     Z-ADD0         ENDA
+|    C                     Z-ADD0         ENDB
+|    C                     Z-ADD0         ENDC
+|    C                     Z-ADD0         ENDD
+|    C                     Z-ADD0         ENDE
+|    C                     Z-ADD0         ENDCUR
+|    C                     Z-ADD0         ENDDUE
+|    C                     Z-ADD0         ENDTOT
+|    C                     Z-ADD0         ENDCHK
+     C*
+| 02-C           DATA      IFEQ 'A'
+|   C                     MOVE TEST,1    TITE
+| 02*C                     ELSE
+|   C                     MOVE TEST,2    TITE
+     C                     SETON                     29
+| 02-C                     END
+     C*
+M001AC                     Z-ADDYDATES    PDATES
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C***
+  01-C           SORT      IFLT DSORT
+|   C                     ADD  1         SORT
+|   C***
+|   C*客戶簡稱
+|   C***
+     C           WF1012    CHAINMD0                  40
+     C           *IN40     IFEQ '1'
+    C           WFFFFF    CHAINMD0L                 44
+     C  N44                ADD  MD22      CRTLIT
+    C  N44      WFFFFF    READEMD0L                     44
+     C           *IN44     DOWEQ'0'
+     C                     ADD  MD22      CRTLIT  90
+    C           WFFFFF    READEMD0L                     44
+     C                     END
+     C                     Z-ADDCRTLIT    MD22
+     C                     END
+|   C           WF1012    CHAINME0                  41
+XX02-C           *IN41     IFEQ '1'
+|   C                     MOVEL'CUSTGRP' #A01
+|   C                     MOVELWF1012    #A02
+|   C           KEY#A     CHAIN#A0                  45
+| 03-C           *IN45     IFEQ '0'
+|   C                     MOVEL#A03      ME04
+| 03*C                     ELSE
+|   C                     MOVE *BLANK    ME04
+| 03-C                     END
+| 03-C                     END
+M001AC                     Z-ADDWF1011    W11
+|   C                     WRITEPD1
+     C                     Z-ADD0         CRTLIT
+|   C*
+|   C                     ADD  WF1131    ENDCUR
+|   C                     ADD  WF1132    ENDE
+|   C                     ADD  WF1014    ENDA
+|   C                     ADD  WF1015    ENDB
+|   C                     ADD  WF1016    ENDC
+|   C                     ADD  WF1017    ENDD
+|   C                     ADD  WF1018    ENDTOT
+|   C                     ADD  WF1181    ENDDUE
+|   C                     ADD  WF1019    ENDCHK
+| 02*C                     ELSE
+|   C                     GOTO END100
+| 02-C                     END
+|   C***
+02===C           END100    ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW --同一公司別
+      *==============================================================*
+03===C           RTN900    BEGSR
+|   C*
+|   C                     WRITEPE1
+M001AC                     Z-ADDYDATES    PDATES
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+|   C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+04===C           RTN999    BEGSR
+|   C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE5
+|   C                     WRITEPE2
+| 01*C                     ELSE
+|   C                     WRITEPD3
+     C           DATA      IFEQ 'B'
+     C                     SETON                     30
+| 01-C                     END
+|   C                     WRITEPE2
+| 01-C                     END
+|   C*
+04===C                     ENDSR
+**
+一般　　　　　　　　　
+未兌現票據還原應收帳款
+

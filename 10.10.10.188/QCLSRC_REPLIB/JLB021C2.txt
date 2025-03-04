@@ -1,0 +1,108 @@
+     /**************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250  */
+     /*                                                            */
+     /*    PROGRAM ID   : JLB021                                   */
+     /*    PROGRAM NAME : 銷退傳票批次                           */
+     /*    AUTHOR       : D910121 CHARLES                          */
+     /*    CREATE DATE  : 1993.06.14                               */
+     /*    UPDATE DATE  :                                          */
+     /*    SYSTEM       : 進銷存收TO總帳                       */
+     /**************************************************************/
+             PGM
+
+             DCL        VAR(&D01)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&D02)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&D03)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&D04)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&F01)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&F02)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             CHGVAR     VAR(&D01)   VALUE(%SST(*LDA 629 1))
+             CHGVAR     VAR(&D02)   VALUE(%SST(*LDA 630 1))
+             CHGVAR     VAR(&D03)   VALUE(%SST(*LDA 631 1))
+             CHGVAR     VAR(&D04)   VALUE(%SST(*LDA 632 1))
+             CHGVAR     VAR(&F01)   VALUE(%SST(*LDA 601 8))
+             CHGVAR     VAR(&F02)   VALUE(%SST(*LDA 609 8))
+     /**** WF#GPF   ****/
+             CPYF       FROMFILE(WF#GPF) TOFILE(QTEMP/WF#GPF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WF#GPF))
+             OVRDBF     FILE(WF#GPF) TOFILE(QTEMP/WF#GPF) SHARE(*YES)
+
+     /**** WFJL10PF ****/
+             CPYF       FROMFILE(WFJL10PF) TOFILE(QTEMP/WFJL10PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL10PF))
+             OVRDBF   FILE(WFJL10PF) TOFILE(QTEMP/WFJL10PF) SHARE(*YES)
+
+     /**** WFJL10LF ****/
+             CRTDUPOBJ  OBJ(WFJL10LF) FROMLIB(REFLIB) OBJTYPE(*ALL) +
+                          TOLIB(QTEMP)
+             MONMSG     MSGID(CPD2104 CPF2130)
+             OVRDBF   FILE(WFJL10LF) TOFILE(QTEMP/WFJL10LF) SHARE(*YES)
+     /**** WFJL21PF ****/
+             CPYF       FROMFILE(WFJL21PF) TOFILE(QTEMP/WFJL21PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL21PF))
+             OVRDBF   FILE(WFJL21PF) TOFILE(QTEMP/WFJL21PF) SHARE(*YES)
+     /**** WFJL16PF ****/
+             CPYF       FROMFILE(WFJL16PF) TOFILE(QTEMP/WFJL16PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL16PF))
+             OVRDBF   FILE(WFJL16PF) TOFILE(QTEMP/WFJL16PF) SHARE(*YES)
+
+             OVRDBF     FILE(SOSGPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSGPF)) QRYSLT('SG01L *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") & +
+                          SG01R *EQ %RANGE("' *CAT &D03 *CAT '" "' +
+                          *CAT &D04 *CAT '") & SG26 *EQ %RANGE(' +
+                          *CAT &F01 *CAT ' ' *CAT &F02 *CAT ') & +
+                          (SG14 *EQ "V" *OR SG14 *EQ "A" *OR SG14 +
+                          *EQ "N") & SG04 *EQ "B0000" & (SG02A *EQ +
+                          "K") ') KEYFLD(*FILE) MAPFLD((SG01L +
+                          '%SST(SG01 1 1)' *CHAR 1) (SG01R +
+                          '%SST(SG01 2 1)' *CHAR 1) (SG02A +
+                          '%SST(SG02 3 1)' *CHAR 1))
+
+   /*產生暫存檔及傳票*/
+             CALL       JLB0215
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CALL       LOG
+             CHGVAR     VAR(&P6601I) VALUE('LOGP')
+             CHGVAR     VAR(&P6602I) VALUE('2')
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE('00')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             CLOF       OPNID(SOSGPF)
+   /*銷貨收入明細報表*/
+             OVRPRTF    FILE(JLB0213P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('銷退金額')
+             CALL       JLB0213
+             CHGVAR     VAR(&P6601I) VALUE('JLB0213P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+   /*銷貨成本彙總報表*/
+             OVRPRTF    FILE(JLB0214P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('銷退成本')
+             CALL       JLB0214
+             CHGVAR     VAR(&P6601I) VALUE('JLB0214P')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

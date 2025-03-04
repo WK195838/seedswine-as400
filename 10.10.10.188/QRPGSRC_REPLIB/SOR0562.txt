@@ -1,0 +1,285 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR0562                                       *
+      * AUTHER       : ANDY                                          *
+      * CREATE DATE  : 81/02/13                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :主檔                                         *
+      * REMARK       :客戶折扣報價明細表                           *
+      ****************************************************************
+     FREWF34  IP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#CPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOR056P O   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 601 DSA02S
+     I                                      602 602 DSA02E
+     I                                      611 612 DSA03S
+     I                                      613 614 DSA03E
+     I                                      621 625 DSB01S
+     I                                      626 630 DSB01E
+     I                                      631 639 DSA01S
+     I                                      641 649 DSA01E
+     I*MM/DD/YY
+     I                                      651 6560DDATE
+     I*YY/MM/DD
+     I                                      661 6660WDATE
+     I*
+     I                                      671 671 DSEL
+     I*
+M001AI*(YYYY/MM/DD)
+M001AI                                      850 8570YMD8S
+     I            DS
+     I                                        1   9 WF3401
+     I                                        3   4 F3401L
+     I                                        5   9 F3401R
+     I            DS
+     I                                        1   5 WF3402
+     I                                        1   1 WF021
+     I                                        2   2 WF022
+     I                                        4   5 WF023
+     I*
+     I            DS
+     I                                        1   5 CUS
+     I                                        1   1 CUS1
+     I                                        3   4 CUS2
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEY#C     KLIST
+     C                     KFLD           #C01
+     C                     KFLD           #C02
+      *==============================================================*
+      *                    DEFINE KEY
+      *==============================================================*
+     C           *LIKE     DEFN WF3401    SS3401
+     C           *LIKE     DEFN WF3402    SS3402
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *SET INIT
+     C                     EXSR RTN020                     *DUP CHK
+     C*
+  01-C           WORK      IFEQ 'Y'
+    C                     EXSR RTN100                     *CHAIN DATA
+    C                     EXSR RTN900                     *PROC SKIP
+    C                     WRITEPD1
+  01-C                     END
+     C*
+     C                     MOVE WF3401    SS3401
+     C                     MOVE WF3402    SS3402
+     C*
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....SET INIT
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     EXSR RTN900                     *PROC SKIP
+|    C*
+|    C                     MOVE *BLANK    NAME
+|    C                     MOVE *BLANK    DSCNT
+|    C                     MOVE *BLANK    COMF
+|    C                     MOVE *BLANK    SS3401
+|    C                     MOVE *BLANK    SS3402
+|    C                     MOVE *BLANK    WORK    1
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN020....DUPLICATE CHECK
+      *==============================================================*
+02===C           RTN020    BEGSR
+|    C*
+| 01-C           DSEL      IFEQ 'B'
+|   C                     MOVE 'Y'       WORK
+| 01*C                     ELSE
+| 02-C           WF3401    IFEQ SS3401
+|   C           WF3402    ANDEQSS3402
+|   C                     MOVE 'N'       WORK
+| 02*C                     ELSE
+|   C                     MOVE 'Y'       WORK
+| 02-C                     END
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN100....CHAIN DATA
+      *==============================================================*
+03===C           RTN100    BEGSR
+|    C*
+|    C                     MOVEL*BLANKS   DMA03
+|    C*
+|    C           WF3401    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C* GET品牌
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'BRAND'   #A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELF3401L    #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C  N40                MOVEL#A03      DMA03
+| 01*C                     ELSE
+|   C                     MOVELMA03      DMA03
+| 01-C                     END
+|    C*************************
+|    C*通路型態／客戶代號
+|    C*************************
+|    C*
+|    C                     MOVE WF3402    CUS
+|    C*************************
+|    C*通路型態說明／客戶簡稱
+|    C*************************
+| 02-C           WF021     IFEQ *BLANK
+|   C*
+|   C                     MOVE *BLANK    CUS
+|   C                     MOVE WF022     CUS1
+|   C                     MOVE WF023     CUS2
+|   C*
+|   C                     MOVELWF022     #C01
+|   C                     MOVELWF023     #C02
+|   C*
+|   C           KEY#C     CHAIN#C0                  40
+|   C*
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVE *BLANK    NAME
+|   C                     MOVEL#C03      NAME
+| 03*C                     ELSE
+|   C                     MOVE *BLANK    NAME
+| 03-C                     END
+|   C*
+| 02*C                     ELSE
+|   C           WF3402    CHAINME0                  41
+|   C*
+| 04-C           *IN41     IFEQ '0'
+|   C                     MOVE *BLANK    NAME
+|   C                     MOVELME04      NAME
+| 04*C                     ELSE
+|   C                     MOVE *BLANK    NAME
+| 04-C                     END
+|   C*
+| 02-C                     END
+|    C*
+|    C*********
+|    C*折扣別
+|    C*********
+| 05-C           WF3403    IFEQ 'N'
+|   C                     MOVEL'普通'  DSCNT
+| 05*C                     ELSE
+| 06-C           WF3403    IFEQ 'S'
+|   C                     MOVEL'特別'  DSCNT
+| 06*C                     ELSE
+|   C                     MOVE *BLANK    DSCNT
+| 06-C                     END
+| 05-C                     END
+|    C*
+|    C*********
+|    C*折扣率
+|    C*********
+|    C*
+|    C           WF3404    MULT 100       D3404
+|    C*********
+|    C*售　價
+|    C*********
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+M001DC*                    PARM $EGMDY    S001I2  80
+M001AC                     PARM $EGMDY    S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC                     PARM           S001O1  60
+|    C*
+|    C                     Z-ADD0         PRICE
+|    C                     Z-ADD0         PRICE$
+M001AC                     MOVE S001O1    HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    YMD8S
+|    C*
+M001DC*          S001O1    IFLT MA39
+M001AC           YMD8S     IFLT MA39
+|   C                     Z-ADDMA41      PRICE   70
+| 07*C                     ELSE
+|   C                     Z-ADDMA46      PRICE
+| 07-C                     END
+|    C*
+| 08-C           F3401R    IFEQ *BLANK
+| 08*C                     ELSE
+|   C           1         SUB  WF3404    WK3404  64
+|   C           PRICE     MULT WK3404    PRICE$  92H
+| 08-C                     END
+|    C***********
+|    C*生效日期
+|    C***********
+M001AC                     Z-ADDWF3405    XF3405  60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WF3405    S001I2  80
+M001AC                     PARM XF3405    S001I2  60
+M001DC*          D3405     PARM           S001O1  80
+M001AC           D3405     PARM           S001O1  60
+|    C*
+|    C***********
+|    C*截止日期
+|    C***********
+M001AC                     Z-ADDWF3406    XF3406  60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WF3406    S001I2  80
+M001AC                     PARM XF3406    S001I2  60
+M001DC*          D3406     PARM           S001O1  80
+M001AC           D3406     PARM           S001O1  60
+|    C*
+|    C***********
+|    C*確認註記
+|    C***********
+| 09-C           WF3407    IFEQ '*'
+|   C                     MOVEL'未確認'COMF
+| 09*C                     ELSE
+|   C                     MOVE *BLANK    COMF
+| 09-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....ENDPGM
+      *==============================================================*
+04===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     SETON                     10
+|   C                     SETOF                     39
+| 01-C                     END
+|    C*
+| 02-C           *IN39     IFEQ '1'
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+| 02-C                     END
+|    C*
+05===C                     ENDSR
+     C/COPY HBP2CVTR
+

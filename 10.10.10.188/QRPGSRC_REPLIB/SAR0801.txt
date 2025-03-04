@@ -1,0 +1,166 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : POR0501                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/01/27                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :採購系統                                     *
+      * REMARK       :驗收單明細表                                 *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.14  Y2K MODIFY                    */
+     /*-------------------------------------------------------------*/
+     /* M002  MICHELLE   99.03.08 補產品判斷                   */
+     /*=============================================================*/
+      ****************************************************************
+     FSOSCPF  IP  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+B2CHKFSAR080P O   E             39     PRINTER
+B2INF *CVR3009 sev.30 PRINTER file SAR080P must be converted, because
+B2INF *   field SC07 is shared by name with other database fields which
+B2INF *   require to be expanded. Please convert SAR080P, enlarging SC07
+B2INF *   prior to compilation, or manually insert in this source the
+B2INF *   proper RENAME and MOVE statements to avoid name-sharing.
+     ISC0
+     I                                              SC02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      139 139 $RMK01
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *辦事處
+     I                                      601 601 COMPS
+     I                                      602 602 COMPE
+      *通路
+     I                                      603 603 DSC33S
+     I                                      604 604 DSC33E
+      *原因
+     I                                      605 606 DSC10S
+     I                                      607 608 DSC10E
+      *SELECT起迄日期
+      *YY/MM/DD
+     I                                      610 6150YMDS
+     I                                      616 6210YMDE
+     I                                      622 6270DSC39S
+     I                                      628 6330DSC39E
+     I                                      640 648 DSD03S
+     I                                      650 658 DSD03E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYCU     KLIST
+     C                     KFLD           SC04
+     C                     KFLD           SC05
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C   39                EXSR RTN900
+M001MC*L1                   SETON                     30
+M001MC*L1                   MOVEL'STOCK'   #A01
+M001MC*L1                   MOVELSC10      #A02
+M001MC*L1         KEY#A     CHAIN#A0                  41
+M001MC*L1 41                MOVE *BLANK    #A03
+M001MC*L1         KEYCU     CHAINME0                  41
+M001MC*L141                MOVEL*BLANK    ME04       12
+M001MC*L1                   MOVEL#A03      #A033
+M001MC                     SETON                     30
+M001MC                     MOVEL'STOCK'   #A01
+M001MC                     MOVELSC10      #A02
+M001MC           KEY#A     CHAIN#A0                  41
+M001MC   41                MOVE *BLANK    #A03
+M001MC           KEYCU     CHAINME0                  41
+M001MC   41                MOVEL*BLANK    ME04           12
+M001MC                     MOVEL#A03      #A033
+     C           SC02      SETLLSD0
+     C           SC02      READESD0                      40
+     C           *IN40     DOWEQ'0'
+M001MC*          SD11      ANDEQ0
+M001MC           SD11      IFEQ 0
+     C           SD12      ANDEQ0
+     C           SD10      ANDNESD22
+M002AC           SD03      ANDGEDSD03S
+M002AC           SD03      ANDLEDSD03E
+     C                     EXSR RTN200
+M001AC                     END
+     C           SC02      READESD0                      40
+     C                     END
+     C*
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN010....GET HEADING
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C                     SETON                     30
+     C                     Z-ADD*ZEROS    BAL
+     C                     Z-ADD*ZEROS    COTTOT
+     C                     Z-ADD*ZEROS    TOT11
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200 ...PROCESS
+     C*==============================================================*
+01===C           RTN200    BEGSR
+     C*
+     C* GET轉換日期
+M001AC                     Z-ADDSC07      W6      60
+     C                     CALL 'RES001'
+     C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SC07      S001I2  80
+M001MC                     PARM W6        S001I2  60
+B2MODC*M001M     SC07      PARM           S001O1  80
+M001MC           PSC07     PARM           S001O1  60
+     C* GET 產品簡稱／單位
+     C*
+     C*
+     C           SD03      CHAINMA0                  41
+     C   41                MOVE *BLANK    MA03
+     C*
+     C           SD22      ADD  SD23      COTTOT
+     C                     ADD  SD24      COTTOT
+     C           SD10      SUB  COTTOT    BAL1    92
+     C           BAL1      MULT SD04      BAL
+     C                     WRITEPD
+     C                     ADD  BAL       TOT11
+     C                     Z-ADD0         BAL
+     C                     Z-ADD0         COTTOT
+     C   30                SETOF                     30
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+02===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     30
+|    C                     SETOF                     39
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+03===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+     C                     WRITEPT1
+|    C                     WRITEPE2
+03===C                     ENDSR
+

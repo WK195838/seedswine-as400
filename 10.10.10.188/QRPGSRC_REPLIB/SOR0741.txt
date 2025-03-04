@@ -1,0 +1,188 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR074                                        *
+      * AUTHER       : D910074 TINA                                  *
+      * CREATE DATE  : 82/05/18                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售子系統                                   *
+      * REMARK       :業務員訂單獎金                               *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.14  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FSOSCPF  IP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FSOR074P O   E             39     PRINTER
+     E*
+     ISC0
+     I                                              SC28  L2
+     I                                              SC27  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *通路
+     I                                      601 601 DSC33S
+     I                                      602 602 DSC33E
+      *型態
+     I                                      603 604 DSC34S
+     I                                      605 606 DSC34E
+      *組別
+     I                                      607 610 DSC28S
+     I                                      611 614 DSC28E
+      *業務員
+     I                                      615 620 DSC27S
+     I                                      621 626 DSC27E
+      *辦事處
+     I                                      671 671 COMPS
+     I                                      672 672 COMPE
+     I                                      664 664 COMP
+      *SELECT起迄日期
+      *YY/MM/DD
+     I                                      628 6330YMDS
+     I                                      634 6390YMDE
+     I                                      701 7060DSC08S
+     I                                      707 7120DSC08E
+     I                                      713 7180DSC39S
+     I                                      719 7240DSC39E
+     I                                      750 750 IN20
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYME     KLIST
+     C                     KFLD           SC04
+     C                     KFLD           SC05
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200
+     CL2 10                SETON                     39
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+| 02-C           IN20      IFEQ '0'
+|   C                     SETOF                     20
+| 02*C                     ELSE
+|   C                     SETON                     20
+| 02-C                     END
+|    C* GET部門組別
+|    C                     MOVEL'CENTER  '#A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVELSC28      #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   #A03
+| 03-C                     END
+      *業務員
+|    C           SC27      CHAINMC0                  41
+| 04-C           *IN41     IFEQ '1'
+|   C                     MOVEL*BLANKS   MC02
+| 04-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     Z-ADD0         COUNT
+|    C                     Z-ADD0         T1TOT1
+      *
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*客戶
+|    C           KEYME     CHAINME0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   ME04
+| 01-C                     END
+|    C*送貨日期
+M001AC                     Z-ADDSC08      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SC08      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           WSC08     PARM           S001O1  60
+|    C*確認日期
+M001AC                     Z-ADDSC39      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM SC39      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           WSC39     PARM           S001O1  60
+|    C*
+|    C   39                EXSR RTN900
+|    C*
+|    C                     WRITEPD1
+|    C                     ADD  1         COUNT
+|    C                     ADD  SC12      T1TOT1
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C                     SETON                     39
+|    C                     Z-ADD0         COUNT
+|    C                     Z-ADD0         T1TOT1
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C* GET部門組別
+|    C                     MOVEL'CENTER  '#A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVELSC28      #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   #A03
+| 01-C                     END
+      *業務員
+|    C           SC27      CHAINMC0                  41
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVEL*BLANKS   MC02
+| 02-C                     END
+|    C                     WRITEPH1
+     C                     SETOF                     39
+      *
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....
+      *==============================================================*
+04===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+04===C                     ENDSR
+

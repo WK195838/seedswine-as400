@@ -1,0 +1,220 @@
+     A*===============================================================
+      * CODE | AUTHOR |  DATE  | DESCRIPTION
+      *---------------------------------------------------------------
+     A* M003 |MICHELLE|00.04.27| FOR DUTY菸酒稅法實施
+     A*---------------------------------------------------------------
+      * M004 |MICHELLE|03.05.20|發票勾稽之折讓單不扣抵應收帳款
+      *---------------------------------------------------------------
+     A*===============================================================
+     FARADPF  IF  E           K        DISK
+     FARAFPF  IF  E           K        DISK
+     FSOSIPF  IF  E           K        DISK
+     FARAKPF  UF  E           K        DISK                      A
+     I**********
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+B2MODI                                      187 1920$EGYMD
+M001AI                                      201 2080$EG8
+B2MODI                                      601 6060DATE
+B2MODI                                      601 6040DATEY
+B2MODI                                      605 6060DATEM
+B2MODI                                      607 6100DAK01
+B2MODI                                      607 6080DAK01M
+B2MODI                                      609 6100DAK01Y
+B2MODI                                      611 611 DAK02
+      *上月
+     I            DS
+B2MODI                                        1   60WDATE
+B2MODI                                        1   40WDATEY
+B2MODI                                        5   60WDATEM
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN96     PARM *IN96     IN96    1
+      *==============================================================*
+      *                   *LIKE DEFN
+      *==============================================================*
+     C           *LIKE     DEFN AK05      WORK05
+     C           *LIKE     DEFN AK06      WORK06
+     C           *LIKE     DEFN AK07      WORK07
+     C           *LIKE     DEFN AK08      WORK08
+     C           *LIKE     DEFN AK09      WORK09
+     C           *LIKE     DEFN AK10      WORK10
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYAK     KLIST
+     C                     KFLD           AK01
+     C                     KFLD           AK02
+     C                     KFLD           AK03
+     C                     KFLD           AK04
+     C           KEYWAK    KLIST
+     C                     KFLD           WDATE
+     C                     KFLD           DAK02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN010
+     C*
+     C                     READ SI0                      45
+     C           *IN45     DOWEQ'0'
+     C                     EXSR RTN100
+     C                     READ SI0                      45
+     C                     END
+     C*
+     C                     READ AD0                      45
+     C           *IN45     DOWEQ'0'
+     C                     EXSR RTN200
+     C                     READ AD0                      45
+     C                     END
+     C*
+     C                     READ AF0                      45
+     C           *IN45     DOWEQ'0'
+M004AC           AF08      IFNE '77'
+     C                     EXSR RTN400
+M004AC                     END
+     C                     READ AF0                      45
+     C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....上月結餘轉本月餘額
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*WDATE=計算上月日期
+B2000C                     Z-ADDDATE      WDATE
+     C           DATEM     IFEQ 1
+     C                     Z-ADD12        WDATEM
+B2000C                     SUB  1         WDATEY
+     C                     ELSE
+     C                     SUB  1         WDATEM
+     C                     END
+      *產生本月資料
+B2000C           KEYWAK    SETLLAK0
+B2000C           KEYWAK    READEAK0                      45
+     C           *IN45     DOWEQ'0'
+      *
+     C           AK10      IFNE 0
+B2000C                     Z-ADDDATE      AK01
+     C                     Z-ADDAK10      AK05
+     C                     Z-ADD0         AK06
+     C                     Z-ADD0         AK07
+     C                     Z-ADD0         AK08
+     C                     Z-ADD0         AK09
+B2000C                     Z-ADD$EG8      AKXX
+B2000C                     TIME           AKYY
+|    C                     MOVE $USER     AKZZ
+     C                     WRITEAK0
+     C                     END
+      *
+B2000C           KEYWAK    READEAK0                      45
+     C                     END
+      *
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....本月發票總額
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+B2000C                     MOVELSI35      AK01
+     C                     MOVELSI01      AK02
+     C                     MOVELSI01      AK03
+     C                     MOVELSI12      AK04
+     C           KEYAK     CHAINAK0                  43
+|    C*
+     C           *IN43     IFEQ '0'
+     C                     ADD  SI25      AK06
+     C           AK05      ADD  AK06      AK10
+     C                     SUB  AK07      AK10
+     C                     SUB  AK08      AK10
+     C                     SUB  AK09      AK10
+     C                     UPDATAK0
+     C                     ELSE
+     C                     Z-ADD0         AK05
+     C                     Z-ADDSI25      AK06
+     C                     Z-ADD0         AK07
+     C                     Z-ADD0         AK08
+     C                     Z-ADD0         AK09
+     C                     Z-ADDSI25      AK10
+     C                     WRITEAK0
+     C                     END
+      *
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....本月沖帳總額
+     C*==============================================================*
+01===C           RTN200    BEGSR
+|    C*
+B2000C                     MOVELAD12      AK01
+     C                     MOVELAD10      AK02
+     C                     MOVELAD10      AK03
+     C                     MOVELAD02      AK04
+     C           KEYAK     CHAINAK0                  43
+|    C*
+     C           *IN43     IFEQ '0'
+      *
+     C           AD05      IFEQ '50'
+     C                     ADD  AD08      AK08
+     C                     ELSE
+     C                     ADD  AD08      AK07
+     C                     END
+      *
+     C           AK05      ADD  AK06      AK10
+     C                     SUB  AK07      AK10
+     C                     SUB  AK08      AK10
+     C                     SUB  AK09      AK10
+     C                     UPDATAK0
+     C                     ELSE
+     C                     Z-ADD0         AK05
+     C                     Z-ADD0         AK06
+      *
+     C           AD05      IFEQ '50'
+     C                     Z-ADD0         AK07
+     C                     Z-ADDAD08      AK08
+     C                     ELSE
+     C                     Z-ADDAD08      AK07
+     C                     Z-ADD0         AK08
+     C                     END
+      *
+     C                     Z-ADD0         AK09
+     C                     Z-SUBAD08      AK10
+     C                     WRITEAK0
+     C                     END
+      *
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN400....本月價差總額
+     C*==============================================================*
+01===C           RTN400    BEGSR
+|    C*
+B2000C                     MOVELAF05      AK01
+     C                     MOVELAF01      AK02
+     C                     MOVELAF01      AK03
+     C                     MOVELAF03      AK04
+     C           KEYAK     CHAINAK0                  43
+|    C*
+     C           *IN43     IFEQ '0'
+     C                     ADD  AF07      AK09
+M003AC                     ADD  AF09      AK09
+     C           AK05      ADD  AK06      AK10
+     C                     SUB  AK07      AK10
+     C                     SUB  AK08      AK10
+     C                     SUB  AK09      AK10
+     C                     UPDATAK0
+     C                     ELSE
+     C                     Z-ADD0         AK05
+     C                     Z-ADD0         AK06
+     C                     Z-ADD0         AK07
+     C                     Z-ADD0         AK08
+     C                     Z-ADDAF07      AK09
+M003AC                     Z-ADDAF09      AK09
+     C                     Z-SUBAF07      AK10
+M003AC                     Z-SUBAF09      AK10
+     C                     WRITEAK0
+     C                     END
+      *
+     C                     ENDSR
+

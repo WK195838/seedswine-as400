@@ -1,0 +1,193 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : SAR0452                                       *
+      * AUTHER       : A1084  CHARLES                                *
+      * CREATE DATE  : 81/05/05                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :通路達成率分析表                             *
+      ****************************************************************
+     FREWF14  IP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#CPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FSAR045P O   E             39     PRINTER
+     E*
+     IWF140
+     I                                              WF1401L3
+     I                                              WF1414L2
+     I                                              WF1402L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 601 DSC33S
+     I                                      602 602 DSC33E
+      *MM/DD/YY
+     I                                      605 6100DSC39
+      *YY/MM/DD
+     I                                      611 6160WSC39
+     I                                      611 6120WSC39Y
+     I                                      613 6140WSC39M
+      *
+     I                                      617 617 DSEL
+      *螢幕本年月
+     I                                      618 6210SCRYM
+      *螢幕上年
+     I                                      622 6250SCRY1
+      *螢幕上月
+     I                                      626 6290SCRM1
+     I                                      626 6270SCRYY
+     I                                      628 6290SCRMM
+     I                                      630 6350KEYDAT
+     I                                      701 7060DSC08
+     I                                      750 750 IN20
+     I*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEY#C     KLIST
+     C                     KFLD           #C01
+     C                     KFLD           #C02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01*C                     ELSE
+  02-C           *INL3     IFEQ '1'
+    C                     EXSR RTN010                     *HEADING
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200
+     CL2 10                SETOF                     21
+     CL3 10                EXSR RTN300
+     CLR 10                WRITEPE2
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+     C           IN20      IFEQ '0'
+     C                     SETOF                     20
+     C                     ELSE
+     C                     SETON                     20
+     C                     END
+|    C*通路
+|    C                     MOVEL'DISTRUBT'#A01
+|    C                     MOVELWF1401    #A02
+|    C           KEY#A     CHAIN#A0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   #A03
+| 03-C                     END
+|    C*禮盒
+|   C                     SETOF                     22
+| 03-C           DSEL      IFEQ 'A'
+|   C                     SETOF                     22
+| 03*C                     ELSE
+|   C                     SETON                     22
+| 03-C                     END
+|    C*
+|    C                     WRITEPH1
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*產品名稱
+|    C           WF1403    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   MA03
+| 01-C                     END
+|    C*型態說明
+|    C                     MOVELWF1401    #C01
+|    C                     MOVELWF1414    #C02
+|    C           KEY#C     CHAIN#C0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   #C03
+| 02-C                     END
+      *
+| 03-C           WF1404    IFNE 0
+|   C           WF1408    MULT 100       WORK   174
+|   C           WORK      DIV  WF1404    RATE1     H
+| 03*C                     ELSE
+|   C                     Z-ADD0         RATE1     H
+| 03-C                     END
+| 04-C           WF1405    IFNE 0
+|   C           WF1409    MULT 100       WORK   174
+|   C           WORK      DIV  WF1405    RATE2     H
+| 04*C                     ELSE
+|   C                     Z-ADD0         RATE2     H
+| 04-C                     END
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+      *IN21 CONTROL型態是否顯示
+|    C                     SETON                     21
+|    C                     ADD  WF1405    T11405
+|    C                     ADD  WF1407    T11407
+|    C                     ADD  WF1409    T11409
+|    C                     ADD  RATE2     T1RATE
+|    C                     ADD  WF1411    T11411
+|    C                     ADD  WF1413    T11413
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C                     ADD  T11405    T21405
+|    C                     ADD  T11407    T21407
+|    C                     ADD  T11409    T21409
+|    C                     ADD  T1RATE    T2RATE
+|    C                     ADD  T11411    T21411
+|    C                     ADD  T11413    T21413
+|    C                     Z-ADD0         T11405
+|    C                     Z-ADD0         T11407
+|    C                     Z-ADD0         T11409
+|    C                     Z-ADD0         T1RATE
+|    C                     Z-ADD0         T11411
+|    C                     Z-ADD0         T11413
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE PT2   TOTAL
+      *==============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT2
+| 01-C           *INLR     IFEQ '0'
+|   C                     WRITEPE1
+| 01-C                     END
+|    C                     Z-ADD0         T21405
+|    C                     Z-ADD0         T21407
+|    C                     Z-ADD0         T21409
+|    C                     Z-ADD0         T2RATE
+|    C                     Z-ADD0         T21411
+|    C                     Z-ADD0         T21413
+      *
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+      *
+05===C                     ENDSR
+

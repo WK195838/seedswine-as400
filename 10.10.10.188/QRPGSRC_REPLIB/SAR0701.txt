@@ -1,0 +1,957 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有    TEL:5042266      *
+      * PROGRAM NAME : SAR0701                                       *
+      * AUTHER       : MERCURY                                       *
+      * CREATE DATE  : 83/05/13                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      *  REMARK      :通路產品銷售週報表－依辦事處                 *
+      ****************************************************************
+     FMTMAPF  IF  E           K        DISK
+     FMTMALF1 IF  E           K        DISK
+     FREWF88  IF  E           K        DISK
+     FREWF89  IF  E           K        DISK
+     FREWF90  IF  E           K        DISK
+     FSOCDLF1 IF  E           K        DISK
+     FREWF871 UF  E           K        DISK                      A
+     FRES18WF IF  E           K        DISK                           UC
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *公司
+     I                                      601 601 DMA07
+      *類別
+     I                                      602 602 DMA11
+     I*產品代號
+B2MODI                                      741 749 DMA01S
+B2MODI                                      751 759 DMA01E
+      *試飲
+     I                                      603 603 DSEL1
+      *單瓶
+     I                                      604 604 DSEL2
+      *YY/MM/DD
+B2MODI                                      631 6380YMDS
+B2MODI                                      643 6500YMDE
+B2MODI                                      655 6620F01S
+B2MODI                                      667 6740F01E
+B2MODI                                      679 6860F02S
+B2MODI                                      679 6840F02SYM
+B2MODI                                      691 6980F02E
+B2MODI                                      691 6960F02EYM
+B2MODI                                      699 7040F02EW
+B2MODI                                      729 7360F0201
+B2MODI                                      705 7100F03S
+B2MODI                                      717 7220F03E
+     I            DS
+     I                                        1   2 MA11
+     I                                        1   1 MA11L
+     I            DS
+     I                                        1   9 SD03
+     I                                        3   4 SD03A
+     I            DS
+     I                                        1   9 SH03
+     I                                        3   4 SH03A
+     I            DS
+     I                                        1   9 CD04
+     I                                        3   4 CD04A
+     I            DS
+     I                                        1   9 SO03
+     I                                        3   4 SO03A
+     I            DS
+     I                                        1   9 R181
+     I                                        3   4 R181A
+     I*辦事處
+     I                                      810 810 COMP
+     I                                      605 605 COMPS
+     I                                      606 606 COMPE
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF8704    WORK01
+     C           *LIKE     DEFN WF8704    WORK02
+     C           *LIKE     DEFN WF8704    WORK03
+     C           *LIKE     DEFN WF8704    WORK04
+     C           *LIKE     DEFN WF8704    WORK05
+     C           *LIKE     DEFN WF8704    WORK06
+     C           *LIKE     DEFN WF8704    WORK07
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF8712
+     C                     KFLD           WF8701
+     C                     KFLD           WF8702
+     C                     KFLD           WF8703
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN10A                     *SOSCPF
+     C                     EXSR RTN20A                     *SOSGPF
+     C                     EXSR RTN30A                     *SOSNPF
+     C                     EXSR RTN40A                     *SOCDPF
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN10A    SOSCPF
+      *==============================================================*
+01===C           RTN10A    BEGSR
+|    C*
+|    C                     READ SC0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVE SC01      WF8712
+|   C           SD03      CHAINMA0                  45
+| 02-C           MA07      IFEQ DMA07
+|   C           MA11L     ANDEQDMA11
+| 03-C*          SD03      IFGE DMA01S
+|   C*          SD03      ANDLEDMA01E
+|   C*不拆
+| 04-C           DSEL2     IFEQ 'A'
+|   C                     MOVELSD03A     WF8701
+|   C                     MOVELSD03      WF8702
+|   C                     MOVELSD03      WF8703
+|   C                     EXSR RTN10B
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+| 04*C                     ELSE
+|   C                     EXSR RTN10X
+| 04-C                     END
+| 03-C*                    END
+| 02-C                     END
+      *
+|   C                     READ SC0                      46
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN10B    PEROID JUDGE
+      *==============================================================*
+02===C           RTN10B    BEGSR
+|    C*
+B2000C           SC39      IFGE YMDS
+|   C           SC39      ANDLEYMDE
+|   C                     EXSR RTN100
+| 01-C                     END
+|    C*當月內
+B2000C           SC39      IFGE F01S
+|   C           SC39      ANDLEF01E
+|   C                     EXSR RTN110
+| 02-C                     END
+|    C*當年內
+B2000C           F02SYM    IFNE F02EYM
+|   C           SC39      ANDGEF0201
+|   C           SC39      ANDLEF02E
+|   C                     EXSR RTN120
+| 03*C                     ELSE
+| 03-C*                    END
+|    C*
+| 04-C*          F02SYM    IFEQ F02EYM
+B2000C           SC39      IFGE F02S
+|   C           SC39      ANDLEF02E
+|   C                     EXSR RTN120
+| 05-C                     END
+| 04-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN10C....GET LITER
+      *==============================================================*
+03===C           RTN10C    BEGSR
+|    C*GET單位容積
+|    C           WF8703    CHAINMA0L                 49
+| 01-C*          *IN49     IFEQ '0'
+|   C*                    Z-ADD0         WORK01
+|   C*                    Z-ADD0         WORK02
+|   C*容積數
+|   C           SD04      MULT MA15L     WORK01
+|   C           SD05      MULT MA15L     WORK02
+|   C*
+| 01-C*                    END
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN100....WRITE OR UPDATE REWF871
+      *==============================================================*
+04===C           RTN100    BEGSR
+|    C*
+|    C                     EXSR RTN10C
+|    C*
+|    C           KEYWF     CHAINWF870                40
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK01    WF8704
+|   C                     ADD  WORK02    WF8705
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADDWORK01    WF8704
+|   C                     Z-ADDWORK02    WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+| 02-C           WF8704    IFNE 0
+|   C           WF8705    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN110....WRITE OR UPDATE REWF871
+      *==============================================================*
+05===C           RTN110    BEGSR
+|    C*當月
+|    C                     EXSR RTN10C
+|    C*
+|    C           KEYWF     CHAINWF870                40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK01    WF8706
+|   C                     ADD  WORK02    WF8707
+|   C*
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADDWORK01    WF8706
+|   C                     Z-ADDWORK02    WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+| 02-C           WF8706    IFNE 0
+|   C           WF8707    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN120....WRITE OR UPDATE REWF871
+      *==============================================================*
+06===C           RTN120    BEGSR
+|    C*當年
+|    C                     EXSR RTN10C
+|    C*
+|    C           KEYWF     CHAINWF870                40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK01    WF8708
+|   C                     ADD  WORK02    WF8709
+|   C*
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADDWORK01    WF8708
+|   C                     Z-ADDWORK02    WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+| 02-C           WF8708    IFNE 0
+|   C           WF8709    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN10X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+07===C           RTN10X    BEGSR
+      *禮盒碼
+| 01-C           MA54      IFEQ 'Y'
+|   C                     EXSR RTN10Y
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN10Z
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 01*C                     ELSE
+|   C                     MOVELSD03A     WF8701
+|   C                     MOVELSD03      WF8702
+|   C                     MOVELSD03      WF8703
+|   C                     EXSR RTN10B
+| 01-C                     END
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN10Y....禮盒單瓶成本
+      *==============================================================*
+08===C           RTN10Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SD02      S08I2  12        訂單號碼
+B2MODC                     PARM 0         S08I3   80       牌價判斷日
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|    C                     PARM SD04      S08I4   60       禮盒訂購數量
+|    C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   92       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   92       禮盒成本FOB
+|    C                     PARM 0         S08I8   92       禮盒成本FHI
+|    C                     PARM 0         S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   92       禮盒轉帳成本DUTY
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN10Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+09===C           RTN10Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181A     WF8701
+|   C                     MOVELR181      WF8702
+|   C                     MOVELR181      WF8703
+|   C                     Z-ADDR182      SD04
+|   C                     Z-ADDR183      SD05
+|   C                     EXSR RTN10B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN20A    SOSGPF
+      *==============================================================*
+10===C           RTN20A    BEGSR
+|    C*銷退
+|    C                     READ SG0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVE SG01      WF8712
+|   C           SH03      CHAINMA0                  45
+| 02-C           MA07      IFEQ DMA07
+|   C           MA11L     ANDEQDMA11
+|   C*不拆
+| 04-C           DSEL2     IFEQ 'A'
+|   C                     MOVELSH03A     WF8701
+|   C                     MOVELSH03      WF8702
+|   C                     MOVELSH03      WF8703
+|   C                     EXSR RTN20B
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+| 04*C                     ELSE
+|   C                     EXSR RTN20X
+| 04-C                     END
+| 02-C                     END
+|   C*
+|   C                     READ SG0                      46
+| 01-C                     END
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN20B    SOSNPF
+      *==============================================================*
+11===C           RTN20B    BEGSR
+|    C*當期
+B2000C           SG26      IFGE YMDS
+|   C           SG26      ANDLEYMDE
+|   C                     EXSR RTN200
+| 01-C                     END
+|    C*當月內
+B2000C           SG26      IFGE F01S
+|   C           SG26      ANDLEF01E
+|   C                     EXSR RTN210
+| 02-C                     END
+|    C*當年內
+B2000C           F02SYM    IFNE F02EYM
+|   C           SG26      ANDGEF0201
+|   C           SG26      ANDLEF02E
+|   C                     EXSR RTN220
+| 03-C*                    END
+| ERRC                     ELSE
+|    C*
+| 04-C*          F02SYM    IFEQ F02EYM
+B2000C           SG26      IFGE F02S
+|   C           SG26      ANDLEF02E
+|   C                     EXSR RTN220
+| 05-C                     END
+| 04-C                     END
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN20C....GET LITER
+      *==============================================================*
+12===C           RTN20C    BEGSR
+|    C*容積
+|    C           WF8703    CHAINMA0L                 49
+| 01-C*          *IN49     IFEQ '0'
+|   C*
+|   C           SH12      MULT MA15L     WORK01
+|   C           SH13      MULT MA15L     WORK02
+| 01-C*                    END
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE OR UPDATE REWF871
+      *==============================================================*
+13===C           RTN200    BEGSR
+|    C*銷退
+|    C                     EXSR RTN20C
+|    C*
+|    C           KEYWF     CHAINWF870                40
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     SUB  WORK01    WF8704
+|   C                     SUB  WORK02    WF8705
+|   C*
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-SUBWORK01    WF8704
+|   C                     Z-SUBWORK02    WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+| 02-C           WF8704    IFNE 0
+|   C           WF8705    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+| 01-C                     END
+|    C*
+|    C*
+13===C                     ENDSR
+      *==============================================================*
+      *          RTN210....WRITE OR UPDATE REWF871
+      *==============================================================*
+14===C           RTN210    BEGSR
+|    C*
+|    C                     EXSR RTN20C
+|    C*
+|    C           KEYWF     CHAINWF870                40
+|    C*當月
+|   C*
+| 02-C           *IN40     IFEQ '0'
+|   C                     SUB  WORK01    WF8706
+|   C                     SUB  WORK02    WF8707
+|   C                     UPDATWF870
+| 02*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-SUBWORK01    WF8706
+|   C                     Z-SUBWORK02    WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+| 03-C           WF8706    IFNE 0
+|   C           WF8707    ORNE 0
+|   C                     WRITEWF870
+| 03-C                     END
+|   C*
+| 02-C                     END
+|    C*
+14===C                     ENDSR
+      *==============================================================*
+      *          RTN220....WRITE OR UPDATE REWF871
+      *==============================================================*
+15===C           RTN220    BEGSR
+|    C*
+|    C                     EXSR RTN20C
+|    C*
+|    C           KEYWF     CHAINWF870                40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+|   C                     SUB  WORK01    WF8708
+|   C                     SUB  WORK02    WF8709
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-SUBWORK01    WF8708
+|   C                     Z-SUBWORK02    WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+| 02-C           WF8708    IFNE 0
+|   C           WF8709    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+| 01-C                     END
+|    C*
+15===C                     ENDSR
+      *==============================================================*
+      *          RTN20X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+16===C           RTN20X    BEGSR
+      *禮盒碼
+| 01-C           MA54      IFEQ 'Y'
+|   C                     EXSR RTN20Y
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN20Z
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 01*C                     ELSE
+|   C                     MOVELSH03A     WF8701
+|   C                     MOVELSH03      WF8702
+|   C                     MOVELSH03      WF8703
+|   C                     EXSR RTN20B
+| 01-C                     END
+|    C*
+16===C                     ENDSR
+      *==============================================================*
+      *          RTN20Y....禮盒單瓶成本
+      *==============================================================*
+17===C           RTN20Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SH03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SG02      S08I2  12        訂單號碼
+B2MODC                     PARM 0         S08I3   80       牌價判斷日
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|    C                     PARM SH12      S08I4   60       禮盒訂購數量
+|    C                     PARM SH13      S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   92       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   92       禮盒成本FOB
+|    C                     PARM 0         S08I8   92       禮盒成本FHI
+|    C                     PARM 0         S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   92       禮盒轉帳成本DUTY
+|    C*
+17===C                     ENDSR
+      *==============================================================*
+      *          RTN20Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+18===C           RTN20Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181A     WF8701
+|   C                     MOVELR181      WF8702
+|   C                     MOVELR181      WF8703
+|   C                     Z-ADDR182      SH12
+|   C                     Z-ADDR183      SH13
+|   C                     EXSR RTN20B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+18===C                     ENDSR
+      *==============================================================*
+      *          RTN30A    SOSNPF
+      *==============================================================*
+19===C           RTN30A    BEGSR
+|    C*試飲收回
+|    C                     READ SN0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVE SN01      WF8712
+|   C           SO03      CHAINMA0                  45
+| 02-C           MA07      IFEQ DMA07
+|   C           MA11L     ANDEQDMA11
+| 03-C*          SO03      IFGE DMA01S
+|   C*          SO03      ANDLEDMA01E
+|   C*不拆
+| 04-C           DSEL2     IFEQ 'A'
+|   C                     MOVELSO03A     WF8701
+|   C                     MOVELSO03      WF8702
+|   C                     MOVELSO03      WF8703
+|   C                     EXSR RTN30B
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+| 04*C                     ELSE
+|   C                     EXSR RTN30X
+| 04-C                     END
+| 03-C*                    END
+| 02-C                     END
+|   C                     READ SN0                      46
+| 01-C                     END
+|    C*
+19===C                     ENDSR
+      *==============================================================*
+      *          RTN30B    PERIOD JUDGE
+      *==============================================================*
+20===C           RTN30B    BEGSR
+|    C*當期內
+B2000C           SN06      IFGE YMDS
+|   C           SN06      ANDLEYMDE
+|   C                     EXSR RTN300
+| 01-C                     END
+|    C*當月內
+B2000C           SN06      IFGE F01S
+|   C           SN06      ANDLEF01E
+|   C                     EXSR RTN310
+| 02-C                     END
+|    C*
+|    C*當年內
+B2000C           SN06      IFGE F0201
+|   C           SN06      ANDLEF02E
+|   C                     EXSR RTN320
+| 03-C                     END
+|    C*
+20===C                     ENDSR
+      *==============================================================*
+      *          RTN30C....GET LITER
+      *==============================================================*
+21===C           RTN30C    BEGSR
+|    C*收回
+|    C           WF8703    CHAINMA0L                 49
+| 01-C*          *IN49     IFEQ '0'
+|   C*
+|   C*                    Z-ADD0         WORK01
+|   C           SO05      MULT MA15L     WORK01
+| 01-C*                    END
+|    C*
+21===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE OR UPDATE REWF871
+      *==============================================================*
+22===C           RTN300    BEGSR
+|    C*容積
+|    C                     EXSR RTN30C
+|    C           KEYWF     CHAINWF870                40
+|    C*
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     SUB  WORK01    WF8704
+|   C*
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+|   C                     Z-SUBWORK01    WF8704
+| 02-C           WF8704    IFNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+| 01-C                     END
+|    C*
+22===C                     ENDSR
+      *==============================================================*
+      *          RTN310....WRITE OR UPDATE REWF871
+      *==============================================================*
+23===C           RTN310    BEGSR
+|    C*容積
+|    C                     EXSR RTN30C
+|    C*當月
+|    C           KEYWF     CHAINWF870                40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+|   C                     SUB  WORK01    WF8706
+|   C*
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+|   C                     Z-SUBWORK01    WF8706
+| 02-C           WF8706    IFNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+23===C                     ENDSR
+      *==============================================================*
+      *          RTN320....WRITE OR UPDATE REWF871
+      *==============================================================*
+24===C           RTN320    BEGSR
+|    C*容積
+|    C                     EXSR RTN30C
+|    C*當年
+|    C           KEYWF     CHAINWF870                40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+|   C                     SUB  WORK01    WF8708
+|   C*
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+|   C                     Z-SUBWORK01    WF8708
+| 02-C           WF8708    IFNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+24===C                     ENDSR
+      *==============================================================*
+      *          RTN30X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+25===C           RTN30X    BEGSR
+      *禮盒碼
+| 01-C           MA54      IFEQ 'Y'
+|   C                     EXSR RTN30Y
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN30Z
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 01*C                     ELSE
+|   C                     MOVELSO03A     WF8701
+|   C                     MOVELSO03      WF8702
+|   C                     MOVELSO03      WF8703
+|   C                     EXSR RTN30B
+| 01-C                     END
+|    C*
+25===C                     ENDSR
+      *==============================================================*
+      *          RTN30Y....禮盒單瓶成本
+      *==============================================================*
+26===C           RTN30Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SO03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SO02      S08I2  12        訂單號碼
+B2MODC                     PARM 0         S08I3   80       牌價判斷日
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|    C                     PARM SO05      S08I4   60       禮盒訂購數量
+|    C                     PARM 0         S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   92       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   92       禮盒成本FOB
+|    C                     PARM 0         S08I8   92       禮盒成本FHI
+|    C                     PARM 0         S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   92       禮盒轉帳成本DUTY
+|    C*
+26===C                     ENDSR
+      *==============================================================*
+      *          RTN30Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+27===C           RTN30Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181A     WF8701
+|   C                     MOVELR181      WF8702
+|   C                     MOVELR181      WF8703
+|   C                     Z-ADDR182      SO05
+|   C                     EXSR RTN30B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+27===C                     ENDSR
+      *==============================================================*
+      *          RTN40A    SOCDPF
+      *==============================================================*
+28===C           RTN40A    BEGSR
+      *月檔
+|    C                     READ CD0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVE CD02      WF8712
+|   C           CD04      CHAINMA0                  45
+| 02-C           MA07      IFEQ DMA07
+|   C           MA11L     ANDEQDMA11
+|   C*含試飲
+| 04-C           DSEL1     IFEQ 'Y'
+|   C                     ADD  CD18      CD16
+|   C                     SUB  CD23      CD16
+| 04-C                     END
+|   C                     ADD  CD19      CD16
+|   C                     SUB  CD20      CD16
+|   C                     SUB  CD21      CD17
+|   C*不拆
+| 05-C           DSEL2     IFEQ 'A'
+|   C                     MOVELCD04A     WF8701
+|   C                     MOVELCD04      WF8702
+|   C                     MOVELCD04      WF8703
+|   C                     EXSR RTN40B
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+| 05*C                     ELSE
+|   C                     EXSR RTN40X
+| 05-C                     END
+| 02-C                     END
+|   C*
+|   C                     READ CD0                      46
+| 01-C                     END
+28===C                     ENDSR
+     C*
+      *==============================================================*
+      *          RTN40B    PERIOD JUDGE
+      *==============================================================*
+29===C           RTN40B    BEGSR
+|    C*
+|    C*當年
+B2000C           F02SYM    IFNE F02EYM
+|   C           CD01      ANDGEF02SYM
+|   C           CD01      ANDLEF02EW
+|   C                     EXSR RTN400
+| 01-C                     END
+|    C*去年
+B2000C           CD01      IFGE F03S
+|   C           CD01      ANDLEF03E
+|   C                     EXSR RTN410
+| 02-C                     END
+|    C*
+29===C                     ENDSR
+      *==============================================================*
+      *          RTN40C....GET LITER
+      *==============================================================*
+30===C           RTN40C    BEGSR
+|    C*月檔
+|    C           WF8703    CHAINMA0L                 49
+|   C*
+|   C           CD16      MULT MA15L     WORK01
+|   C           CD17      MULT MA15L     WORK02
+| 01-C*                    END
+30===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE OR UPDATE REWF871
+      *==============================================================*
+31===C           RTN400    BEGSR
+|    C*
+|    C                     EXSR RTN40C
+|    C*當年
+|    C           KEYWF     CHAINWF870                40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK01    WF8708
+|   C                     ADD  WORK02    WF8709
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8710
+|   C                     Z-ADD0         WF8711
+|   C                     Z-ADDWORK01    WF8708
+|   C                     Z-ADDWORK02    WF8709
+| 02-C           WF8708    IFNE 0
+|   C           WF8709    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+31===C                     ENDSR
+      *==============================================================*
+      *          RTN410....WRITE OR UPDATE REWF871
+      *==============================================================*
+32===C           RTN410    BEGSR
+|    C*月檔
+|    C                     EXSR RTN40C
+|    C*當年
+|    C           KEYWF     CHAINWF870                40
+|    C*去年
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK01    WF8710
+|   C                     ADD  WORK02    WF8711
+|   C                     UPDATWF870
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF8704
+|   C                     Z-ADD0         WF8705
+|   C                     Z-ADD0         WF8706
+|   C                     Z-ADD0         WF8707
+|   C                     Z-ADD0         WF8708
+|   C                     Z-ADD0         WF8709
+|   C                     Z-ADDWORK01    WF8710
+|   C                     Z-ADDWORK02    WF8711
+| 02-C           WF8710    IFNE 0
+|   C           WF8711    ORNE 0
+|   C                     WRITEWF870
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+32===C                     ENDSR
+      *==============================================================*
+      *          RTN40X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+33===C           RTN40X    BEGSR
+      *禮盒碼
+| 01-C           MA54      IFEQ 'Y'
+|   C                     EXSR RTN40Y
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN40Z
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 01*C                     ELSE
+|   C                     MOVELCD04A     WF8701
+|   C                     MOVELCD04      WF8702
+|   C                     MOVELCD04      WF8703
+|   C                     EXSR RTN40B
+| 01-C                     END
+|    C*
+33===C                     ENDSR
+      *==============================================================*
+      *          RTN40Y....禮盒單瓶成本
+      *==============================================================*
+34===C           RTN40Y    BEGSR
+|    C*含試飲
+| 01-C*          DSEL1     IFEQ 'Y'
+|   C*                    ADD  CD18      CD16
+|   C*                    SUB  CD23      CD16
+| 01-C*                    END
+|    C*                    ADD  CD19      CD16
+|    C*                    SUB  CD20      CD16
+|    C*                    SUB  CD21      CD17
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM CD04      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM *BLANK    S08I2  12        訂單號碼
+B2MODC                     PARM 0         S08I3   80       牌價判斷日
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+|    C                     PARM CD16      S08I4   60       禮盒訂購數量
+|    C                     PARM CD17      S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   92       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   92       禮盒成本FOB
+|    C                     PARM 0         S08I8   92       禮盒成本FHI
+|    C                     PARM 0         S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   92       禮盒轉帳成本DUTY
+|    C*
+34===C                     ENDSR
+      *==============================================================*
+      *          RTN40Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+35===C           RTN40Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181A     WF8701
+|   C                     MOVELR181      WF8702
+|   C                     MOVELR181      WF8703
+|   C                     Z-ADDR182      CD16
+|   C                     Z-ADDR183      CD17
+|   C                     EXSR RTN40B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+35===C                     ENDSR
+

@@ -1,0 +1,260 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : WEB029                                     *
+     A*    AUTHOR       : A1546  VINCENT                             *
+     A*    CREATE DATE  : 98/04/07                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存STORE PROCEDURE                 *
+     A*    SUBSYSTEM    :前台管理系統                              *
+     A*    REMARK       :驗收單驗收產品檢核及更新                  *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A*00A需求單號: 1090255
+     A*00A 2020/02/03 CAROL調撥單新增修改功能
+     A*00B 2020/09/30 CAROL驗收註記修正
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FSCWB04PFUF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FPOCLPF  UF  E           K        DISK
+     FPOCMPF  UF  E           K        DISK
+     F*
+     E                    MSG     1   7 60               *訊息
+     E*
+     I           UDS
+     I                                      187 1920DATES
+     I                                      201 2080DATE
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PARM1  13        驗收單號
+     C                     PARM           PARM2  10        人員代號
+     C                     PARM           PARM3   1        多出品項
+     C                     PARM           ERRRD   3        ERR RCD NO.
+     C                     PARM           RTNCD   2        RETURN CODE
+     C                     PARM           RTNDSC 60        RETURN DESC.
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYNC     KLIST
+     C                     KFLD           CL01
+     C                     KFLD           WB0403
+     C           KEYCM     KLIST
+     C                     KFLD           WB0401
+     C                     KFLD           WB0402
+     C                     KFLD           WB0403
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C* CHK HEADING
+     C                     EXSR RTN100
+     C* CHK DETAIL
+     C  N99                EXSR RTN200
+     C*
+     C* UPDATE INTCPF,INTDPF
+     C  N99                EXSR RTN300
+     C*
+     C                     MOVE WRDNO     ERRRD
+     C  N99                MOVE '00'      RTNCD
+     C  N99                MOVE *BLANKS   RTNDSC
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....CHECK HEADINB
+      *==============================================================*
+01===C           RTN100    BEGSR
+|     *
+|    C                     Z-ADD0         WRDNO   30
+|     *
+|    C*先LOCK驗收單
+|    C           PARM1     CHAINCL0                  4020
+|    C* CHK驗收單LOCK
+| 01-C           *IN20     IFEQ '1'
+|   C                     MOVEL'01'      RTNCD
+|   C                     MOVELMSG,1     RTNDSC
+|   C                     SETON                     99
+| 01*C                     ELSE
+|   C* CHK驗收單不存在
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL'02'      RTNCD
+|   C                     MOVELMSG,2     RTNDSC
+|   C                     SETON                     99
+| 02*C                     ELSE
+|   C* CHK狀態碼已變更
+| 03-C           CL14      IFNE *BLANKS
+|00A+C           CL14      ANDNE'O'
+|00B+C           CL14      ANDNE'R'
+|   C                     MOVEL'03'      RTNCD
+|   C                     MOVELMSG,3     RTNDSC
+|   C                     SETON                     99
+| 03-C                     ENDIF
+| 02-C                     ENDIF
+| 01-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+01===C           END100    ENDSR
+      *==============================================================*
+      *          RTN200....CHECK DETAIL
+      *==============================================================*
+02===CSR         RTN200    BEGSR
+|    C*
+|    C* READ工作檔
+|    C           *LOVAL    SETLLWB04
+|    C                     READ WB04                N    44
+| 01-C           *IN44     DOWEQ'0'
+|   C                     ADD  1         WRDNO
+|   C* CHK產品代號
+|   C           KEYNC     CHAINNC0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL'04'      RTNCD
+|   C                     MOVELMSG,4     RTNDSC
+|   C                     SETON                     99
+| 02-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+|   C* CHK驗收數量
+| 03-C           WB0404    IFLT 0
+|   C                     MOVEL'07'      RTNCD
+|   C                     MOVELMSG,7     RTNDSC
+|   C                     SETON                     99
+| 03-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+|   C                     READ WB04                N    44
+| 01-C                     ENDDO
+|    C*
+| 04-C           WRDNO     IFEQ 0
+|   C                     MOVEL'05'      RTNCD
+|   C                     MOVELMSG,5     RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|    C   99                GOTO END200
+|    C*
+02===C           END200    ENDSR
+      *==============================================================*
+      *          RTN300....UPDATE POCLPF,POCMPF
+      *==============================================================*
+03===CSR         RTN300    BEGSR
+|    C*
+|    C                     Z-ADD0         WRDNO   30
+|    C                     SETOF                         50
+|    C* UPDATE POCMPF
+|    C           *LOVAL    SETLLWB04
+|    C                     READ WB04                N    44
+| 01-C           *IN44     DOWEQ'0'
+|   C                     ADD  1         WRDNO
+|   C           KEYCM     CHAINCM0                  4020
+| 02-C           *IN20     IFEQ '1'
+|   C                     MOVEL'06'      RTNCD
+|   C                     MOVELMSG,6     RTNDSC
+|   C                     SETON                     99
+|   C                     GOTO END300
+| 02-C                     ENDIF
+| 03-C           *IN40     IFEQ '0'
+|   C* CHK數量差異
+|   C  N31      CM04      COMP WB0404               3131
+|   C                     EXSR RTN301
+|   C                     UPDATCM0
+| 03-C                     ENDIF
+|   C                     READ WB04                N    44
+| 01-C                     ENDDO
+|    C* UPDATE POCLPF
+|    C                     EXSR RTN302
+|    C                     UPDATCL0
+|    C* UPDATE POCMPF STATUS
+|    C                     EXSR RTN303
+|    C* CLEAR SCWB04PF
+|    C           *LOVAL    SETLLWB04
+|    C                     READ WB04                     40
+| 04-C           *IN40     DOWEQ'0'
+|   C                     DELETWB04
+|   C                     READ WB04                     40
+| 04-C                     ENDDO
+|    C*
+03===C           END300    ENDSR
+      *==============================================================*
+      *          RTN301....MOVE POCMPF FIELDS
+      *==============================================================*
+04===CSR         RTN301    BEGSR
+|    C*
+|    C                     Z-ADDWB0404    CM05
+|    C*
+| 01-C           *IN50     IFEQ '0'
+|   C                     MOVE *BLANK    CMWW
+|   C                     MOVEL'WEB029'  CMWW
+|   C                     Z-ADDDATE      CMXX
+|   C                     TIME           CMYY
+|   C                     MOVELPARM2     CMZZ
+|   C                     SETON                     50
+| 01-C                     ENDIF
+|    C*
+04===C           END301    ENDSR
+     C*==============================================================*
+     C*          RTN302....MOVE POCLPF FIELDS
+     C*==============================================================*
+05===C           RTN302    BEGSR
+|    C*
+| 01-C                     SELEC
+|   C*有差異無多收O
+|   C           PARM3     WHEQ *BLANKS
+|   C           *IN31     ANDEQ'1'
+|   C                     MOVEL'O'       CL13
+|   C*無差異有多收A
+|   C           PARM3     WHNE *BLANKS
+|   C           *IN31     ANDEQ'0'
+|   C                     MOVEL'A'       CL13
+|   C*有差異有多收B
+|   C           PARM3     WHNE *BLANKS
+|   C           *IN31     ANDEQ'1'
+|   C                     MOVEL'B'       CL13
+|   C*無差異無多收空白
+|   C                     OTHER
+|00B-C*                    MOVEL*BLANKS   CL13
+|00B+C                     MOVEL'C'       CL13
+| 01-C                     ENDSL
+|    C*
+|00B-C*          CL13      IFEQ *BLANKS
+|00B-C           CL13      IFEQ 'C'
+|   C                     MOVEL'R'       CL14
+| 02*C                     ELSE
+|   C                     MOVEL'O'       CL14
+| 02-C                     ENDIF
+|    C*
+|    C                     MOVEL*BLANK    CLWW
+|    C                     MOVEL'WEB029'  CLWW
+|    C                     Z-ADDDATE      CLXX
+|    C                     TIME           CLYY
+|    C                     MOVELPARM2     CLZZ
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN303....UPDATE POCMPF STATUS
+     C*==============================================================*
+06===C           RTN303    BEGSR
+|    C*
+|    C           CL05      SETLLCM0
+|    C           CL05      READECM0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C                     MOVELCL14      CM15
+|   C                     Z-ADDCM05      CM06
+|   C                     UPDATCM0
+|   C           CL05      READECM0                      40
+| 01-C                     ENDDO
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+** /MSG
+驗收單主檔正被其它人使用中，請聯絡總公司。
+驗收單號不存在。
+驗收單狀態已變更，無法驗收。
+產品代號錯誤。
+無驗收單產品明細。
+驗收單明細檔正被其它人使用中，請聯絡總公司。
+驗收數量不可為負數。
+

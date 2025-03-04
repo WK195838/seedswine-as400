@@ -1,0 +1,226 @@
+     F****************************************************************
+     F*    PROGRAM NAME : P40                                        *
+     F*    REF. PROGRAM : P20                                        *
+     F*    AUTHOR       : A1062  JEANNY LIN                          *
+     F*    CREATE DATE  : 78/11/11                                   *
+     F*    SYSTEM ID    : PTPLIB                                     *
+     F*    FUNTCTION    :轉換日期為星期                            *
+     F****************************************************************
+     F*                                                              *
+     F* BASIC DATE : 78/12/31---(7)                                  *
+     F*                                                              *
+     F* PARAMETER  : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION     *
+     F*              ===  =======  ===  =====  ====  ===========     *
+     F*              01   P4001I    I   *DEC    6 0 日期(中國年) *
+     F*              02   P4011O    O   *DEC    1 0 星期別         *
+     F*                                                              *
+     F* W-VARABLE  : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION     *
+     F*              ===  =======  ===  =====  ====  ===========     *
+     F*                   P40BSD    N   *DEC    6 0  YYMMDD(中國年)*
+     F*              01   P4001     N   *DEC    4 0 西元年         *
+     F*              02   P4002(P40)N   *DEC    2 0 月份           *
+     F*              03   P4003     N   *DEC    2 0 日期           *
+     F*              04   P4004     N   *DEC    5 0 商數           *
+     F*              05   P4005     N   *DEC    4 0 餘數           *
+     F*              06   P4006     N   *CHAR   1   潤年(Y/N)      *
+     F*              07   P4007     N   *DEC    3 0 驗証(Y/N)      *
+     F*              08   P40DAY,1  N   *DEC    2 0 DAYS PER MONTH   *
+     F*                                                            *
+     F*              19   P40DAY,12 N   *DEC    2 0 DAYS PER MONTH   *
+     F*                                                              *
+     F*                                                              *
+     F* LEAP YEAR CALCULATION RULE......                             *
+     F*                        (Y)                                   *
+     F*                         +- P4006=Y                           *
+     F*             MVR 400 =0  |            (Y)                     *
+     F*  LEAP YEAR -------------+             +- P4006=N             *
+     F*                         | MVR 100 =0  |         (Y)          *
+     F*                         +-------------+          +- P4006=Y  *
+     F*                        (N)            | MVR 4 =0 |           *
+     F*                                       +----------+           *
+     F*                                      (N)         |           *
+     F*                                                  +- P4006=N  *
+     F*                                                 (N)          *
+     F*                                                              *
+     F****************************************************************
+     E                    P40DAY 12  12  2 0
+     IP40SC       DS
+     I                                        1   20P40SYY
+     I                                        3   40P40SMM
+     I                                        5   60P40SDD
+     IP40BC       DS
+     I                                        1   20P40BYY
+     I                                        3   40P40BMM
+     I                                        5   60P40BDD
+     C*--------------------------------------------------------------*
+     C*                    MAIN PROGRAM                              *
+     C*--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P4001I  60
+     C                     PARM           P4011O  10
+     C*
+     C                     Z-ADD781231    P40BSD  60
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     EXSR P40CMP
+     C                     EXSR P40CYY
+     C                     EXSR P40CMD
+     C                     EXSR P40CAL
+     C*
+     C           P40TD     DIV  7         P4004
+     C                     MVR            P40WEK  10
+     C           P40CCK    IFEQ 'N'                        *IND<BSD
+     C           7         SUB  P40WEK    P40WEK
+     C                     END
+     C           P40WEK    IFEQ 0
+     C                     Z-ADD7         P40WEK
+     C                     END
+     C                     Z-ADDP40WEK    P4011O
+     C*
+     C                     RETRN
+     C*--------------------------------------------------------------*
+     C*          P40CMP....COMPARE P40BSD AND INPUT DATE WHICH LARGE *
+     C*                    INPUT      P4001I                         *
+     C*                    INPUT      P4002I                         *
+     C*                    OUTPUT     P40SML                         *
+     C*                    OUTPUT     P40BIG                         *
+     C*                    OUTPUT     P40CCK ( Y : P40BSD <= P4001I )*
+     C*--------------------------------------------------------------*
+     C           P40CMP    BEGSR
+     C           P40BSD    IFLE P4001I
+     C                     MOVE 'Y'       P40CCK  1
+     C                     Z-ADDP40BSD    P40SML  60
+     C                     Z-ADDP4001I    P40BIG  60
+     C                     ELSE
+     C                     MOVE 'N'       P40CCK
+     C                     Z-ADDP4001I    P40SML
+     C                     Z-ADDP40BSD    P40BIG
+     C                     END
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*          P40CYY....CACULATE YEARS DAY                        *
+     C*                    INPUT      P40SCY 小日期西元年          *
+     C*                    INPUT      P40BCY 大日期西元年          *
+     C*                    OUTPUT     P40YDA 相距年度天數          *
+     C*--------------------------------------------------------------*
+     C           P40CYY    BEGSR
+     C                     MOVE P40SML    P40SC   6
+     C                     MOVE P40BIG    P40BC   6
+     C                     Z-ADD0         P40SCY  40
+     C                     Z-ADD0         P40BCY  40
+     C           P40SYY    ADD  1911      P40SCY
+     C           P40BYY    ADD  1911      P40BCY
+     C                     Z-ADD0         P40YDA  90
+     C           P40SCY    DOWNEP40BCY
+     C*
+     C                     Z-ADDP40SCY    P4001   40
+     C                     EXSR P40LEP
+     C*
+     C           P4006     IFEQ 'Y'
+     C                     ADD  366       P40YDA
+     C                     ELSE
+     C                     ADD  365       P40YDA
+     C                     END
+     C*
+     C                     ADD  1         P40SCY
+     C                     END
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*          P40LEP....VERIFY LEAP YEAR                          *
+     C*                    INPUT      P4001 西元年                 *
+     C*                    OUTPUT     P4006  (Y=潤年:N=平年)     *
+     C*--------------------------------------------------------------*
+     C           P40LEP    BEGSR
+     C           P4001     DIV  400       P4004   50
+     C                     MVR            P4005   40
+     C           P4005     IFEQ 0
+     C                     MOVE 'Y'       P4006   1
+     C                     ELSE
+     C*
+     C           P4001     DIV  100       P4004
+     C                     MVR            P4005
+     C           P4005     IFEQ 0
+     C                     MOVE 'N'       P4006
+     C                     ELSE
+     C*
+     C           P4001     DIV  4         P4004
+     C                     MVR            P4005
+     C           P4005     IFEQ 0
+     C                     MOVE 'Y'       P4006
+     C                     ELSE
+     C                     MOVE 'N'       P4006
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     END
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*          P40CMD....CALCULATE YEAR DAYS OF P40SML AND P40BIG  *
+     C*                    INPUT    P40SML ......                    *
+     C*                                    P40SYY                    *
+     C*                                    P40SMM                    *
+     C*                                    P40SDD                    *
+     C*                             P40BIG ......                    *
+     C*                                    P40BYY                    *
+     C*                                    P40BMM                    *
+     C*                                    P40BDD                    *
+     C*                    OUTPUT   P40SDA(YEAR DAYS OF P40SML)      *
+     C*                             P40BDA(YEAR DAYS OF P40BIG)      *
+     C*--------------------------------------------------------------*
+     C           P40CMD    BEGSR
+     C*-------------------------------------*
+     C*        CALCULATE   P40SDA           *
+     C*-------------------------------------*
+     C                     Z-ADD0         P40SDA  90
+     C                     Z-ADD1         PMM     20
+     C           PMM       DOWNEP40SMM
+     C                     ADD  P40DAY,PMMP40SDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P40SDD    P40SDA
+     C*
+     C                     Z-ADD1911      P4001
+     C                     ADD  P40SYY    P4001
+     C                     EXSR P40LEP
+     C           P4006     IFEQ 'Y'
+     C           P40SMM    ANDGT2
+     C                     ADD  1         P40SDA
+     C                     END
+     C*-------------------------------------*
+     C*        CALCULATE   P40BDA           *
+     C*-------------------------------------*
+     C                     Z-ADD0         P40BDA  90
+     C                     Z-ADD1         PMM
+     C           PMM       DOWNEP40BMM
+     C                     ADD  P40DAY,PMMP40BDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P40BDD    P40BDA
+     C*
+     C                     Z-ADD1911      P4001
+     C                     ADD  P40BYY    P4001
+     C                     EXSR P40LEP
+     C           P4006     IFEQ 'Y'
+     C           P40BMM    ANDGT2
+     C                     ADD  1         P40BDA
+     C                     END
+     C*
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*          P40CAL....CACULATE DAYS BETWEEN P40SML & P40BIG     *
+     C*                    INPUT      P40SDA  (YEAR DAYS OF P40SML)  *
+     C*                    INPUT      P40BDA  (YEAR DAYS OF P40BIG)  *
+     C*                    INPUT      P40YDA 相距年度天數          *
+     C*                    OUTPUT     P40RST 相距天數              *
+     C*--------------------------------------------------------------*
+     C           P40CAL    BEGSR
+     C                     Z-ADD0         P40TD   90
+     C           P40YDA    ADD  P40BDA    P40TD
+     C                     SUB  P40SDA    P40TD
+     C                     ENDSR
+**
+312831303130313130313031
+

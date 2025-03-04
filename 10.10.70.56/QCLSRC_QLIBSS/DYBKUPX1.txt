@@ -1,0 +1,58 @@
+             PGM
+             DCL        VAR(&IN88) TYPE(*LGL) LEN(1) VALUE('0')
+             DCL        VAR(&TIME) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN90) TYPE(*CHAR) LEN(1) VALUE('0')
+             DCL        VAR(&ENDINT) TYPE(*CHAR) LEN(1) VALUE('Y')
+             DCLF       FILE(WKBKUPF)
+             MONMSG     MSGID(MCH0000 CPF0000 CPF9999)
+                           /*EXECEPTION HANDER */
+     /*      DLYJOB     DLY(20)    */
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*HOLD)
+     /*      CHGJOB     LOGCLPGM(*YES)       */
+
+             ENDSBS     SBS(QINTER) OPTION(*IMMED)
+             MONMSG     MSGID(MCH0000 CPI0000 CPD0000)
+             DLYJOB     DLY(30)
+
+ /* LOOP:    RCVF                 */
+RCVFIL:      RCVF
+             MONMSG     MSGID(CPF0864) EXEC(GOTO CMDLBL(ENDPGM)) +
+                        /*EXIT OF FILE REACHED */
+             IF         COND(&LIB *EQ '          ') THEN(GOTO +
+                          CMDLBL(RCVFIL))
+             CHKOBJ     OBJ(QSYS/&LIB) OBJTYPE(*LIB) /*CHECK IF FILE +
+                          EXISTS */
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(RCVFIL))
+
+             RTVSYSVAL  SYSVAL(QTIME) RTNVAR(&TIME)
+             IF         COND((&TIME *GT '125000') & (&IN88 *EQ '0')) +
+                          THEN(DO)
+             STRSBS     SBSD(QINTER)
+             MONMSG     MSGID(MCH0000 CPI0000 CPD0000 CPF0000)
+             DLYJOB     DLY(30)
+             CHGVAR     VAR(&IN88) VALUE('1')
+             ENDDO
+
+ /*          SAVCHGOBJ            */
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('此LIB: ' *CAT &LIB *CAT +
+                          '正在做DAILY BACKUP') TOPGMQ(*EXT) +
+                          MSGTYPE(*STATUS)
+             SAVCHGOBJ  OBJ(Q*) LIB(&LIB) DEV(TAP01) OBJTYPE(*FILE) +
+                          EXPDATE(090189) ENDOPT(*LEAVE)
+             GOTO       RCVFIL
+ /*          GOTO LOOP            */
+ENDPGM:      CLOF       OPNID(WKBKUP)
+             CHKTAP     DEV(TAP01) ENDOPT(*UNLOAD)
+             IF         COND(&IN88 *EQ '0') THEN(DO)
+             STRSBS     SBSD(QINTER)
+             MONMSG     MSGID(MCH0000 CPI0000 CPD0000 CPF0000)
+             DLYJOB     DLY(60)
+             ENDDO
+         /*  DSPJOBLOG  OUTPUT(*PRINT)     */
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*BREAK)
+             TFRJOB     JOBQ(QINTER)
+             MONMSG     MSGID(CPI0000)
+             ENDPGM
+

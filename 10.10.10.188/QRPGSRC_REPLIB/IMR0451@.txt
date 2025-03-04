@@ -1,0 +1,349 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0451                                       *
+      * AUTHER       : A1118  PHILIP                                 *
+      * CREATE DATE  : 81/04/27                                      *
+      * UPDATE DATE  : 81/04/30                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存子系統                                   *
+      * REMARK       :電子統一發票列印                             *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.16 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A* M004      | 00.04.25 | FOR DUTY菸酒稅法實施
+     A*---------------------------------------------------------------
+     A* M005      | 01.12.31 |二聯式發票格式變更，只顯示稅後金額
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSIPF  UP  E           K        DISK
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FSOSEPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+@    FMTMEPF  UF  E           K        DISK
+     FIMR045P O   E             39     PRINTER
+     F*===========================================================
+     E*: FUNCTION DATA :
+     E                    PM          8  1               總計金額
+     E                    PC          8  4               中文大寫
+     E                    TAB1   10  10  1   TAB2    4   金額轉換
+     E*===========================================================
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 602 DSI01
+     I                                      603 612 DSI02
+     I                                      609 613 DSI05
+     I*發票日期
+     I            DS
+     I                                        1   60WSI21
+     I                                        1   20PSI21Y
+     I                                        3   40PSI21M
+     I                                        5   60PSI21D
+     I*發票金額中文大寫欄位
+     I            DS
+     I                                        1  32 PCT
+     I                                        1   4 PC1
+     I                                        5   8 PC2
+     I                                        9  12 PC3
+     I                                       13  16 PC4
+     I                                       17  20 PC5
+     I                                       21  24 PC6
+     I                                       25  28 PC7
+     I                                       29  32 PC8
+M004AIDA02        DS
+M004AI                                        1   43DUTY
+     I*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSJ     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C           KEYSD     KLIST
+     C                     KFLD           SI10
+     C                     KFLD           SJ03
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+ @   C           KEYME2    KLIST
+ @   C                     KFLD           SI08
+ @   C                     KFLD           SI09
+M004AC           *NAMVAR   DEFN           DA02
+M004AC                     IN   DA02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+M001AC                     Z-ADD0         W6      60
+  01-C           SI08      IFNE 'B0000'
+     C           SI11      CHAINSE0                  44
+  01-C           *IN44     IFEQ '0'
+      *列印註記
+    C           SE25      ANDEQ'V'
+    C*派車車號
+  02-C           SE22      IFNE *BLANKS
+    C           SE03      OREQ 'D7'
+      *
+    C                     EXSR RTN100                     WRITE HEAD
+    C                     EXSR RTN200                     WRITE DETAILL
+    C                     EXSR RTN300                     WRITE TOTAL L
+  @  C  N51      KEYME2    CHAINME0                  51
+B2000C  N51                Z-ADDSI21      ME18
+  @  C  N51                UPDATME0
+      *
+  02-C                     END
+  01-C                     END
+  01-C                     END
+     C*
+     CLR 10                EXSR RTN400
+      *==============================================================*
+      *          RTN100....WRITE HEADING
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*發票年份轉中國年
+B2TRCC                     Z-ADDSI21      WSI21
+M001AC                     MOVELSI21      W4Y     40
+B2CHKC*M001M               SUB  11        PSI21Y
+M001MC           W4Y       SUB  11        PSI21Y
+|    C*客戶訂單單號
+|    C           SI10      CHAINSC0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    SC06
+| 03-C                     END
+|    C****三聯式，讀取客戶檔買受人，統一編號，地址
+| 04-C           SI17      IFEQ 3
+|   C                     SETON                     30
+|   C*
+|   C                     MOVE SI12      ME01
+|   C                     MOVE *BLANK    ME02
+|   C           KEYME     CHAINME0                  40
+| 05-C           *IN40     IFEQ '0'
+|   C****                 MOVE ME04      ME041
+|   C                     MOVE ME03      ME031
+|   C                     MOVE ME05      ME051
+|   C                     MOVE ME06      ME061
+| 05*C                     ELSE
+|   C                     MOVE *BLANK    ME031
+|   C***                  MOVE *BLANK    ME041
+|   C                     MOVE *BLANK    ME051
+|   C                     MOVE *BLANK    ME061
+| 05-C                     END
+|   C*統一編號
+|   C           SI12      CHAINMD0                  40
+| 06-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MD17
+| 06-C                     END
+|   C*
+| 04*C                     ELSE
+|   C                     SETOF                     30
+| 04-C                     END
+|    C*****
+|    C*送貨地址
+|    C*                    MOVE SI14      ME01
+|    C*                    MOVE SI15      ME02
+|    C*          KEYME     CHAINME0                  40
+| 07-C*          *IN40     IFEQ '0'
+|   C*                    MOVE ME04      ME042
+|   C*                    MOVE ME05      ME052
+|   C*                    MOVE ME06      ME062
+| 07*C*                    ELSE
+|   C*                    MOVE *BLANK    ME042
+|   C*                    MOVE *BLANK    ME052
+|   C*                    MOVE *BLANK    ME062
+| 07-C*                    END
+|    C*業務員
+|    C           SI31      CHAINMC0                  40
+| 08-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MC02
+| 08-C                     END
+|    C*清總折扣金額
+|    C                     Z-ADD0         TSJ07
+|    C*
+|    C                     WRITEPH1
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*送貨單明細資料列印
+|    C           KEYSJ     SETLLSJ0
+|    C           KEYSJ     READESJ0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C*產品主檔資料
+|   C           SJ03      CHAINMA0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+| 02-C                     END
+|   C           KEYSD     CHAINSD0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C*判斷新舊列印方式
+|   C           SJ05      SUB  SD06      CHKFLD 150
+|   C                     MULT SD04      CHKFLD
+| 04-C           CHKFLD    IFEQ SJ07
+|   C           SD05      ANDNE0
+      *新
+|   C           SJ04      SUB  SJ13      SJ04A
+     C           SJ04A     IFNE 0
+|   C                     Z-ADDSJ05      SJ05A
+|   C                     Z-ADDSJ07      SJ07A
+|   C*銷售金額
+     C           SJ04A     MULT SJ05      WFLD   130
+|   C           WFLD      SUB  SJ07      SJ06C
+|   C*總折扣金額加總
+|   C                     ADD  SJ07A     TSJ07
+M004AC           SI22      IFEQ 'D'
+M004AC           SI17      IFEQ 2
+M004AC           1         ADD  DUTY      WDUTY   74
+M004AC           SJ06C     MULT WDUTY     SJ06C     H
+M004AC                     ADD  SJ06C     LSI25   90
+M004AC                     Z-ADD0         SJ05A            不顯示單價
+M004AC           SI25      SUB  LSI25     LDIF    90
+M004AC           LDIF      IFLE 5
+M004AC           LDIF      ADD  SJ06C     SJ06C
+M004AC                     END
+M004AC                     Z-ADD0         SJ07A
+M004AC                     Z-ADD0         TSJ07
+M004AC                     ELSE
+M004AC           SI17      IFEQ 3
+M004AC           SJ07A     DIV  SJ04A     UNIT    70
+M004AC           SJ05A     SUB  UNIT      SJ05A
+M004AC                     Z-ADD0         SJ07A
+M004AC                     Z-ADD0         TSJ07
+M004AC                     END
+M004AC                     END
+M004AC                     END
+|   C*
+|   C                     WRITEPD1
+     C                     END
+      *
+|   C                     Z-ADDSJ13      SJ04A
+|   C                     Z-ADD0         SJ05A
+|   C                     Z-ADD0         SJ06C
+|   C                     Z-ADD0         SJ07A
+|   C*總折扣金額加總
+|   C                     ADD  SJ07A     TSJ07
+|   C*
+|   C                     WRITEPD1
+| 04*C                     ELSE
+      *舊
+|   C                     Z-ADDSJ04      SJ04A
+|   C                     Z-ADDSJ05      SJ05A
+|   C                     Z-ADDSJ07      SJ07A
+|   C*銷售金額
+|   C           SJ06      SUB  SJ07      SJ06C
+|   C*總折扣金額加總
+|   C                     ADD  SJ07A     TSJ07
+M004AC           SI22      IFEQ 'D'
+M004AC           SI17      IFEQ 2
+M004AC           1         ADD  DUTY      WDUTY   74
+M004AC           SJ06C     MULT WDUTY     SJ06C     H
+M004AC                     ADD  SJ06C     LSI25   90
+M004AC                     Z-ADD0         SJ05A            不顯示單價
+M004AC           SI25      SUB  LSI25     LDIF    90
+M004AC           LDIF      IFLE 5
+M004AC           LDIF      ADD  SJ06C     SJ06C
+M004AC                     END
+M004AC                     Z-ADD0         SJ07A
+M004AC                     Z-ADD0         TSJ07
+M004AC                     ELSE
+M004AC           SI17      IFEQ 3
+M004AC           SJ07A     DIV  SJ04A     UNIT    70
+M004AC           SJ05A     SUB  UNIT      SJ05A
+M004AC                     Z-ADD0         SJ07A
+M004AC                     Z-ADD0         TSJ07
+M004AC                     END
+M004AC                     END
+M004AC                     END
+|   C*
+|   C                     WRITEPD1
+| 04-C                     END
+|   C                     SETON                     10
+| 03-C                     END
+      *
+|   C           KEYSJ     READESJ0                      41
+| 01-C                     END
+M004AC                     Z-ADD0         LSI25
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE TOTAL AND FOOT
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*發票總計金額轉換
+M005AC                     Z-ADDSI23      WSI23
+M005AC                     Z-ADDSI24      WSI24
+M005AC           SI22      IFEQ 'D'
+M005AC           SI17      IFEQ 2
+M005AC                     Z-ADDSI25      WSI23            列印使用
+M005AC                     Z-ADD0         WSI24            列印使用
+M005AC                     END
+M005AC                     END
+     C*
+|    C                     MOVE SI25      WSI25   8
+|    C                     MOVEAWSI25     PM
+|    C                     Z-ADD1         I       10
+| 01-C           I         DOWLE8
+|   C           PM,I      LOKUPTAB1      TAB2           38
+|   C*營業稅
+|   C                     MOVE *BLANK    PSI221
+|   C                     MOVE *BLANK    PSI222
+|   C                     MOVE *BLANK    PSI223
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C                     MOVE 'V'       PSI221
+|   C           SI22      WHEQ 'Z'
+|   C                     MOVE 'V'       PSI222
+|   C           SI22      WHEQ 'B'
+|   C                     MOVE 'V'       PSI223
+|   C                     OTHER
+|   C                     MOVE *BLANK    PSI221
+|   C                     MOVE *BLANK    PSI222
+|   C                     MOVE *BLANK    PSI223
+|   C                     ENDSL
+|   C*中文大寫金額ARRAY
+|   C   38                MOVE TAB2      PC,I
+|   C                     ADD  1         I
+| 01-C                     END
+|    C                     MOVEAPC        PCT
+|    C                     WRITEPE1
+|    C*更新主檔資料
+B2MODC                     Z-ADD0         DATE    80
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM $EGMDY    S001I2  60
+B2MODC           W6        PARM           S001O1  60
+M001AC                     MOVE W6        HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M001AC                     MOVE HB2@T8    DATE
+|    C*
+|    C                     ADD  1         SI33
+B2000C                     Z-ADDDATE      SIXX
+B2000C                     TIME           SIYY
+|    C                     MOVE $USER     SIZZ
+|    C                     UPDATSI0
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE REPORT END
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*
+| 01-C           DSI05     IFEQ 'W0001'
+|   C           DSI05     OREQ 'W0005'
+|   C*                    WRITEPE3
+| 01-C                     END
+04===C                     ENDSR
+M001AC/COPY HBP2CVTR
+**
+0零1壹2貳3參4肆5伍6陸7柒8捌9玖
+

@@ -1,0 +1,295 @@
+      ****************************************************************
+      * PROGRAM NAME : ARR069                                        *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 82/04/26                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款子系統                               *
+      * REMARK       :產品銷貨成本明細表                           *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.23  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FSOSIPF  IF  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FRES18WF IF  E           K        DISK                           UC
+     FREWF69  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 602 DSI01
+     I                                      603 6080DSI35S
+     I                                      609 6140DSI35E
+M001MI*                                     615 6200WSI35S
+M001MI*                                     621 6260WSI35E
+M001MI                                      641 6480WSI35S
+M001MI                                      651 6580WSI35E
+     I                                      627 627 DSI10
+     I                                      628 628 DSEL
+     I                                      629 629 COMPS
+     I                                      630 630 COMPE
+     I                                      631 631 DSEL1
+     I            DS
+     I                                        1   2 SJ01
+     I                                        1   1 SJ01A
+     I                                        2   2 SJ01B
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSI     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C           KEYSD     KLIST
+     C                     KFLD           SI10
+     C                     KFLD           SJ03
+     C           KEYSJ     KLIST
+     C                     KFLD           SJ01A
+     C                     KFLD           SJ11
+     C                     KFLD           SJ03
+     C           KEYWF     KLIST
+     C                     KFLD           WF6901
+     C                     KFLD           WF6902
+     C                     KFLD           WF6903
+     C*
+     C           *LIKE     DEFN WF6906    WF696W
+     C           *LIKE     DEFN WF6907    WF697W
+     C           *LIKE     DEFN WF6908    WF698W
+     C           *LIKE     DEFN WF6909    WF69A1
+     C           *LIKE     DEFN WF6910    WF69A2
+     C           *LIKE     DEFN WF6911    WF69A3
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *分析方式－禮盒(A)
+  01-C           DSEL1     IFEQ 'A'
+    C                     EXSR RTN100
+  01-C                     END
+      *
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+  02-C           DSEL1     IFEQ 'B'
+    C                     EXSR RTN400
+  02-C                     END
+      *
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN100....GET DETAIL
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C**發票明細檔讀取
+|    C                     READ SI0                      45
+| 03-C           *IN45     DOWEQ'0'
+|   C           KEYSI     SETLLSJ0
+|   C           KEYSI     READESJ0                      41
+| 04-C           *IN41     DOWEQ'0'
+|   C**CHAIN KEY
+|   C                     MOVEL*BLANKS   SJ11
+|   C*
+|   C           KEYSJ     CHAINWF690                40
+| 05-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN200
+| 05*C                     ELSE                              修改
+|   C                     EXSR RTN300
+| 05-C                     END
+|   C*
+|   C           KEYSI     READESJ0                      41
+| 04-C                     END
+|   C                     READ SI0                      45
+| 03-C                     END
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE WORK FILE
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C                     Z-ADD0         WF6904
+|    C                     Z-ADD0         WF6905
+|    C                     Z-ADD0         WF6906
+|    C                     Z-ADD0         WF6907
+|    C                     Z-ADD0         WF6908
+|    C                     Z-ADD0         WF6909
+|    C                     Z-ADD0         WF6910
+|    C                     Z-ADD0         WF6911
+|    C                     MOVELSJ01A     WF6901
+|    C                     MOVEL*BLANKS   WF6902
+|    C                     MOVELSJ03      WF6903
+|    C           SJ04      SUB  SJ13      WF6904           訂購
+|    C                     Z-ADDSJ13      WF6905           搭贈
+|    C                     MOVELSJ01B     WF6912
+|    C**ＦＯＢ＆ＦＨＩ＆公賣利益
+|    C           KEYSD     CHAINSD0                  42
+| 01-C           *IN42     IFEQ '0'
+|   C           SD10      MULT WF6904    WF6906
+|   C           SD11      MULT WF6904    WF6907
+|   C           SD12      MULT WF6904    WF6908
+|   C           SD10      MULT WF6905    WF6909
+|   C           SD11      MULT WF6905    WF6910
+|   C           SD12      MULT WF6905    WF6911
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF6904
+|   C                     Z-ADD0         WF6905
+|   C                     Z-ADD0         WF6906
+|   C                     Z-ADD0         WF6907
+|   C                     Z-ADD0         WF6908
+|   C                     Z-ADD0         WF6909
+|   C                     Z-ADD0         WF6910
+|   C                     Z-ADD0         WF6911
+| 01-C                     END
+|    C*WRITE WORK FILE
+|    C                     WRITEWF690
+|    C***
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....UPDATE WORK FILE
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+|    C           SJ04      SUB  SJ13      WORK1   50       訂購
+|    C                     ADD  WORK1     WF6904           訂購
+|    C                     ADD  SJ13      WF6905           搭贈
+|    C**ＦＯＢ＆ＦＨＩ＆公賣利益
+|    C           KEYSD     CHAINSD0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C           SD10      MULT WORK1     WF696W
+|   C           SD11      MULT WORK1     WF697W
+|   C           SD12      MULT WORK1     WF698W
+|   C           SD10      MULT SJ13      WF69A1
+|   C           SD11      MULT SJ13      WF69A2
+|   C           SD12      MULT SJ13      WF69A3
+|   C                     ADD  WF696W    WF6906
+|   C                     ADD  WF697W    WF6907
+|   C                     ADD  WF698W    WF6908
+|   C                     ADD  WF69A1    WF6909
+|   C                     ADD  WF69A2    WF6910
+|   C                     ADD  WF69A3    WF6911
+| 01-C                     END
+|    C*WRITE WORK FILE
+|    C                     UPDATWF690
+|    C***
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+04===C           RTN400    BEGSR
+      *
+|    C                     READ SI0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C           KEYSI     SETLLSJ0
+|   C           KEYSI     READESJ0                      46
+| 02-C           *IN46     DOWEQ'0'
+      *WSJ04=訂購數
+|   C           SJ04      SUB  SJ13      WSJ04   50
+      *
+|   C                     MOVEL*BLANKS   WF6902
+|   C                     MOVEL*BLANKS   SJ11
+|   C           SJ03      CHAINMA0                  40
+      *禮盒碼
+| 03-C           MA54      IFEQ 'Y'
+      *禮盒單瓶成本
+|   C           KEYSD     CHAINSD0                  42
+| 04-C           *IN42     IFEQ '0'
+|   C                     EXSR RTN500
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN600
+|   C                     CLOSERES18WF
+| 04-C                     END
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 03*C                     ELSE
+|   C           KEYSJ     CHAINWF690                40
+| 05-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN200
+| 05*C                     ELSE                              修改
+|   C                     EXSR RTN300
+| 05-C                     END
+| 03-C                     END
+|   C           KEYSI     READESJ0                      46
+| 02-C                     END
+|   C                     READ SI0                      45
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN500....禮盒單瓶成本
+      *==============================================================*
+05===C           RTN500    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SD02      S08I2  12        訂單號碼
+|    C                     PARM 0         S08I3   60       牌價判斷日
+|    C                     PARM SD04      S08I4   60       禮盒訂購數量
+|    C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|    C                     PARM SD06      S08I6   92       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM SD10      S08I7   92       禮盒成本FOB
+|    C                     PARM SD11      S08I8   92       禮盒成本FHI
+|    C                     PARM SD12      S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM SD22      S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM SD23      S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM SD24      S08IC   92       禮盒轉帳成本DUTY
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE OR UPDATE REWF69
+      *==============================================================*
+06===C           RTN600    BEGSR
+|    C*
+|    C                     MOVELSJ01A     WF6901
+|    C                     MOVELSJ01B     WF6912
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVELR181      WF6903
+|   C*TOTAL FOB,FHI,DUTY
+|   C           KEYWF     CHAINWF690                40
+| 02-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN700
+| 02*C                     ELSE                              修改
+|   C                     EXSR RTN800
+| 02-C                     END
+|   C                     READ RE18R                    46
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN700....WRITE OR UPDATE REWF69
+      *==============================================================*
+07===C           RTN700    BEGSR
+      *
+|    C*
+|    C                     Z-ADDR182      WF6904
+|    C                     Z-ADDR183      WF6905
+|    C                     Z-ADDR185      WF6906
+|    C                     Z-ADDR188      WF6909
+|    C                     Z-ADDR186      WF6907
+|    C                     Z-ADDR189      WF6910
+|    C                     Z-ADDR187      WF6908
+|    C                     Z-ADDR18A      WF6911
+|    C                     WRITEWF690
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN800....WRITE OR UPDATE REWF69
+      *==============================================================*
+08===C           RTN800    BEGSR
+|    C*
+|    C                     ADD  R182      WF6904
+|    C                     ADD  R183      WF6905
+|    C                     ADD  R185      WF6906
+|    C                     ADD  R188      WF6909
+|    C                     ADD  R186      WF6907
+|    C                     ADD  R189      WF6910
+|    C                     ADD  R187      WF6908
+|    C                     ADD  R18A      WF6911
+|    C                     UPDATWF690
+|    C*
+08===C                     ENDSR
+

@@ -1,0 +1,241 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM NAME : WDS008                                     *
+     H*    AUTHOR       : A1139  JANE                                *
+     H*    CREATE DATE  : 81/01/30                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :人頭馬匯東洋酒股份有限公司                *
+     H*    SUBSYSTEM    :                                            *
+     H*    REMARK       :單別資料查詢(WINDOW)                      *
+     F****************************************************************
+     FPA#2PF  IF  E           K        DISK
+     FWDS008D CF  E                    WORKSTN
+     E* OP CODE
+     E                    W01         8  1
+     E* COMBINED BY 單別X(02) 單別說明X(22)
+     E                    W02         8 29
+     I*
+     IWOP0        DS
+@    I                                        1   8 W01
+     I                                        1   1 D1011
+     I                                        2   2 D1021
+     I                                        3   3 D1031
+     I                                        4   4 D1041
+     I                                        5   5 D1051
+     I                                        6   6 D1061
+     I                                        7   7 D1071
+     I                                        8   8 D1081
+     IWD0         DS
+@    I                                        1 232 W02
+     I                                        1  29 D1012
+     I                                       30  58 D1022
+     I                                       59  87 D1032
+     I                                       88 116 D1042
+     I                                      117 145 D1052
+     I                                      146 174 D1062
+     I                                      175 203 D1072
+     I                                      204 232 D1082
+     I            DS
+@    I                                        1  29 WT
+     I                                        1   2 #202
+     I                                        8  29 #203
+     IS008I2      DS
+     I                                        1   1 S08I21
+     I                                        2   2 S08I22
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           S008I1  1        單別類型
+     C                     PARM           S008I2  2        顯示碼
+     C                     PARM           S008O1  2        單別
+     C*==============================================================*
+     C*                    KEY LIST FOR NMPF
+     C*==============================================================*
+     C           KEY#2T    KLIST                           *KEY TOP
+     C                     KFLD           W#201T
+     C                     KFLD           W#202T
+     C*
+     C           KEY#2B    KLIST                           *KEY BOTTOM
+     C                     KFLD           W#201B
+     C                     KFLD           W#202B
+     C*
+     C           *LIKE     DEFN #201      W#201T
+     C           *LIKE     DEFN #202      W#202T
+     C           *LIKE     DEFN #201      W#201B
+     C           *LIKE     DEFN #202      W#202B
+     C*==============================================================*
+     C*          MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C           KEY#2B    SETLL#20                        *1 SETLL
+     C                     EXSR RTN100                     *1 READ NEXT
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+    C                     EXFMTDSPC1
+    C*
+  02-C           *IN25     IFEQ '1'                        *ROLLUP
+    C           *IN97     ANDEQ'0'                        *LAST PAGE
+    C           KEY#2B    SETGT#20                        *AFTER 1 SETLL
+    C                     EXSR RTN100                     *READ NEXT
+  02-C                     END
+    C*
+  03-C           *IN26     IFEQ '1'                        *ROLLDOWN
+    C           *IN98     ANDEQ'0'                        *FIRST PAGE
+    C           KEY#2T    SETLL#20
+    C                     EXSR RTN200                     *READ PREV
+  03-C                     END
+    C*
+  04-C           *IN25     IFEQ '0'
+    C           *IN26     ANDEQ'0'
+    C                     EXSR RTN300
+  04-C                     END
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C* CLEAR TOP AND BOTTOM
+|    C                     MOVE S008I1    W#201T
+|    C                     MOVE *BLANK    W#202T
+|    C                     MOVE S008I1    W#201B
+|    C                     MOVE *BLANK    W#202B
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....READ NEXT
+     C*==============================================================*
+02===CSR         RTN100    BEGSR
+|    C*
+|    C                     MOVEA*BLANKS   W01
+|    C                     MOVEA*BLANKS   W02
+|    C                     Z-ADD0         CT      10
+|    C   25                SETOF                     98
+|    C*
+|    C                     EXSR RTN910                     *SELECT DATA
+|    C  N97                EXSR RTN810                     *GET KEY TOP
+|    C*
+| 01-C           CT        DOWLE7
+| 02-C           *IN97     IFEQ '0'
+|   C*
+| 03-C           S08I21    IFEQ #204
+|   C           S08I22    OREQ #204
+| 04-C           #202      IFNE 'S4'
+|   C           #202      ANDNE'S9'
+|   C                     ADD  1         CT
+|   C                     MOVE WT        W02,CT
+|   C                     EXSR RTN820                     *GET KEY BOT
+| 04-C                     END
+| 03-C                     END
+| 02*C                     ELSE
+|   C           CT        ADD  61        WO      20
+|   C                     MOVEA*ALL'1'   *IN,WO
+|   C                     SETOF                       98
+|   C                     Z-ADD9         CT
+| 02-C                     END
+|   C*
+|   C                     EXSR RTN910                     *SELECT DATA
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....READ PREVIOUS
+     C*==============================================================*
+03===CSR         RTN200    BEGSR
+|    C*
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     MOVEA*BLANKS   W01
+|    C                     MOVEA*BLANKS   W02
+|    C                     Z-ADD9         CT
+|    C                     Z-ADD0         AA      10
+|    C*
+|    C                     EXSR RTN920
+|    C                     EXSR RTN820                     *GET KEY BOTTOM
+|    C*
+|    C*
+| 01-C           AA        DOWLE7                          *SFL FULL
+| 02-C           *IN98     IFEQ '0'
+| 03-C           S08I21    IFEQ #204
+|   C           S08I22    OREQ #204
+| 04-C           #202      IFNE 'S4'
+|   C           #202      ANDNE'S9'
+|   C                     SUB  1         CT
+|   C                     MOVE WT        W02,CT
+|   C                     EXSR RTN810                     *GET KEY TOP
+|   C                     ADD  1         AA
+| 04-C                     END
+| 03-C                     END
+| 02*C                     ELSE
+|   C                     ADD  9         AA
+| 02-C                     END
+|   C                     EXSR RTN920                     *SELECT DATA
+| 01-C                     END
+| 05-C           *IN98     IFEQ '1'                        *READP EOF
+|   C                     MOVE W#201T    W#201B
+|   C                     MOVE W#202T    W#202B
+|   C           KEY#2B    SETLL#20
+|   C                     EXSR RTN100                     *READ NEXT
+|   C                     GOTO END200
+| 05-C                     END
+|    C*
+03===C           END200    ENDSR
+     C*==============================================================*
+     C*          RTN300....
+     C*==============================================================*
+04===CSR         RTN300    BEGSR
+|    C*
+|    C                     Z-ADD1         WJ      10
+|    C           '/'       LOKUPW01,WJ                   30
+| 01-C           *IN30     IFEQ '1'
+|   C                     MOVELW02,WJ    S008O1
+|   C                     SETON                     03
+| 01*C                     ELSE
+|   C                     MOVE D#202     W#202B
+|   C                     MOVE D#202     W#202T
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C           KEY#2B    SETLL#20                        *1 SETLL
+|   C                     EXSR RTN100                     *1 READ NEXT
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN810....READ NEXT CLEAR & INIT
+     C*==============================================================*
+05===CSR         RTN810    BEGSR
+|    C                     MOVE #201      W#201T
+|    C                     MOVE #202      W#202T           *KEY TOP
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN820....READ PREV CLEAR & INIT
+     C*==============================================================*
+06===CSR         RTN820    BEGSR
+|    C                     MOVE #201      W#201B
+|    C                     MOVE #202      W#202B           *KEY BOTTOM
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN910....SELECT DATA TO SHOW
+     C*==============================================================*
+07===C           RTN910    BEGSR
+| 01-C           S008I1    IFEQ *BLANK
+|   C                     READ #20                      97
+| 01*C                     ELSE
+|   C           S008I1    READE#20                      97
+| 01-C                     END
+07===C                     ENDSR
+     C*==============================================================*
+     C*          RTN920....SELECT DATA TO SHOW
+     C*==============================================================*
+08===C           RTN920    BEGSR
+| 01-C           S008I1    IFEQ *BLANK
+|   C                     READP#20                      98
+| 01*C                     ELSE
+|   C           S008I1    REDPE#20                      98
+| 01-C                     END
+08===C                     ENDSR
+

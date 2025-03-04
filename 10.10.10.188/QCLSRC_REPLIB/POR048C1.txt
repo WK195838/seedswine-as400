@@ -1,0 +1,79 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1005   ROGER CHIEN                       */
+     /*    CREATE DATE  : 80/11/20                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : POR0481                                   */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :基本資料子系統                           */
+     /*    REMARK       :公司別資料列印                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DPF01S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DPF01E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DATES) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&DATEE) TYPE(*CHAR) LEN(8) /*M001M*/
+             DCL        VAR(&IN20) TYPE(*CHAR) LEN(1)
+
+             CHGVAR     VAR(&DPF01S) VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DPF01E) VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&DATES) VALUE(%SST(*LDA 611  8)) /*M001M*/
+             CHGVAR     VAR(&DATEE) VALUE(%SST(*LDA 621  8)) /*M001M*/
+             CHGVAR     VAR(&IN20) VALUE(%SST(*LDA 650  1))
+
+             OVRDBF     FILE(POPFPF) SHARE(*YES)
+             IF         COND(&IN20 = '0') THEN(DO)
+
+             OVRPRTF    FILE(POR048AP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('完稅明細')
+             OPNQRYF    FILE((POPFPF)) QRYSLT('(PF01 *EQ %RANGE("' +
+                          *CAT &DPF01S *CAT '" "' *CAT &DPF01E *CAT +
+                          '")) *AND (mPF04 *EQ %RANGE("' *CAT +
+                          &DATES *CAT '" "' *CAT &DATEE *CAT '"))') +
+                          KEYFLD((PF04) (PF02)) MAPFLD((MPF04 PF04 +
+                          *CHAR 8)) /*M001M*/
+
+             CALL       POR0481
+             ENDDO
+
+             ELSE       CMD(DO)
+             OVRPRTF    FILE(POR048BP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('完稅明細')
+             OPNQRYF    FILE((POPFPF)) QRYSLT('(PF01 *EQ %RANGE("' +
+                          *CAT &DPF01S *CAT '" "' *CAT &DPF01E *CAT +
+                          '")) *AND (mPF11 *EQ %RANGE("' *CAT +
+                          &DATES *CAT '" "' *CAT &DATEE *CAT '"))') +
+                          KEYFLD((PF11) (PF02)) MAPFLD((MPF11 PF11 +
+                          *CHAR 8)) /*M001M*/
+             CALL       POR0482
+             ENDDO
+
+             CLOF       OPNID(POPFPF)
+             DLTOVR     FILE(*ALL)
+
+             IF         COND(&IN20 *EQ '0') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('POR048AP')
+                        ENDDO
+             ELSE
+             IF         COND(&IN20 *EQ '1') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('POR048BP')
+                        ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

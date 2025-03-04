@@ -1,0 +1,435 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : WEB020                                     *
+     A*    AUTHOR       : A1546  VINCENT                             *
+     A*    CREATE DATE  : 98/03/20                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存STORE PROCEDURE                 *
+     A*    SUBSYSTEM    :前台管理系統                              *
+     A*    REMARK       :訂貨單產品檢核及單據產生/更新/刪除    *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FSCWB03PFUF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMANBPF  IF  E           K        DISK
+     FMANDPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FPOCDLF06IF  E           K        DISK
+     F            CD0                               KRENAMECD0L6
+     FPOCDPF  UF  E           K        DISK                      A
+     FPOCEPF  UF  E           K        DISK                      A
+     F*
+     E                    MSG     1  19 60               *訊息
+     E*
+     I           UDS
+     I                                      187 1920DATES
+     I                                      201 2080DATE
+     IPARM3       DS
+     I                                        1   80P3YMD
+     I                                        1   60P3YM
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PARM1   2        公司代號
+     C                     PARM           PARM2   2        通路代號
+     C                     PARM           PARM3   8        到店日期
+     C                     PARM           PARM4   5        分店代號
+     C                     PARM           PARM5   1        到貨時間
+     C                     PARM           PARM6  10        人員代號
+     C                     PARM           PARM7  13        訂貨單號
+     C                     PARM           MODE    1        MODE
+     C                     PARM           ERRRD   3        ERR RCD NO.
+     C                     PARM           RTNCD   2        RETURN CODE
+     C                     PARM           RTNDSC 60        RETURN DESC.
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN CD06      WCD06
+     C           *LIKE     DEFN CD07      WCD07
+     C           *LIKE     DEFN CD03      WCD03
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYCD     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C                     KFLD           WCD03            訂單日期
+     C                     KFLD           PARM4
+     C                     KFLD           WCD06            單別
+     C           KEYND     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C           KEYNE     KLIST
+     C                     KFLD           PARM1
+     C                     KFLD           PARM2
+     C                     KFLD           PARM4
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C* CHK HEADING
+     C                     EXSR RTN100
+     C* CHK DETAIL
+     C  N99                EXSR RTN200
+     C*
+     C* PROCESS HEADING & DETAIL FILES
+     C  N99                EXSR RTN300
+     C*
+     C                     MOVE WRDNO     ERRRD
+     C  N99                MOVE '00'      RTNCD
+     C  N99                MOVE *BLANKS   RTNDSC
+     C  N99      MODE      IFEQ 'A'
+     C                     MOVELCD05      PARM7            新訂貨單號
+     C                     ENDIF
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....CHECK HEADING
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C                     Z-ADD0         WRDNO   30
+|     * CHK MODE
+| 01-C           MODE      IFNE 'A'
+|   C           MODE      ANDNE'U'
+|   C           MODE      ANDNE'D'
+|   C                     MOVEL'15'      RTNCD
+|   C                     MOVELMSG,15    RTNDSC
+|   C                     SETON                     99
+| 01-C                     END
+|    C   99                GOTO END100
+|     *
+|     * CHK公司代號
+|    C           PARM1     CHAIN#B0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL'01'      RTNCD
+|   C                     MOVELMSG,1     RTNDSC
+|   C                     SETON                     99
+| 02-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+|     * CHK通路代號
+|    C           KEYND     CHAINND0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL'02'      RTNCD
+|   C                     MOVELMSG,2     RTNDSC
+|   C                     SETON                     99
+| 03-C                     ENDIF
+|    C   99                GOTO END100
+|     *
+|     * CHK分店代號
+|    C           KEYNE     CHAINNE0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVEL'04'      RTNCD
+|   C                     MOVELMSG,4     RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+| 05-C           MODE      IFEQ 'A'
+|   C           MODE      OREQ 'U'
+|   C* CHK訂貨單預計到分店日
+|   C                     CALL 'BCM001'
+     C                     PARM '1'       M001I0  1        需求代碼
+|   C                     PARM P3YMD     M001I1  80       到分店日
+|    C                     PARM PARM1     M001I2  2        公司代碼
+|    C                     PARM PARM2     M001I3  2        通路代碼
+|    C                     PARM PARM4     M001I4  5        分店代碼
+|   C           WCD07     PARM           M002O1  80       到運貨日
+|   C           WCD03     PARM           M003O2  80       訂貨單日
+|   C                     PARM           M004O3  1        訊息代碼
+| 06-C                     SELEC
+|    *日期為休假日
+|   C           M004O3    WHEQ '1'
+|   C                     MOVEL'05'      RTNCD
+|   C                     MOVELMSG,5     RTNDSC
+|   C                     SETON                     99
+|    *回推的訂貨單日期必須大於或等於系統日期
+|   C           M004O3    WHEQ '2'
+|   C                     MOVEL'06'      RTNCD
+|   C                     MOVELMSG,6     RTNDSC
+|   C                     SETON                     99
+|   C*日期或休假檔錯誤
+|   C           M004O3    WHEQ '3'
+|   C                     MOVEL'07'      RTNCD
+|   C                     MOVELMSG,7     RTNDSC
+|   C                     SETON                     99
+|    *訂貨單日為系統日，且已過中午12:00
+|   C           M004O3    WHEQ '4'
+|   C                     MOVEL'19'      RTNCD
+|   C                     MOVELMSG,19    RTNDSC
+|   C                     SETON                     99
+| 06-C                     ENDSL
+|   C   99                GOTO END100
+|    * CHK到貨時間代碼
+| 07-C           PARM5     IFNE 'A'
+|   C           PARM5     ANDNE'P'
+|   C                     MOVEL'08'      RTNCD
+|   C                     MOVELMSG,8     RTNDSC
+|   C                     SETON                     99
+| 07-C                     END
+|   C   99                GOTO END100
+| 05-C                     ENDIF                           IF MODE A/U
+|    C*
+|     *新增模式CHK 一日只能一張訂貨單
+| 08-C           MODE      IFEQ 'A'                        ADD MODE
+|   C                     MOVEL'R1'      WCD06
+|   C           KEYCD     CHAINCD0L6                40
+| 09-C           *IN40     IFEQ '0'
+|   C                     MOVEL'09'      RTNCD
+|   C                     MOVELMSG,9     RTNDSC
+|   C                     SETON                     99
+| 09-C                     ENDIF
+|    C   99                GOTO END100
+| 08-C                     ENDIF                           IF MODE A
+      *
+|     *修改模式CHK 一日只能一張訂貨單
+| 08-C           MODE      IFEQ 'U'                        UPD MODE
+|   C           PARM7     CHAINCD0                  40
+| 09-C           *IN40     IFEQ '0'
+     C           WCD03     IFNE CD03
+|   C                     MOVEL'R1'      WCD06
+|   C           KEYCD     CHAINCD0L6                41
+| 09-C           *IN41     IFEQ '0'
+|   C                     MOVEL'09'      RTNCD
+|   C                     MOVELMSG,9     RTNDSC
+|   C                     SETON                     99
+| 09-C                     ENDIF
+| 09-C                     ENDIF
+| 09-C                     ENDIF
+|    C   99                GOTO END100
+| 08-C                     ENDIF                           IF MODE A
+|    C*
+|    C*更新／刪除模式
+| 10-C           MODE      IFEQ 'U'
+|   C           MODE      OREQ 'D'
+     C*先LOCK訂貨單
+|   C           PARM7     CHAINCD0                  4020
+| 11-C                     SELEC
+|   C* CHK訂貨單LOCK
+|   C           *IN20     WHEQ '1'
+|   C                     MOVEL'12'      RTNCD
+|   C                     MOVELMSG,12    RTNDSC
+|   C                     SETON                     99
+|   C* CHK訂貨單不存在
+|   C           *IN40     WHEQ '1'
+|   C                     MOVEL'13'      RTNCD
+|   C                     MOVELMSG,13    RTNDSC
+|   C                     SETON                     99
+|   C* CHK狀態碼已變更
+|   C           CD12      WHNE *BLANKS
+|   C                     MOVEL'14'      RTNCD
+|   C                     MOVELMSG,14    RTNDSC
+|   C                     SETON                     99
+| 11-C                     ENDSL
+|    C   99                GOTO END100
+| 10-C                     ENDIF                           IF MODE U/D
+|     *
+01===C           END100    ENDSR
+      *==============================================================*
+      *          RTN200....CHECK DETAIL
+      *==============================================================*
+02===CSR         RTN200    BEGSR
+|    C*
+| 01-C           MODE      IFEQ 'A'
+|   C           MODE      OREQ 'U'
+|   C*
+|   C* READ工作檔
+|   C           *LOVAL    SETLLWB03
+|   C                     READ WB03                     44
+| 02-C           *IN44     DOWEQ'0'
+|   C                     ADD  1         WRDNO
+|   C*
+|   C* CHK產品貨架規則
+|   C                     CALL 'BCM002'
+|   C                     PARM PARM1     M002I1  2        公司
+|   C                     PARM PARM2     M002I2  2        通路
+|   C                     PARM PARM4     M002I3  5        分店
+|   C                     PARM P3YMD     M002I4  80       到分店日
+|   C                     PARM WB0302    M002I5  9        產品代號
+|   C                     PARM           M002O3  1
+| 03-C           M002O3    IFEQ 'N'
+|   C                     MOVEL'16'      RTNCD
+|   C                     MOVELMSG,16    RTNDSC
+|   C                     SETON                     99
+| 03-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+|   C* CHK訂貨數量必須大於零
+| 04-C           WB0303    IFLE 0
+|   C                     MOVEL'17'      RTNCD
+|   C                     MOVELMSG,17    RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+|   C* CHK供應商編號( FOR網路傳輸可能造成亂碼)
+| 04-C           WB0304    CHAINNB0                  40
+     C           *IN40     IFEQ '1'
+|   C                     MOVEL'18'      RTNCD
+|   C                     MOVELMSG,18    RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+|   C                     READ WB03                     44
+| 02-C                     ENDDO
+|   C*
+| 05-C           WRDNO     IFEQ 0
+|   C                     MOVEL'11'      RTNCD
+|   C                     MOVELMSG,11    RTNDSC
+|   C                     SETON                     99
+| 05-C                     ENDIF
+|   C   99                GOTO END200
+|   C*
+| 01-C                     ENDIF                           IF MODE A/U
+|    C*
+02===C           END200    ENDSR
+     C*==============================================================*
+     C*          RTN300....PROCESS POCDPF,POCEPF
+     C*==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+| 01-C                     SELEC
+|   C* GET訂貨單號
+|   C           MODE      WHEQ 'A'
+|   C                     CALL 'GET001'
+|   C                     PARM PARM1     T001I1  2
+|   C                     PARM 'R1'      T001I2  2
+|   C                     PARM DATES     T001I3  60       西元YYMMDD
+|   C           CE01      PARM           T001O1 13
+     C*
+|   C           MODE      WHEQ 'U'
+|   C           MODE      OREQ 'D'
+|   C*刪除原訂貨單明細
+|   C           PARM7     SETLLCE0
+|   C           PARM7     READECE0                      40
+| 02-C           *IN40     DOWEQ'0'
+|   C                     DELETCE0
+|   C           PARM7     READECE0                      40
+| 02-C                     ENDDO
+|   C                     MOVELPARM7     CE01
+| 01-C                     ENDSL
+|    C*
+|    C*產生明細POCEPF
+| 03-C           MODE      IFEQ 'A'
+|   C           MODE      OREQ 'U'
+|   C                     SETOF                         50
+|   C           *LOVAL    SETLLWB03
+|   C                     READ WB03                N    40
+| 04-C           *IN40     DOWEQ'0'
+|   C                     EXSR RTN301
+|   C                     WRITECE0
+|   C                     READ WB03                N    40
+| 04-C                     ENDDO
+| 03-C                     ENDIF
+|    C*
+|    C*處理主檔POCDPF
+| 05-C                     SELEC
+|   C* WRITE
+|   C           MODE      WHEQ 'A'
+|   C                     EXSR RTN302
+|   C                     WRITECD0
+|   C* UPDATE
+|   C           MODE      WHEQ 'U'
+|   C                     EXSR RTN302
+|   C                     UPDATCD0
+|   C* DELETE
+|   C           MODE      WHEQ 'D'
+|   C                     DELETCD0
+| 05-C                     ENDSL
+|    C*
+|    C* CLEAR SCWB03PF
+|    C           *LOVAL    SETLLWB03
+|    C                     READ WB03                     40
+| 06-C           *IN40     DOWEQ'0'
+|   C                     DELETWB03
+|   C                     READ WB03                     40
+| 06-C                     ENDDO
+|    C*
+03===C           END300    ENDSR
+      *==============================================================*
+      *          RTN301....MOVE POCEPF FIELDS
+      *==============================================================*
+04===CSR         RTN301    BEGSR
+|    C*
+|    C                     MOVELWB0304    CE02             供應商
+|    C                     MOVELWB0302    CE03             產品
+|    C                     Z-ADDWB0303    CE04             數量
+| 01-C           *IN50     IFEQ '0'
+|   C                     Z-ADD0         CE05
+|   C                     MOVE *BLANK    CE06
+|   C                     Z-ADDDATE      CEVV
+|   C                     MOVE *BLANK    CEWW
+|   C                     MOVEL'WEB020'  CEWW
+|   C                     Z-ADDDATE      CEXX
+|   C                     TIME           CEYY
+|   C                     MOVELPARM6     CEZZ
+|   C                     SETON                     50
+| 01-C                     ENDIF
+|    C*
+04===C           END301    ENDSR
+     C*==============================================================*
+     C*          RTN302....MOVE POCDPF FIELDS
+     C*==============================================================*
+05===C           RTN302    BEGSR
+|    C*
+| 01-C           MODE      IFEQ 'A'
+|   C                     MOVE PARM1     CD01
+|   C                     MOVE PARM2     CD02
+|   C                     Z-ADDWCD03     CD03
+|   C                     MOVE PARM4     CD04
+|   C                     MOVE CE01      CD05
+|   C                     MOVE WCD06     CD06
+|   C*                    MOVE WCD07     CD07
+|   C                     Z-ADDWCD07     CD07
+|   C                     Z-ADD0         CD10
+|   C                     MOVE *BLANK    CD11
+|   C                     MOVE *BLANK    CD12
+|   C                     MOVE PARM6     CD13
+|   C                     MOVE *BLANK    CD14
+|   C                     MOVE *BLANK    CD15
+|   C                     MOVE DATE      CDVV
+| 01-C                     ENDIF
+|    C*
+| 01-C           MODE      IFEQ 'U'
+|   C                     Z-ADDWCD03     CD03
+|   C                     Z-ADDWCD07     CD07
+| 01-C                     ENDIF
+|    C*
+|    C                     MOVE P3YMD     CD08             到店日期
+|    C                     MOVE PARM5     CD09             到店時間
+|    C                     MOVEL*BLANK    CDWW
+|    C                     MOVEL'WEB020'  CDWW
+|    C                     Z-ADDDATE      CDXX
+|    C                     TIME           CDYY
+|    C                     MOVELPARM6     CDZZ
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+** /MSG
+公司代號不存在。
+通路代號不存在。
+公司參數檔無該公司記錄。
+分店代號不存在。
+日期為休假日。
+回推的訂貨單日期必須大於或等於系統日期。
+日期或休假檔錯誤。
+到貨時間代碼錯誤。
+每家分店一天只能有一張訂貨單。
+產品代號不存在。
+訂貨單工作檔無產品明細。
+訂貨單主檔正被其它人使用中，請聯絡總公司。
+此訂貨單不存於訂貨單檔案。
+單據狀態已變更，不可更新。
+處理模式代碼錯誤MODE(A/U/D)。
+產品代號不符合產品貨架規則。
+訂貨數量必須大於零。
+供應商代號錯誤。
+回推的訂貨單日期為今日，但時間已過中午１２點。
+

@@ -1,0 +1,1147 @@
+     F****************************************************************
+     F*    PROGRAM ID   - ARA01#                                     *
+     F*    PROGRAM NAME - 出貨單資料輸入                           *
+     F*    WRITTEN BY   - A1032   JAMMY                              *
+     F*    DATE WRITTEN - 89/10/19                                   *
+     F*    PURPOSE      - TO ADD RXPF & RCPF                         *
+     F*                                                              *
+     F*    *IN31        - SCR_1 AT LEAST 1 ENTRY ON SUBFILE          *
+     F*    *IN32        - SCR_2 AT LEAST 1 ENTRY ON SUBFILE          *
+     F*    *IN33        - SCREEN 2 BACK TO 1 ,DON'T INIT SCREEN 1    *
+     F*    *IN34        - SCREEN 1 PASS                              *
+     F*    *IN35        - SCREEN 2 PASS                              *
+     F*    *IN36        - SCREEN 3 PASS                              *
+     F*    *IN99        - SUBROUTINE ERROR DETECT                    *
+     F****************************************************************
+     FRXPF    UF  E           K        DISK                      A
+     FRCPF    UF  E           K        DISK                      A
+     FCMPF    IF  E           K        DISK
+     FCUPF    IF  E           K        DISK
+     FEMPF    IF  E           K        DISK
+     FNMPF    IF  E           K        DISK
+     FRCLF01  UF  E           K        DISK
+     FRAPF    O   E                    DISK                      A
+     FPNPF    IF  E           K        DISK
+     FARA01D# CF  E                    WORKSTN
+     F                                        RRN1  KSFILE SFLSR1
+     F                                        RRN2  KSFILE SFLSR2
+     E*
+     E                    TEX     1   3  8
+     I*
+     I            DS
+     I                                        1   40D30
+     I                                        1   20D301
+     I                                        3   40D302
+     I            DS
+     I                                        1   60D05
+     I                                        1   40D051
+     I                                        5   60D052
+     I            DS
+     I                                        1  15 NM02
+     I                                        1   1 NM021
+     I                                        2   7 NM022
+     I                                        8  15 NM023
+     I            DS
+     I                                        1  42 NM03
+     I                                        1  22 NM031
+     I           UDS
+     I                                      101 110 WUSER
+     I                                      111 1160DDAT
+     C*
+     C           KEYRX     KLIST
+     C                     KFLD           RX01
+     C                     KFLD           RX03
+     C                     KFLD           RX04
+     C                     KFLD           RX05
+     C           KEYRC     KLIST
+     C                     KFLD           RC01
+     C                     KFLD           RC03
+     C                     KFLD           RC04
+     C                     KFLD           RC05
+     C           KEYCM     KLIST
+     C                     KFLD           CM01
+     C           KEYCU     KLIST
+     C                     KFLD           CU01
+     C           KEYEM     KLIST
+     C                     KFLD           EM01
+     C           KEYNM     KLIST
+     C                     KFLD           WNM01
+     C                     KFLD           NM02
+     C           KEYRCL    KLIST
+     C                     KFLD           RC01
+     C                     KFLD           RC09
+     C                     KFLD           RC03
+     C                     KFLD           RC04
+     C                     KFLD           RC05
+     C           KEYPN     KLIST
+     C                     KFLD           PN01
+     C*===========================================================*
+     C*                    MAIN ROUTINE
+     C*===========================================================*
+     C                     EXSR RTN100                     *INIT KEY
+     C*
+     C           *IN03     DOUEQ'1'
+     C           WSCID     IFEQ 'SC01'
+     C                     EXSR RTN300                     *SCREEN 1
+     C                     END
+     C           WSCID     IFEQ 'SC02'
+     C                     EXSR RTN400                     *SCREEN 2
+     C                     END
+     C           WSCID     IFEQ 'SC03'
+     C                     EXSR RTN500                     *SCREEN 3
+     C                     END
+     C                     END
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+     C*===========================================================*
+     C*          RTN100....INITIAL KEY VALUE
+     C*===========================================================*
+     C           RTN100    BEGSR
+     C*
+     C                     MOVE *BLANK    WRC     1
+     C                     Z-ADD0         WCU10   42
+     C                     MOVE *BLANK    WCU11   5
+     C                     Z-ADD0         WRX15  112
+     C                     Z-ADD0         WRC15   90
+     C                     Z-ADD0         WCOUNT  20
+     C                     Z-ADD0         WCALT  134
+     C                     Z-ADD0         WSUBT   90
+     C                     Z-ADD0         WAMT1  134
+     C                     Z-ADD0         WAMT2  134
+     C                     Z-ADD0         WAMT3  134
+     C                     Z-ADD0         WLAST   10
+     C                     MOVE *BLANK    WSCID   4
+     C                     MOVE *BLANK    WCHK    1
+     C                     Z-ADD0         S04I1   60
+     C                     MOVE *BLANK    S04I3   1
+     C                     MOVE *BLANK    S04O1   9
+     C                     MOVE *BLANK    P05I1   6
+     C                     MOVE *BLANK    P05I2   1
+     C                     MOVE *BLANK    P05I3  10
+     C                     MOVE *BLANK    P0512O  1
+     C                     MOVE '23'      WNM01   2
+     C                     MOVE 'SC01'    WSCID   4
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN300....SCREEN_ONE MAIN ROUTINE
+     C*===========================================================*
+     C           RTN300    BEGSR
+     C*
+     C           *IN33     IFEQ '0'                        *SCR 2 BACK 1
+     C                     EXSR RTN310                     *INIT SCREEN
+     C                     END
+     C                     SETOF                     33
+     C*
+     C           *IN03     DOUEQ'1'
+     C           *IN34     OREQ '1'
+     C*
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR1
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN05     IFEQ '1'
+     C                     EXSR RTN320                     *GET REF DATA
+     C                     EXSR RTN330                     *ERR CHECK
+     C                     ELSE
+     C                     EXSR RTN320                     *GET REF DATA
+     C                     EXSR RTN330                     *ERR CHECK
+     C*
+     C           *IN99     IFEQ '0'
+     C                     EXSR RTN340                     *NEXT SCREEN
+     C                     END
+     C                     END
+     C*
+     C                     END                             *END DO
+     C*
+     C                     SETOF                     34
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN310....INIT SCREEN_ONE VALUE
+     C*===========================================================*
+     C           RTN310    BEGSR
+     C*: INITIAL HEADING VALUE :
+     C                     MOVE *BLANK    D01
+     C                     MOVE *BLANK    D02
+     C                     MOVE *BLANK    D03
+     C                     MOVE *BLANK    D04
+     C                     Z-ADD0         D05
+     C                     MOVE *BLANK    D06
+     C                     MOVE *BLANK    D07
+     C                     MOVE *BLANK    D08
+     C                     Z-ADD0         D09
+     C                     MOVE *BLANK    D10
+     C                     MOVE *BLANK    D11
+     C                     Z-ADD0         D30
+     C*: CLEAR SUBFILE_1 :
+     C                     SETON                     50    *SFLCLR
+     C                     WRITESFLCR1
+     C                     SETOF                     50
+     C*: INIT SUBFILE_1 VALUE :
+     C                     Z-ADD0         RRN1
+     C                     SETOF                     51    *SFLEND
+     C           *IN51     DOWEQ'0'
+     C                     ADD  1         RRN1
+     C                     MOVE *BLANK    D12
+     C                     MOVE *BLANK    D13
+     C                     Z-ADD0         D14
+     C                     Z-ADD0         D15
+     C                     Z-ADD0         D16
+     C                     WRITESFLSR1                   51*SFLEND
+     C                     END
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN320....GET REDERENCE DATA FROM SCREEN_1
+     C*===========================================================*
+     C           RTN320    BEGSR
+     C*
+     C                     MOVE D01       CM01
+     C           KEYCM     CHAINCMPF                 40    *NF
+     C           *IN40     IFEQ '0'
+     C                     MOVE CM03      D02
+     C                     ELSE
+     C                     MOVE *BLANK    D02
+     C                     END
+     C           *LOVAL    SETLLCMPF
+     C*
+     C                     MOVE D03       CU01
+     C           KEYCU     CHAINCUPF                 40    *NF
+     C           *IN40     IFEQ '0'
+     C                     MOVE CU04      D04
+     C                     MOVE CU11      WCU11
+     C                     ELSE
+     C                     MOVE *BLANK    D04
+     C                     END
+     C           *LOVAL    SETLLCUPF
+     C*
+     C                     MOVE D01       NM021
+     C                     MOVE D06       NM022
+     C                     MOVE *BLANK    NM023
+     C           KEYNM     CHAINNMPF                 40    *NF
+     C           *IN40     IFEQ '0'
+     C                     MOVE NM031     D07
+     C                     ELSE
+     C                     MOVE *BLANK    D07
+     C                     END
+     C           *LOVAL    SETLLNMPF
+     C*
+     C           D10       IFEQ *BLANK
+     C                     MOVE WCU11     D10
+     C                     END
+     C*
+     C                     MOVE D10       EM01
+     C           KEYEM     CHAINEMPF                 40    *NF
+     C           *IN40     IFEQ '0'
+     C                     MOVE EM02      D11
+     C                     ELSE
+     C                     MOVE *BLANK    D11
+     C                     END
+     C           *LOVAL    SETLLEMPF
+     C*
+     C                     Z-ADD0         RRN1
+     C*
+     C                     SETOF                     40
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINSFLSR1               40    *NF
+     C           *IN40     IFEQ '0'
+     C*
+     C           D12       IFEQ *BLANK
+     C                     MOVE *BLANK    D13
+     C                     ELSE
+     C           KEYPN     CHAINPNPF                 42    *NF
+     C           *IN42     IFEQ '0'
+     C                     MOVE PN02      D13
+     C                     ELSE
+     C                     MOVE *BLANK    D13
+     C                     END
+     C                     END
+     C                     UPDATSFLSR1
+     C*
+     C                     END
+     C                     END
+     C*
+     C           *LOVAL    SETLLPNPF
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN330....CHECK SCREEN_1
+     C*===========================================================*
+     C           RTN330    BEGSR
+     C*: CHECK COMPANY ID :
+     C           D01       IFEQ *BLANK                     *CHK BLANK
+     C                     SETON                     619899
+     C                     END
+     C   99                GOTO END330
+     C*
+     C                     MOVE D01       CM01             *CHK VALUE
+     C           KEYCM     CHAINCMPF                 40    *NF
+     C           *IN40     IFEQ '1'
+     C                     SETON                     619699
+     C                     ELSE
+     C           CM04      IFEQ *BLANK
+     C                     SETON                     619699
+     C                     ELSE
+     C                     MOVE CM03      D02
+     C                     END
+     C                     END
+     C           *LOVAL    SETLLCMPF
+     C   99                GOTO END330
+     C*: CHECK CUSTOMER ID :
+     C           D03       IFEQ *BLANK                     *CHK BLANK
+     C                     SETON                     629899
+     C                     END
+     C   99                GOTO END330
+     C*
+     C                     MOVE D03       CU01             *CHK VALUE
+     C           D03       CHAINCUPF                 40    *NF
+     C           *IN40     IFEQ '1'
+     C                     SETON                     629399
+     C                     ELSE
+     C                     MOVE CU04      D04
+     C                     END
+     C           *LOVAL    SETLLCUPF
+     C   99                GOTO END330
+     C*: CHECK 出貨日期:
+     C                     Z-ADDD05       S04I1
+     C                     CALL 'P04'
+     C                     PARM           S04I1
+     C           WCHK      PARM           WCHK
+     C           WCHK      IFEQ 'N'
+     C                     SETON                     639299
+     C                     END
+     C   99                GOTO END330
+     C*: CHECK 帳款類別:
+     C           D06       IFEQ *BLANK                     *CHK BLANK
+     C                     SETON                     649899
+     C                     END
+     C   99                GOTO END330
+     C*
+     C                     MOVE D01       NM021             *CHK VALUE
+     C                     MOVE D06       NM022
+     C                     MOVE *BLANK    NM023
+     C           KEYNM     CHAINNMPF                 40    *NF
+     C           *IN40     IFEQ '1'
+     C                     SETON                     649199
+     C                     ELSE
+     C                     MOVE NM031     D07
+     C                     END
+     C           *LOVAL    SETLLNMPF
+     C   99                GOTO END330
+     C*: CHECK統一發票號碼:
+     C           D08       IFNE *BLANK                     *CHK VALUE
+     C                     MOVELD09       P05I1
+     C                     MOVE '1'       P05I2
+     C                     MOVE D08       P05I3
+     C                     CALL 'P05'
+     C                     PARM           P05I1
+     C                     PARM           P05I2
+     C                     PARM           P05I3
+     C           WCHK      PARM           WCHK
+     C           P0512O    PARM           P0512O
+     C           WCHK      IFEQ 'Y'
+     C           WCHK      OREQ '*'
+     C                     SETON                     658999
+     C                     END
+     C                     END
+     C   99                GOTO END330
+     C*
+     C           D08       IFNE *BLANK
+     C                     MOVE D01       RC01             *CHK VALUE
+     C                     MOVE '11'      RC03
+     C                     MOVE D08       RC04
+     C                     Z-ADD1         RC05
+     C           KEYRC     CHAINRCPF                 40    *NF
+     C           *IN40     IFEQ '1'
+     C                     MOVE *BLANK    WRC
+     C                     ELSE
+     C           RC97      IFEQ 'D'
+     C                     MOVE 'D'       WRC
+     C                     ELSE
+     C                     SETON                     658599
+     C                     END
+     C                     END
+     C           *LOVAL    SETLLRCPF
+     C                     END
+     C   99                GOTO END330
+     C*: CHECK統一發票日期:
+     C           D08       IFNE *BLANK                     *CHK BLANK
+     C           D09       ANDEQ0
+     C                     SETON                     669099
+     C                     END
+     C   99                GOTO END330
+     C*
+     C           D08       IFNE *BLANK
+     C                     MOVE D09       S04I1            *CHK VALUE
+     C                     CALL 'P04'
+     C                     PARM           S04I1
+     C           WCHK      PARM           WCHK
+     C           WCHK      IFEQ 'N'
+     C                     SETON                     669299
+     C                     END
+     C                     END
+     C   99                GOTO END330
+     C*:CHECK業務員ID :
+     C           D10       IFEQ *BLANK                     *CHK BLANK
+     C                     SETON                     679899
+     C                     END
+     C   99                GOTO END330
+     C*
+     C                     MOVE D10       EM01             *CHK VALUE
+     C           KEYEM     CHAINEMPF                 40    *NF
+     C           *IN40     IFEQ '1'
+     C                     SETON                     679499
+     C                     END
+     C           *LOVAL    SETLLEMPF
+     C   99                GOTO END330
+     C*:CHECK請款月份:
+     C           D30       IFEQ 0                          *CHK ZEROS
+     C                     SETON                     689899
+     C                     END
+     C   99                GOTO END330
+     C*
+     C           D302      IFLT 1                          *CHK VALUE
+     C           D302      ORGT 12
+     C                     SETON                     689299
+     C                     END
+     C   99                GOTO END330
+     C*: CHECK請款月份與出貨日期 :
+     C           D30       IFLT D051                       *CHK VALUE
+     C                     SETON                     688499
+     C                     END
+     C   99                GOTO END330
+     C*: CHECK SUBFILE DATA :
+     C                     SETOF                     40
+     C                     Z-ADD0         RRN1
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINSFLSR1               40    *NF
+     C*
+     C           *IN40     IFEQ '0'
+     C                     EXSR RTN360                     *CHK SFL DTA
+     C           *IN99     IFEQ '1'
+     C                     UPDATSFLSR1
+     C                     SETON                     40    *EXIT
+     C                     END
+     C                     END
+     C*
+     C                     END
+     C                     SETOF                     40
+     C*
+     C  N99      *IN31     IFEQ '0'
+     C                     Z-ADD1         RRN1
+     C           RRN1      CHAINSFLSR1               40    *NF
+     C                     SETON                     698899
+     C                     UPDATSFLSR1
+     C                     SETOF                     31
+     C                     END
+     C   99                GOTO END330
+     C*
+     C           END330    ENDSR
+     C*===========================================================*
+     C*          RTN340....SET NEXT SCREEN ID
+     C*===========================================================*
+     C           RTN340    BEGSR
+     C*
+     C           D08       IFEQ *BLANK
+     C                     EXSR RTN350                     *SAVE DTA
+     C                     END
+     C           D08       IFEQ *BLANK
+     C                     MOVE 'SC03'    WSCID
+     C                     ELSE
+     C                     MOVE 'SC02'    WSCID
+     C                     END
+     C                     SETON                     34
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN350....SAVE RXPF AND RAPF WHEN D08=SPACE
+     C*===========================================================*
+     C           RTN350    BEGSR
+     C*
+     C                     Z-ADD0         WRX15
+     C*
+     C                     MOVE D01       RX01
+     C                     MOVE '00000'   RX02
+     C                     MOVE '11'      RX03
+     C*
+     C                     MOVE '4'       S04I3
+     C                     CALL 'FIS04'
+     C                     PARM           D01
+     C                     PARM           D05
+     C                     PARM           S04I3
+     C           S04O1     PARM           S04O1
+     C*
+     C                     MOVE *BLANK    RX04
+     C                     MOVELS04O1     RX04
+     C                     MOVE D05       RX06
+     C                     MOVE D03       RX07
+     C                     Z-ADDD30       RX08
+     C                     MOVE S04O1     RX09
+     C                     MOVE D06       RX10
+     C                     MOVE D10       RX11
+     C                     Z-ADD0         RX16
+     C                     MOVE '1'       RX17
+     C                     MOVE *BLANK    RX18
+     C                     MOVE D08       RX19
+     C                     MOVE *BLANK    RX97
+     C                     MOVE DDAT      RX98
+     C                     MOVE WUSER     RX99
+     C*
+     C                     MOVE D01       CM01
+     C           KEYCM     CHAINCMPF                 40    *NF
+     C                     MOVE CM04      RA01
+     C                     MOVE '00000'   RA02
+     C                     MOVE '11'      RA03
+     C                     MOVE *BLANK    RA04
+     C                     MOVELS04O1     RA04
+     C                     MOVE D05       RA05
+     C                     MOVE D06       RA06
+     C                     Z-ADD0         RA08
+     C                     MOVE '1'       RA09
+     C                     MOVE *BLANK    RA10
+     C                     MOVE *BLANK    RA11
+     C                     MOVE DDAT      RA96
+     C                     MOVE DDAT      RA98
+     C                     MOVE WUSER     RA99
+     C*
+     C                     Z-ADD0         WCOUNT
+     C                     Z-ADD0         RRN1
+     C*
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINSFLSR1               40    *NF
+     C*
+     C           *IN40     IFEQ '0'
+     C           D12       ANDNE*BLANK
+     C                     ADD  1         WCOUNT
+     C*
+     C                     MOVE WCOUNT    RX05
+     C                     MOVE D12       RX12
+     C                     MOVE D14       RX13
+     C                     MOVE D15       RX14
+     C                     MOVE D16       RX15
+     C           WRX15     ADD  D16       WRX15
+     C*
+     C           *LOVAL    SETLLRXPF
+     C                     WRITERX0
+     C*
+     C                     END
+     C                     END
+     C*
+     C                     Z-ADDWRX15     RA07
+     C*
+     C                     WRITERA0
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN360....CHECK SCREEN_1 SUBFILE_1
+     C*===========================================================*
+     C           RTN360    BEGSR
+     C*: CHECK品號:
+     C           D12       IFEQ *BLANK                     *CHK BLANK
+     C           D14       IFNE 0
+     C           D15       ORNE 0
+     C           D16       ORNE 0
+     C                     SETON                     698899
+     C                     END
+     C                     END
+     C   99                GOTO END360
+     C*
+     C           D12       IFNE *BLANK
+     C                     SETON                     31    *AT LEAST 1
+     C                     MOVE D12       PN01             *CHK VALUE
+     C           KEYPN     CHAINPNPF                 42    *NF
+     C           *IN42     IFEQ '1'
+     C                     SETON                     698699
+     C                     END
+     C           *LOVAL    SETLLPNPF
+     C                     END
+     C   99                GOTO END360
+     C*: CHECK銷貨金額:
+     C           D12       IFNE *BLANK
+     C           D16       IFEQ 0                          *CHK ZEROS
+     C                     SETON                     728799
+     C                     END
+     C                     END
+     C   99                GOTO END360
+     C*
+     C           END360    ENDSR
+     C*===========================================================*
+     C*          RTN400....SCREEN_TWO MAIN ROUTINE
+     C*===========================================================*
+     C           RTN400    BEGSR
+     C*
+     C                     EXSR RTN410                     *INIT SCREEN
+     C*
+     C           *IN03     DOUEQ'1'
+     C           *IN35     OREQ '1'
+     C*
+     C                     WRITEDSPC2
+     C                     EXFMTSFLCR2
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN12     IFEQ '1'
+     C                     MOVE 'SC01'    WSCID
+     C                     SETON                     35    *END LOOP
+     C                     SETON                     33    *BACK TO SCR 1
+     C                     ELSE
+     C           *IN05     IFEQ '1'
+     C                     EXSR RTN420                     *GET REF DATA
+     C                     EXSR RTN430                     *ERR CHECK
+     C                     ELSE
+     C                     EXSR RTN420                     *GET REF DATA
+     C                     EXSR RTN430                     *ERR CHECK
+     C*
+     C           *IN99     IFEQ '0'
+     C                     EXSR RTN350                     *SAVE
+     C                     EXSR RTN440                     *SAVE
+     C                     END
+     C                     END
+     C                     END
+     C*
+     C                     END                             *END DO
+     C*
+     C                     SETOF                     35
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN410....INIT SCREEN_TWO VALUE
+     C*===========================================================*
+     C           RTN410    BEGSR
+     C*
+     C                     MOVE D03       D24
+     C                     MOVE *BLANK    D25
+     C                     MOVE *BLANK    D26
+     C                     Z-ADD*ZEROS    D18
+     C*
+     C                     MOVE D24       CU01
+     C           KEYCU     CHAINCUPF                 40    *NF
+     C                     MOVE CU10      WCU10
+     C                     MOVE CU04      D25
+     C           CU10      IFNE 0
+     C                     MOVE '1'       D17
+     C                     MOVE '應稅'  D26
+     C                     ELSE
+     C                     MOVE '3'       D17
+     C                     MOVE '免稅'  D26
+     C                     END
+     C           *LOVAL    SETLLCUPF
+     C*: CLEAR SUBFILE_2 DATA :
+     C                     SETON                     50
+     C                     WRITESFLCR2
+     C                     SETOF                     50
+     C*: INIT SUBFILE_2 DATA :
+     C                     Z-ADD0         WCALT
+     C                     Z-ADD0         WAMT1
+     C                     Z-ADD0         WAMT2
+     C                     Z-ADD0         WAMT3
+     C                     Z-ADD0         WLAST
+     C                     Z-ADD0         RRN1
+     C                     Z-ADD0         RRN2
+     C*
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN1
+     C           RRN1      CHAINSFLSR1               40    *NF
+     C*
+     C           *IN40     IFEQ '0'
+     C*
+     C                     MOVE D12       D19
+     C*
+     C           D12       IFNE *BLANK
+     C                     Z-ADDRRN2      WLAST
+     C                     END
+     C*
+     C                     Z-ADDD14       D21
+     C                     Z-ADDD15       D22
+     C*
+     C           WCU10     IFEQ 5
+     C           WCU10     OREQ 0
+     C                     Z-ADDD16       D23
+     C                     ELSE
+     C           WCU10     ADD  100       WCALT
+     C           WCALT     DIV  105       WCALT     H
+     C           WCALT     MULT D16       WCALT
+     C                     Z-ADD0         D23
+     C                     ADD  WCALT     D23       H
+     C                     Z-ADD0         WCALT
+     C                     END
+     C*
+     C                     ADD  1         RRN2
+     C                     WRITESFLSR2
+     C*
+     C           WAMT1     ADD  D23       WAMT1
+     C           WAMT2     ADD  D16       WAMT2
+     C                     END
+     C                     END
+     C*
+     C           WCU10     IFNE 5
+     C           WCU10     ANDNE0
+     C           WCU10     ADD  100       WCALT
+     C           WCALT     DIV  105       WCALT     H
+     C           WCALT     MULT WAMT2     WCALT
+     C*
+     C           WCALT     IFNE WAMT1
+     C                     Z-ADDWLAST     RRN2
+     C           RRN2      CHAINSFLSR2               40    *NF
+     C           D23       ADD  WCALT     D23
+     C           D23       SUB  WAMT2     D23
+     C                     UPDATSFLSR2
+     C                     END
+     C*
+     C                     END
+     C*
+     C           WAMT1     MULT 0.05      D18
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN420....GET REDERENCE DATA FROM SCREEN_2
+     C*===========================================================*
+     C           RTN420    BEGSR
+     C*
+     C                     MOVE D24       CU01
+     C           KEYCU     CHAINCUPF                 40    *NF
+     C           *IN40     IFEQ '0'
+     C                     MOVE CU04      D25
+     C                     ELSE
+     C                     MOVE *BLANK    D25
+     C                     END
+     C           *LOVAL    SETLLCUPF
+     C*
+     C           D17       IFNE *BLANK
+     C           D17       IFEQ '1'
+     C                     MOVE TEX,1     D26
+     C                     ELSE
+     C           D17       IFEQ '2'
+     C                     MOVE TEX,2     D26
+     C                     ELSE
+     C           D17       IFEQ '3'
+     C                     MOVE TEX,3     D26
+     C                     END
+     C                     END
+     C                     END
+     C                     ELSE
+     C                     MOVE *BLANK    D26
+     C                     END
+     C*
+     C                     SETOF                     40
+     C                     Z-ADD0         RRN2
+     C*
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN2
+     C           RRN2      CHAINSFLSR2               40    *NF
+     C           *IN40     IFEQ '0'
+     C*
+     C           D19       CHAINPNPF                 42    *NF
+     C           *IN42     IFEQ '0'
+     C                     MOVE PN02      D20
+     C                     ELSE
+     C                     MOVE *BLANK    D20
+     C                     END
+     C                     UPDATSFLSR2
+     C           *LOVAL    SETLLPNPF
+     C*
+     C                     END
+     C                     END
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN430....CHECK SCREEN_2
+     C*===========================================================*
+     C           RTN430    BEGSR
+     C*
+     C                     Z-ADD0         WSUBT
+     C*: CHECK統一發票之CUSTOMER ID :
+     C           D24       IFEQ *BLANK                     *CHK BLANK
+     C                     SETON                     619899
+     C                     END
+     C   99                GOTO END430
+     C*
+     C                     MOVE D24       CU01             *CHK VALUE
+     C           KEYCU     CHAINCUPF                 40    *NF
+     C           *IN40     IFEQ '1'
+     C                     SETON                     619599
+     C                     ELSE
+     C           CU02      IFEQ *BLANK
+     C                     SETON                     619199
+     C                     END
+     C                     END
+     C   99                GOTO END430
+     C*: CHECK稅別:
+     C           D17       IFEQ *BLANK                     *CHK BLANK
+     C                     SETON                     629899
+     C                     END
+     C   99                GOTO END430
+     C*
+     C           D17       IFNE '1'                        *CHK VALUE
+     C           D17       ANDNE'2'
+     C           D17       ANDNE'3'
+     C                     SETON                     629099
+     C                     END
+     C   99                GOTO END430
+     C*: CHECK銷項稅額:
+     C           D17       IFEQ '1'                        *CHK BLANK
+     C           D18       ANDEQ0
+     C                     SETON                     639899
+     C                     END
+     C   99                GOTO END430
+     C*
+     C           D17       IFEQ '2'                        *CHK BLANK
+     C           D17       OREQ '3'
+     C           D18       IFNE 0
+     C                     SETON                     639899.RI PC
+     C                     END
+     C                     END
+     C   99                GOTO END430
+     C*: MOVE DATA TO稅別說明:
+     C           D17       IFNE *BLANK
+     C           D17       IFEQ '1'
+     C                     MOVE TEX,1     D26
+     C                     ELSE
+     C           D17       IFEQ '2'
+     C                     MOVE TEX,2     D26
+     C                     ELSE
+     C           D17       IFEQ '3'
+     C                     MOVE TEX,3     D26
+     C                     END
+     C                     END
+     C                     END
+     C                     END
+     C*
+     C                     SETOF                     40
+     C                     Z-ADD0         RRN2
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN2
+     C           RRN2      CHAINSFLSR2               40    *NF
+     C           *IN40     IFEQ '0'
+     C                     EXSR RTN450                     *CHK SFL DTA
+     C           *IN99     IFEQ '1'
+     C                     UPDATSFLSR2
+     C                     SETON                     40    *EXIT
+     C                     END
+     C                     END
+     C*
+     C                     END
+     C                     SETOF                     40
+     C   99                GOTO END430
+     C*
+     C           *IN32     IFEQ '0'
+     C                     Z-ADD1         RRN2
+     C           RRN2      CHAINSFLSR2               40    *NF
+     C                     SETON                     649499
+     C                     UPDATSFLSR2
+     C                     END
+     C   99                GOTO END430
+     C*
+     C                     SETOF                     32
+     C*
+     C*: CHECK稅別=1且發票金額之合計も０．０５與銷項稅額是否相等*
+     C           D17       IFEQ '1'
+     C           WSUBT     MULT 0.05      WSUBT
+     C           WSUBT     IFNE D18
+     C                     SETON                     638899
+     C                     END
+     C                     END
+     C   99                GOTO END430
+     C*
+     C           END430    ENDSR
+     C*===========================================================*
+     C*          RTN440....SAVE RXPF AND RAPF AND RCPF
+     C*===========================================================*
+     C           RTN440    BEGSR
+     C*
+     C                     Z-ADD0         WRX15
+     C*
+     C           WRC       IFEQ 'D'
+     C                     MOVE D01       RC01
+     C                     MOVE D08       RC09
+     C                     MOVE *BLANK    RC03
+     C                     MOVE *BLANK    RC04
+     C                     MOVE *BLANK    RC05
+     C           KEYRCL    SETLLRCLF01
+     C                     READ RCLF01                   46*EOF
+     C           *IN46     DOWEQ'0'
+     C           RC01      ANDEQD01
+     C           RC09      ANDEQD08
+     C                     DELETRCL1
+     C                     READ RCLF01                   46*EOF
+     C                     END
+     C                     END
+     C*
+     C                     MOVE D01       RC01
+     C                     MOVE '00000'   RC02
+     C                     MOVE '11'      RC03
+     C                     MOVE D08       RC04
+     C                     MOVE D09       RC06
+     C                     MOVE D24       RC07
+     C                     Z-ADDD30       RC08
+     C                     MOVE D08       RC09
+     C                     MOVE D06       RC10
+     C                     MOVE D10       RC11
+     C                     Z-ADD0         RC16
+     C                     MOVE D17       RC17
+     C                     MOVE P0512O    RC18
+     C                     MOVE '0000'    RC19
+     C                     MOVE S04O1     RC20
+     C                     MOVE '1'       RC21
+     C                     MOVE *BLANK    RC22
+     C                     MOVE *BLANK    RC97
+     C                     MOVE DDAT      RC98
+     C                     MOVE WUSER     RC99
+     C*
+     C                     MOVE D01       RA01
+     C                     MOVE '00000'   RA02
+     C                     MOVE '11'      RA03
+     C                     MOVE D08       RA04
+     C                     MOVE D09       RA05
+     C                     MOVE D06       RA06
+     C                     Z-ADD0         RA08
+     C                     MOVE '1'       RA09
+     C                     MOVE *BLANK    RA10
+     C                     MOVE *BLANK    RA11
+     C                     MOVE DDAT      RA96
+     C                     MOVE DDAT      RA98
+     C                     MOVE WUSER     RA99
+     C*
+     C                     Z-ADD0         WCOUNT
+     C                     Z-ADD0         RRN2
+     C                     Z-ADD0         WRC15
+     C                     SETOF                     40
+     C*
+     C           *IN40     DOWEQ'0'
+     C                     ADD  1         RRN2
+     C           RRN2      CHAINSFLSR2               40    *NF
+     C           *IN40     IFEQ '0'
+     C*
+     C           D19       IFNE *BLANK
+     C                     ADD  1         WCOUNT
+     C*
+     C                     MOVE WCOUNT    RC05
+     C                     MOVE D19       RC12
+     C                     MOVE D21       RC13
+     C                     MOVE D22       RC14
+     C                     MOVE D23       RC15
+     C           WRC15     ADD  D23       WRC15
+     C*
+     C           *LOVAL    SETLLRCPF
+     C                     WRITERC0
+     C*
+     C                     END
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     Z-ADDWRC15     RA07
+     C*
+     C                     WRITERA0
+     C*
+     C           D18       IFNE 0
+     C                     MOVE D01       RX01
+     C                     MOVE '00000'   RX02
+     C                     MOVE '12'      RX03
+     C                     MOVE D08       RX04
+     C                     MOVE '00'      RX05
+     C                     MOVE D09       RX06
+     C                     MOVE D03       RX07
+     C                     Z-ADDD30       RX08
+     C                     MOVE S04O1     RX09
+     C                     MOVE D06       RX10
+     C                     MOVE D10       RX11
+     C                     MOVE *BLANK    RX12
+     C                     Z-ADD0         RX13
+     C                     Z-ADD0         RX14
+     C                     Z-ADD0         RX15
+     C                     Z-ADDD18       RX16
+     C                     MOVE '1'       RX17
+     C                     MOVE *BLANK    RX18
+     C                     MOVE D08       RX19
+     C                     MOVE *BLANK    RX97
+     C                     MOVE DDAT      RX98
+     C                     MOVE WUSER     RX99
+     C*
+     C                     WRITERX0
+     C*
+     C                     MOVE D01       CM01
+     C           KEYCM     CHAINCMPF                 40    *NF
+     C                     MOVE CM04      RA01
+     C                     MOVE '00000'   RA02
+     C                     MOVE '12'      RA03
+     C                     MOVE D08       RA04
+     C                     MOVE D09       RA05
+     C                     MOVE *BLANK    RA06
+     C                     Z-ADD0         RA07
+     C                     Z-ADDD18       RA08
+     C                     MOVE '1'       RA09
+     C                     MOVE *BLANK    RA10
+     C                     MOVE *BLANK    RA11
+     C                     MOVE DDAT      RA96
+     C                     MOVE DDAT      RA98
+     C                     MOVE WUSER     RA99
+     C*
+     C                     WRITERA0
+     C*
+     C                     MOVE D01       RC01
+     C                     MOVE '00000'   RC02
+     C                     MOVE '12'      RC03
+     C                     MOVE D08       RC04
+     C                     MOVE '00'      RC05
+     C                     MOVE D09       RC06
+     C                     MOVE D24       RC07
+     C                     Z-ADDD30       RC08
+     C                     MOVE D08       RC09
+     C                     MOVE D06       RC10
+     C                     MOVE D10       RC11
+     C                     MOVE *BLANK    RC12
+     C                     Z-ADD0         RC13
+     C                     Z-ADD0         RC14
+     C                     Z-ADD0         RC15
+     C                     Z-ADDD18       RC16
+     C                     MOVE D17       RC17
+     C                     MOVE P0512O    RC18
+     C                     MOVE '0000'    RC19
+     C                     MOVE S04O1     RC20
+     C                     MOVE '1'       RC21
+     C                     MOVE *BLANK    RC22
+     C                     MOVE *BLANK    RC97
+     C                     MOVE DDAT      RC98
+     C                     MOVE WUSER     RC99
+     C*
+     C                     WRITERC0
+     C*
+     C                     MOVE D01       RA01
+     C                     MOVE '00000'   RA02
+     C                     MOVE '12'      RA03
+     C                     MOVE D08       RA04
+     C                     MOVE D09       RA05
+     C                     MOVE *BLANK    RA06
+     C                     Z-ADD0         RA07
+     C                     Z-ADDD18       RA08
+     C                     MOVE '1'       RA09
+     C                     MOVE *BLANK    RA10
+     C                     MOVE *BLANK    RA11
+     C                     MOVE DDAT      RA96
+     C                     MOVE DDAT      RA98
+     C                     MOVE WUSER     RA99
+     C*
+     C                     WRITERA0
+     C*
+     C                     END
+     C*
+     C                     MOVE 'SC03'    WSCID
+     C                     SETON                     35
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN450....CHECK SCREEN_2 SUBFILE_2
+     C*===========================================================*
+     C           RTN450    BEGSR
+     C*: CHECK品號:
+     C           D19       IFEQ *BLANK                     *CHK BLANK
+     C           D21       IFNE 0
+     C           D22       ORNE 0
+     C           D23       ORNE 0
+     C                     SETON                     649499
+     C                     END
+     C                     END
+     C   99                GOTO END450
+     C*
+     C           D19       IFNE *BLANK
+     C                     SETON                     32    *AT LEAST 1
+     C                     MOVE D19       PN01             *CHK VALUE
+     C           KEYPN     CHAINPNPF                 42    *NF
+     C           *IN42     IFEQ '1'
+     C                     SETON                     649299
+     C                     END
+     C           *LOVAL    SETLLPNPF
+     C                     END
+     C   99                GOTO END450
+     C*: CHECK統一發票金額:
+     C           D19       IFNE *BLANK
+     C           D23       IFEQ 0                          *CHK ZEROS
+     C                     SETON                     679399
+     C                     END
+     C                     END
+     C   99                GOTO END450
+     C*
+     C           WSUBT     ADD  D23       WSUBT
+     C*
+     C           END450    ENDSR
+     C*===========================================================*
+     C*          RTN500....SCREEN_THREE MAIN ROUTINE
+     C*===========================================================*
+     C           RTN500    BEGSR
+     C*
+     C                     EXSR RTN510                     *INIT SCREEN
+     C*
+     C                     EXFMTDSPC3
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN03     DOWEQ'0'
+     C           *IN36     ANDEQ'0'
+     C*
+     C           *IN12     IFEQ '1'
+     C                     MOVE 'SC01'    WSCID
+     C                     SETON                     36    *END LOOP
+     C                     ELSE
+     C                     EXSR RTN520                     *ERR CHECK
+     C*
+     C           *IN99     IFEQ '0'
+     C                     EXSR RTN530                     *NEXT SCREEN
+     C                     MOVE 'SC01'    WSCID
+     C                     END
+     C                     END
+     C*
+     C                     EXFMTDSPC3
+     C*
+     C           *IN03     IFEQ '0'
+     C                     MOVEA*ALL'0'   *IN,60
+     C                     END
+     C*
+     C                     END                             *END DO
+     C*
+     C                     SETOF                     36
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN510....INIT SCREEN_3 VALUE
+     C*===========================================================*
+     C           RTN510    BEGSR
+     C*
+     C                     MOVE *BLANK    D27
+     C                     MOVELS04O1     D27
+     C                     MOVE D08       D28
+     C                     MOVE *BLANK    D29
+     C*
+     C                     ENDSR
+     C*===========================================================*
+     C*          RTN520....CHECK SCREEN_THREE
+     C*===========================================================*
+     C           RTN520    BEGSR
+     C*: CHECK PRINTER ID :
+     C           D29       IFEQ *BLANK
+     C                     SETON                     619899
+     C                     END
+     C   99                GOTO END520
+     C*
+     C           END520    ENDSR
+     C*===========================================================*
+     C*          RTN530....EXEC PRINT OUT
+     C*===========================================================*
+     C           RTN530    BEGSR
+     C*
+     C                     CALL 'ARS01C'
+     C                     PARM           D01
+     C                     PARM           D27
+     C                     PARM           D28
+     C                     PARM           D29
+     C*
+     C                     SETON                     36    *END LOOP
+     C                     ENDSR
+**
+應稅　
+零稅率
+免稅　
+

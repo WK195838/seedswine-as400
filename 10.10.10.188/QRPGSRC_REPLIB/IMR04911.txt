@@ -1,0 +1,459 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0491                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/04/22                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :異動明細表                                   *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.23  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FIMIRLF11IF  E           K        DISK
+     F                                              KINFDS IRRCDN
+     FPA#2LF01IF  E           K        DISK
+     FIMISLF  IF  E           K        DISK
+     FIMISLF99IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FIMILPF  IF  E           K        DISK
+     F            IL0                               KRENAMEIL0L
+     FMTMAPF  IF  E           K        DISK
+     FREWF98  UF  E           K        DISK                      A
+     FPOPCPF  IF  E           K        DISK
+     FRES18WF IF  E           K        DISK                           UC
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      139 139 $RMK01
+     I                                      598 5990$LPRT
+     I                                      603 607 DIR02
+     I                                      603 603 DIR02L
+     I                                      608 609 DIR05S
+     I                                      610 611 DIR05E
+     I                                      612 612 CODE
+     I                                      613 613 DSEL1
+     I*(MM/DD/YY)
+     I                                      630 6350DIR04S
+     I                                      636 6410DIR04E
+     I*(YY/MM/DD)
+B2MODI                                      650 6570YIR04S
+B2MODI                                      658 6650YIR04E
+     I*
+     I                                      671 679 DIR03S
+     I                                      681 689 DIR03E
+     I            DS
+     I                                        1  32 #A03
+     I                                        1   1 #A03F
+     I                                        3   3 #A033
+     I*
+     IIRRCDN      DS
+     I                                     *RECORD  RCDN
+      *==============================================================*
+      *                    DEFN RTN
+      *==============================================================*
+     C           *LIKE     DEFN #202      H#202
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYIR1    KLIST
+     C                     KFLD           DIR05S
+     C*
+     C           KEYIR3    KLIST
+     C                     KFLD           DIR02
+     C                     KFLD           #202
+     C*
+     C           KEYIR4    KLIST
+     C                     KFLD           DIR02
+     C                     KFLD           #202
+     C                     KFLD           YIR04S
+     C           KEYWF     KLIST
+     C                     KFLD           WF9801
+     C                     KFLD           WF981A
+     C                     KFLD           WF9802
+     C                     KFLD           WF9803
+     C                     KFLD           WF9804
+     C                     KFLD           WF9805
+     C                     KFLD           WF9806
+     C*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C*
+     C           KEYPC     KLIST
+     C                     KFLD           IR13
+     C                     KFLD           IR03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     C                     SETON                         LR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*單別
+|    C           KEYIR1    SETLLPA#2LF01
+|    C                     READ PA#2LF01                 46
+| 01-C           *IN46     DOWEQ'0'
+| 02-C           #202      IFLE DIR05E
+|   C*異動明細檔
+B2000C           KEYIR4    SETLLIMIRLF11
+|   C           KEYIR3    READEIMIRLF11                 47
+| 03-C           *IN47     DOWEQ'0'
+B2000C           IR04      IFLE YIR04E
+|   C           IR03      ANDGEDIR03S
+|   C           IR03      ANDLEDIR03E
+|   C*不可為未確認單據
+|   C           IR06      CHAINIMISLF               48
+| 05-C           *IN48     IFEQ '1'
+|   C                     EXSR RTN110                     *共同欄位
+|   C           IR03      CHAINMA0                  45
+| 06-C           MA54      IFEQ 'Y'
+| 07-C           #A033     IFNE 'IL0'                      *NOT組拆
+|   C                     EXSR RTN500
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN600
+|   C                     CLOSERES18WF
+| 07*C                     ELSE
+|   C                     EXSR RTN900
+| 07-C                     END
+| 06*C                     ELSE
+|   C                     MOVELIR03      WF9806           *產品代號
+|   C           KEYWF     CHAINWF980                40
+| 08-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN300                     *WRITE
+| 08*C                     ELSE
+|   C                     EXSR RTN400                     *UPDATE
+| 08-C                     END
+| 06-C                     END
+|   C*
+| 05-C                     END
+| 04-C                     END
+|   C           KEYIR3    READEIMIRLF11                 47
+| 03-C                     END
+| 02-C                     END
+|   C                     READ PA#2LF01                 46
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN110....共同欄位
+      *==============================================================*
+02===C           RTN110    BEGSR
+|    C*物流點
+|    C                     MOVELIR02      WF9801
+|    C*單別
+|    C                     MOVELIR05      WF981A
+|    C*異動日期
+B2???C                     Z-ADDIR04      WF9802
+B2INF *CVR0001 sev.00 Field WF9802 is not a date or year
+|    C*單據
+|    C                     MOVELIR06      WF9803
+|    C*客戶代號，確認日
+|    C                     MOVEL*BLANKS   @IS02
+|    C                     MOVEL*BLANKS   @IS03
+|    C                     Z-ADD0         @IS04
+|    C           IR06      CHAINIMISLF99             40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL@IS02     WF9804
+|   C                     MOVEL@IS03     WF9805
+|   C                     Z-ADD@IS04     WF9809
+| 01-C                     END
+|    C*進／出
+|    C                     MOVE *BLANKS   #A01
+|    C                     MOVE *BLANKS   #A02
+|    C                     MOVEL'IMIRLF ' #A01
+|    C                     MOVELRCDN      #A02
+|    C           KEY#A     CHAIN#A0                  45
+| 02-C           *IN45     IFEQ '0'
+| 03-C           #A03F     CASEQ'+'       RTN11A           *WF9807
+|   C           #A03F     CASEQ'-'       RTN11B
+|   C           #A03F     CASEQ' '       RTN11C
+|   C           #A03F     CASEQ'*'       RTN11D
+| 03-C                     END
+| 02-C                     END
+|    C*
+|    C*對應物流點
+|    C                     MOVELIR11      WF9808
+| 04-C           RCDN      IFEQ 'IB0'
+B2???C                     Z-ADDIR04      WF9809
+B2INF *CVR0001 sev.00 Field WF9809 is not a date or year
+| 04-C                     END
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN11A....#A03之第一碼為'+'
+      *==============================================================*
+03===C           RTN11A    BEGSR
+|    C*
+|    C                     MOVE '進'    WF9807
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN11B....#A03之第一碼為'-'
+      *==============================================================*
+04===C           RTN11B    BEGSR
+|    C*
+|    C                     MOVE '出'    WF9807
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN11C....#A03之第一碼為' '
+      *==============================================================*
+05===C           RTN11C    BEGSR
+|    C*
+| 01-C           IR09      IFGT 0
+|   C                     MOVE '進'    WF9807
+| 01*C                     ELSE
+|   C                     MOVE '出'    WF9807
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN11D....#A03之第一碼為'*'
+      *==============================================================*
+06===C           RTN11D    BEGSR
+|    C*
+|    C           IR121     ADD  IR122     TEMP   120
+| 01-C           TEMP      IFGT 0
+|   C                     MOVE '進'    WF9807
+| 01*C                     ELSE
+|   C                     MOVE '出'    WF9807
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE WF980
+      *==============================================================*
+07===C           RTN300    BEGSR
+|    C*
+|    C                     Z-ADD0         WF9810
+|    C                     Z-ADD0         WF9811
+|    C                     Z-ADD0         WF9812
+|    C                     Z-ADD0         WF9813
+|    C***
+|    C*數量
+|    C***
+|    C           IR121     ADD  IR122     WF9810
+| 01-C           RCDN      IFEQ 'PE0'
+|   C           RCDN      OREQ 'PI0'
+|   C           KEYPC     CHAINPC0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MULT PC10      WF9810
+| 02-C                     END
+| 01-C                     END
+|    C***
+|    C*成本
+|    C***
+| 03-C           $RMK01    IFEQ 'Y'                        *AUTHORITY
+| 04-C           #A033     IFEQ 'T'
+|   C                     Z-ADDIR101     WF9811    H
+|   C                     Z-ADDIR102     WF9812    H
+|   C                     Z-ADDIR103     WF9813    H
+| 04*C                     ELSE
+| 05-C           #A033     IFEQ 'U'
+|   C           IR101     MULT WF9810    WF9811    H
+|   C           IR102     MULT WF9810    WF9812    H
+|   C           IR103     MULT WF9810    WF9813    H
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|    C*
+|    C                     WRITEWF980
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN400....UPDATE WF980
+      *==============================================================*
+08===C           RTN400    BEGSR
+|    C***
+|    C*數量
+|    C***
+|    C           IR121     ADD  IR122     WORK01  60
+| 01-C           RCDN      IFEQ 'PE0'
+|   C           RCDN      OREQ 'PI0'
+|   C           KEYPC     CHAINPC0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MULT PC10      WORK01
+| 02-C                     END
+| 01-C                     END
+|    C***
+|    C*成本
+|    C***
+| 03-C           $RMK01    IFEQ 'Y'                        *AUTHORITY
+| 04-C           #A033     IFEQ 'T'
+|   C                     Z-ADDIR101     WORK02 112
+|   C                     Z-ADDIR102     WORK03 112
+|   C                     Z-ADDIR103     WORK04 112
+| 04*C                     ELSE
+| 05-C           #A033     IFEQ 'U'
+|   C           IR101     MULT WORK01    WORK02    H
+|   C           IR102     MULT WORK01    WORK03    H
+|   C           IR103     MULT WORK01    WORK04    H
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|    C*
+|    C                     ADD  WORK01    WF9810    H
+|    C                     ADD  WORK02    WF9811    H
+|    C                     ADD  WORK03    WF9812    H
+|    C                     ADD  WORK04    WF9813    H
+|    C                     UPDATWF980
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN500....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+09===C           RTN500    BEGSR
+|    C***
+|    C*成本為TOTAL,須換算成UNIT,才能CALL RES018
+|    C***
+| 01-C           $RMK01    IFEQ 'Y'                        *AUTHORITY
+| 02-C           #A033     IFEQ 'T'
+|   C           IR121     ADD  IR122     WORK01
+| 03-C           WORK01    IFNE 0
+|   C           IR101     DIV  WORK01    IR101     H
+|   C           IR102     DIV  WORK01    IR102     H
+|   C           IR103     DIV  WORK01    IR103     H
+| 03-C                     END
+| 02-C                     END
+| 01-C                     END
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM IR03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM IR06      S08I2  12        訂單號碼
+|    C                     PARM 0         S08I3   60       牌價判斷日
+|    C                     PARM IR121     S08I4   60       禮盒訂購數量
+|    C                     PARM IR122     S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   92       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM IR101     S08I7   92       禮盒成本FOB
+|    C                     PARM IR102     S08I8   92       禮盒成本FHI
+|    C                     PARM IR103     S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   92       禮盒轉帳成本DUTY
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE OR UPDATE REWF89
+      *==============================================================*
+10===C           RTN600    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVELR181      WF9806
+|   C*TOTAL FOB,FHI,DUTY
+|   C           KEYWF     CHAINWF980                40
+| 02-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN700
+| 02*C                     ELSE                              修改
+|   C                     EXSR RTN800
+| 02-C                     END
+|   C                     READ RE18R                    46
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN700....WRITE WF980
+      *==============================================================*
+11===C           RTN700    BEGSR
+|    C*
+|    C                     Z-ADD0         WF9810
+|    C                     Z-ADD0         WF9811
+|    C                     Z-ADD0         WF9812
+|    C                     Z-ADD0         WF9813
+|    C***
+|    C           R182      ADD  R183      WF9810
+| 01-C           RCDN      IFEQ 'PE0'
+|   C           RCDN      OREQ 'PI0'
+|   C           KEYPC     CHAINPC0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MULT PC10      WF9810
+| 02-C                     END
+| 01-C                     END
+|    C           R185      ADD  R188      WF9811    H
+|    C           R186      ADD  R189      WF9812    H
+|    C           R187      ADD  R18A      WF9813    H
+|    C*
+|    C                     WRITEWF980
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN800....UPDATE WF980  IL0
+      *==============================================================*
+12===C           RTN800    BEGSR
+|    C***
+|    C           R182      ADD  R183      WORK01
+|    C                     Z-ADDR185      WORK02
+|    C                     ADD  R188      WORK02
+|    C                     Z-ADDR186      WORK03
+|    C                     ADD  R189      WORK03
+|    C                     Z-ADDR187      WORK04
+|    C                     ADD  R18A      WORK04
+|    C*
+|    C                     ADD  WORK01    WF9810    H
+|    C                     ADD  WORK02    WF9811    H
+|    C                     ADD  WORK03    WF9812    H
+|    C                     ADD  WORK04    WF9813    H
+|    C                     UPDATWF980
+|    C*
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN900....UPDATE WF980  IL0
+      *==============================================================*
+13===C           RTN900    BEGSR
+     C*
+| 01-C           RCDN      IFEQ 'IL0'
+|   C           IR06      SETLLIL0L
+|   C           IR06      READEIL0L                     42
+| 02-C           *IN42     DOWEQ'0'
+|   C           IR03      ANDNEIL05
+|   C                     MOVELIL05      WF9806
+|   C           KEYWF     CHAINWF980                40
+| 03-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN901                     *WRITE
+| 03*C                     ELSE
+|   C                     EXSR RTN902                     *UPDATE
+| 03-C                     END
+|   C           IR06      READEIL0L                     42
+| 02-C                     END
+| 01-C                     END
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN901....WRITE OR UPDATE REWF98
+      *==============================================================*
+14===C           RTN901    BEGSR
+      *
+|    C                     Z-ADDIL06      WF9810
+|    C                     Z-ADDIL08      WF9811
+|    C                     Z-ADDIL09      WF9812
+|    C                     Z-ADDIL10      WF9813
+|    C                     WRITEWF980
+|    C*
+14===C                     ENDSR
+      *==============================================================*
+      *          RTN902....WRITE OR UPDATE REWF69
+      *==============================================================*
+15===C           RTN902    BEGSR
+|    C*
+|    C                     ADD  IL06      WF9810
+|    C                     ADD  IL08      WF9811
+|    C                     ADD  IL09      WF9812
+|    C                     ADD  IL10      WF9813
+|    C                     UPDATWF980
+|    C*
+15===C                     ENDSR
+

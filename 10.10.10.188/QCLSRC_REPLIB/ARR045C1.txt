@@ -1,0 +1,182 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1118   PHILIP TSAI                       */
+     /*    CREATE DATE  : 81/04/06                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : ARR0451                                   */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款子系統                           */
+     /*    REMARK       :銷貨收入明細表                           */
+     /*    M001M: FOR Y2K                                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DSI01) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&COMP) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&COMPS) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&COMPE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&WSI35S) TYPE(*CHAR) LEN(8) /* M001M */
+             DCL        VAR(&WSI35E) TYPE(*CHAR) LEN(8) /* M001M */
+             DCL        VAR(&DSI10) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSEL) TYPE(*CHAR) LEN(1)
+
+             CHGVAR     VAR(&DSI01) VALUE(%SST(*LDA 601 1))
+             CHGVAR     VAR(&COMP) VALUE(%SST(*LDA 602 1))
+             CHGVAR     VAR(&COMPS) VALUE(%SST(*LDA 633 1))  /*M001M*/
+             CHGVAR     VAR(&COMPE) VALUE(%SST(*LDA 634 1))  /*M001M*/
+             CHGVAR     VAR(&WSI35S) VALUE(%SST(*LDA 615 8)) /*M001M*/
+             CHGVAR     VAR(&WSI35E) VALUE(%SST(*LDA 623 8)) /*M001M*/
+             CHGVAR     VAR(&DSI10) VALUE(%SST(*LDA 631 1)) /*M001M*/
+             CHGVAR     VAR(&DSEL) VALUE(%SST(*LDA 632 1))  /* M001M*/
+
+             OVRDBF     FILE(SOSILF09) SHARE(*YES)
+     /*  選擇是否為專櫃之報表格式 */
+             IF         COND(&DSI01 *NE 'K') THEN(DO)
+             OVRPRTF    FILE(ARR045AP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('銷貨收入')
+                        ENDDO
+             ELSE
+             IF         COND(&DSI01 *EQ 'K') THEN(DO)
+             OVRPRTF    FILE(ARR045BP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('銷貨收入')
+             CPYF       FROMFILE(REWF70) TOFILE(QTEMP/REWF70) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF70))
+             OVRDBF     FILE(REWF70) TOFILE(QTEMP/REWF70) SHARE(*YES)
+                        ENDDO
+
+     /*  康齡 */
+             IF         COND(&DSI01 *EQ 'K') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " " & SI10A *eq "2" ') +
+                          KEYFLD(*FILE) MAPFLD((SI10A '%SST(SI10 4 +
+                          1)' *CHAR 1) (SI01A '%SST(SI01 1 1)' +
+                          *CHAR 1) (SI01B '%sst(SI01 2 1)' *CHAR 1))
+             ENDDO
+             ELSE       CMD(DO)
+     /*  非轉帳 */
+             IF         COND(&DSI10 *EQ '1') THEN(DO)
+             IF         COND(&DSEL *EQ 'A') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " " & SI10A *GT "0" & SI10A *NE +
+                          "2" ') KEYFLD(*FILE) MAPFLD((SI10A +
+                          '%SST(SI10 4 1)' *CHAR 1) (SI01A +
+                          '%SST(SI01 1 1)' *CHAR 1) (SI01B +
+                          '%sst(SI01 2 1)' *CHAR 1))
+             ENDDO
+             IF         COND(&DSEL *EQ 'B') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " " & SI10A *GT "0" & SI12A *EQ +
+                          "B" ') KEYFLD(*FILE) MAPFLD((SI10A +
+                          '%SST(SI10 1 1)' *CHAR 1) (SI01A +
+                          '%SST(SI01 1 1)' *CHAR 1) (SI01B +
+                          '%sst(SI01 2 1)' *CHAR 1) (SI12A +
+                          '%SST(SI12 1 1)' *CHAR 1))
+             ENDDO
+             ENDDO
+     /*  轉帳 */
+             IF         COND(&DSI10 *EQ '2') THEN(DO)
+             IF         COND(&DSEL *EQ 'A') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " " &  SI10A *LT "0" & SI10A *NE +
+                          "B" ') KEYFLD((*FILE)) +
+                          MAPFLD((SI10A '%SST(SI10 4 1)' +
+                          *CHAR 1) (SI01A '%SST(SI01 1 1)' *CHAR 1) +
+                          (SI01B '%sst(si01 2 1)' *CHAR 1))
+             ENDDO
+             IF         COND(&DSEL *EQ 'B') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " " &  SI10A *LT "0" & SI10A *EQ +
+                          "B" ') KEYFLD((*FILE)) +
+                          MAPFLD((SI10A '%SST(SI10 4 1)' *CHAR 1) +
+                          (SI01A '%SST(SI01 1 1)' *CHAR 1) (SI01B +
+                          '%sst(si01 2 1)' *CHAR 1))
+
+             ENDDO
+             ENDDO
+     /*  全部 */
+             IF         COND(&DSI10 *EQ '3') THEN(DO)
+             IF         COND(&DSEL *EQ 'A') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " "  & ((SI10A *NE "2") *AND +
+                          (SI10A *NE "B"))') KEYFLD((*FILE)) +
+                          MAPFLD((SI01A '%SST(SI01 1 1)' *CHAR 1) +
+                          (SI01B '%SST(SI01 2 1)' *CHAR 1) (SI10A +
+                          '%sst(si10 4 1)' *CHAR 1))
+             ENDDO
+             IF         COND(&DSEL *EQ 'B') THEN(DO)
+             OPNQRYF    FILE((SOSILF09)) QRYSLT('SI01A *EQ "' *CAT +
+                          &DSI01 *CAT '" & SI01B *EQ %RANGE("' *CAT +
+                          &COMPS *CAT '" "' *CAT &COMPE *CAT '") & +
+                          SI35 *EQ %RANGE(' *CAT &WSI35S *CAT ' ' +
+                          *CAT &WSI35E *CAT ') & SI18 *EQ " " & +
+                          SI19 *EQ " " &( SI12A *EQ "B") ') +
+                          KEYFLD(*FILE) MAPFLD((SI01A '%SST(SI01 1 +
+                          1)' *CHAR 1) (SI01B '%SST(SI01 2 1)' +
+                          *CHAR 1) (SI12A '%sst(si12 1 1)' *CHAR 1))
+
+             ENDDO
+             ENDDO
+             ENDDO
+     /*  選擇是否為專櫃之程式 */
+             IF         COND(&DSI01 *NE 'K') THEN(DO)
+             CALL       ARR0451
+                        ENDDO
+             ELSE
+             IF         COND(&DSI01 *EQ 'K') THEN(DO)
+             CALL       ARR0452
+             CALL       ARR0453
+                        ENDDO
+
+             CLOF       OPNID(SOSILF09)
+             DLTOVR     FILE(*ALL)
+
+             IF         COND(&DSI01 *NE 'K') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('ARR045AP')
+                        ENDDO
+             ELSE
+             IF         COND(&DSI01 *EQ 'K') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('ARR045BP')
+                        ENDDO
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

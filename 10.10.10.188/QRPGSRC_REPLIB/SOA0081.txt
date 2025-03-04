@@ -1,0 +1,814 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOA008                                        *
+      * AUTHER       : A1118 PHILIP                                  *
+      * CREATE DATE  : 81/03/10                                      *
+      * UPDATE DATE  : 81/04/13 ERROR REPORT CREATE                  *
+      * UPDATE DATE  : 81/04/17 結帳註記 ADD FIELD                 *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+      * REMARK       :訂單批次處理                                 *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.12.02 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A* M002      | 00.04.11 | FOR DUTY菸酒稅法實施
+     A*---------------------------------------------------------------
+     A* M003      | 03.03.21 |欄位加寬事項
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSCPF  UP  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMDPF  UF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#2PF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FSOSEPF  O   E           K        DISK
+     FSOSFPF  O   E           K        DISK
+     FSOSIPF  O   E           K        DISK
+     FSOSJPF  O   E           K        DISK
+     FSOSELF  UF  E           K        DISK
+     F            SE0                               KRENAMESE0L
+     FSOA008P O   E             39     PRINTER
+     FSOA008BPO   E             38     PRINTER
+     I**********
+     I            DS
+     I                                        1   2 SC03
+     I                                        2   2 SC032
+     I            DS
+B2MODI                                        1   80SC08
+B2MODI                                        1   60SC08YM
+M001MI                                        3   40SC08Y
+B2MODI                                        5   60SC08M
+B2MODI                                        7   80SC08D
+     I            DS
+B2MODI                                        1   80WSC08
+B2MODI                                        1   40WSC08Y
+B2MODI                                        5   60WSC08M
+B2MODI                                        7   80WSC08D
+     I            DS
+     I                                        1   30MD26
+     I                                        1   10MD26M
+     I                                        2   30MD26D
+     IDA02        DS
+     I                                        1   43DUTY
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+M001AI                                      201 2080DATE
+     I                                      603 603 DSEL
+     I                                      609 613 PSC11
+     I*(MM/DD/YY)
+     I                                      621 6260PSC08
+B2MODI                                      640 6470YSE06
+B2MODI                                      682 682 ERRCDE
+     I            DS
+     I                                        1  10 SI02
+     I                                        1   2 SI02L
+     I                                        2   2 SI021
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#20    KLIST
+     C                     KFLD           #201
+     C                     KFLD           SC03
+     C                     MOVE 'S'       #201
+     C           KEYME     KLIST
+     C                     KFLD           SC04
+     C                     KFLD           SC05
+      *==============================================================*
+      *                   *LIKE DEFN
+      *==============================================================*
+     C           *LIKE     DEFN SI23      WSI23
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C*
+     C*UPDATE SE25 '*' 表已作過訂單批次，將送貨單鎖住
+  01-C           *IN80     IFEQ '0'
+    C                     WRITEPH1B
+    C                     EXSR RTN010                     UPD SE0
+    C                     SETON                     8010
+  01-C                     END
+     C*
+     C                     EXSR RTN020                     UPD MD
+     C                     EXSR RTN100
+     C*
+     C                     WRITEPD1B
+  02-C           *IN38     IFEQ '1'
+    C                     WRITEPE1B
+    C                     WRITEPH1B
+    C                     SETOF                     38
+  02-C                     END
+     C*
+     CLR 10                WRITEPE2B
+     CLR                   RETRN
+      *===============================================================*
+     C**         RTN010    UPDATE SOSEPF SE25
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     READ SE0L                     46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVE '*'       SE25
+|   C                     UPDATSE0L
+|   C*
+|   C                     WRITEPD2B
+| 02-C           *IN38     IFEQ '1'
+|   C                     WRITEPE1B
+|   C                     WRITEPH1B
+|   C                     SETOF                     38
+| 02-C                     END
+|   C*
+|   C                     READ SE0L                     46
+| 01-C                     END
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C**         RTN020    轉應收
+      *===============================================================*
+02===C           RTN020    BEGSR
+|    C*
+|    C           KEY#20    CHAIN#20                  40
+| 01-C           *IN40     IFEQ '0'
+|   C           #220      ANDEQ'Y'
+|   C           SC14      CHAINMD0                  40
+| 02-C           *IN40     IFEQ '0'
+| 03-C           SC37      IFNE 'D'
+|   C                     SUB  SC12      MD30
+|   C                     ADD  SC12      MD29
+|   C                     ADD  SC12      MD31
+| 03*C                     ELSE
+|   C           SC12      MULT DUTY      WSC12   90H
+|   C                     SUB  WSC12     MD30
+|   C                     ADD  WSC12     MD29
+|   C                     ADD  WSC12     MD31
+| 03-C                     END
+| 04-C           MD30      IFLT 0
+|   C                     Z-ADD0         MD30
+| 04-C                     END
+|   C                     UPDATMD0
+| 02-C                     END
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET HEADING  FILE
+     C*==============================================================*
+03===C           RTN100    BEGSR
+|    C*
+|    C* 日期轉換
+|    C*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+|    C*                    PARM $EGMDY    S001I2  80
+|     *CVR3012 sev.30 Field $EGMDY contains more than one year
+|     *CVR5011 sev.50 Field S001I2 is generic. Propagation engine found
+|     *   relationships with seeded dates and non-dates. Therefore, the
+|     *   tool cannot decide whether this is a date field or not. The
+|     *   cause of the problem may be incorrect or insufficient seeding.
+|     *   Please verify.
+|    C* M001D    DATE      PARM           S001O1  80
+|    C*
+|    C           KEY#20    CHAIN#20                  40
+| 01-C           *IN40     IFEQ '0'
+|   C*
+|   C****送貨單產生
+| 02-C           #208      IFEQ 'Y'
+|   C*送貨單主檔清空
+|   C                     EXSR RTN110                     .INIT SOSEPF
+|   C*單別
+|   C                     MOVEL'D'       SE03
+|   C                     MOVE SC032     SE03
+|   C*送貨單號
+|   C                     CALL 'RES005'
+|   C                     PARM SC01      S005I1  2
+|   C                     PARM SE03      S005I2  2
+|   C                     PARM SC08Y     S005I3  20
+|   C           SE02      PARM           S005O1 12
+| 02-C                     END
+|   C*
+|   C****發票號碼產生
+| 03-C           #209      IFEQ 'Y'
+|   C*發票主檔清空
+|   C                     EXSR RTN120                     .INIT SOSIPF
+|   C*發票號碼
+|   C                     MOVE *BLANK    ERR     1
+|   C                     MOVE *BLANK    ERRCDE
+|   C  N10                Z-ADD0         FSTERR  10
+| 04-C           #210      IFEQ 'Y'
+|   C                     MOVE SC02      SI02
+|   C**BY STEPHANIE       MOVE SD02      SI02
+|   C                     MOVE *BLANK    SI07
+| 04*C                     ELSE
+|    *Ｓ２，Ｓ３應以定單日期
+| 05-C           SC08      IFNE 0
+|    *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+|    *   verify
+|   C*M001M               MOVELSC08      S014I2
+|   C                     Z-ADDSC08      W6      60
+|   C                     MOVELW6        S014I2  40
+| 05*C                     ELSE
+|   C*M001M               MOVELSC07      S014I2
+|   C                     Z-ADDSC07      W6      60
+|   C                     MOVELW6        S014I2  40
+| 05-C                     END
+|   C                     Z-ADDYSE06     W6
+|   C                     CALL 'RES014'
+|   C                     PARM SC01      S014I1  2
+|   C                     PARM           S014I2  40
+|   C*M001M               PARM YSE06     S014I3  80
+|   C                     PARM W6        S014I3  60
+|   C           SI02      PARM           S014O1 10
+|   C           SI07      PARM           S014O2  4
+|   C           ERR       PARM           S014O3  1
+| 04-C                     END
+|   C*
+| 03-C                     END
+|   C*送貨單處理
+| 06-C           #208      IFEQ 'Y'
+|   C                     EXSR RTN200
+|   C                     MOVE SE02      SC29
+| 06*C                     ELSE
+|   C                     MOVE *ALL'*'   SC29
+| 06-C                     END
+|   C*發票檔處理
+| 07-C           #209      IFEQ 'Y'
+|   C                     EXSR RTN300
+|   C                     MOVE SI02      SC30
+| 07*C                     ELSE
+|   C                     MOVE *ALL'*'   SC30
+| 07-C                     END
+|   C*更新訂單主檔
+|   C                     Z-ADDDATE      SCXX
+|   C                     TIME           SCYY
+|   C                     MOVE $USER     SCZZ
+|   C                     UPDATSC0
+| 01-C                     END
+|    C*發票號碼有誤，列印錯誤資料
+| 08-C           ERR       IFNE *BLANK
+|   C                     MOVE 'Y'       ERRCDE
+|   C                     EXSR OUTLDA
+| 09-C           FSTERR    IFEQ 0
+|   C           KEYME     CHAINME0                  40
+|   C   40                MOVE *BLANK    ME04
+|   C                     WRITEPH1
+|   C                     Z-ADD1         FSTERR
+|   C                     SETON                     10
+| 09*C                     ELSE
+| 10-C           *IN39     IFEQ '1'
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+| 10-C                     END
+| 09-C                     END
+|   C                     WRITEPD1
+| 08-C                     END
+|    C*
+03===C           MAINED    ENDSR
+      *==============================================================*
+      *          RTN110....INIT OTHER HEADING FILE 1
+      *==============================================================*
+04===C           RTN110    BEGSR
+|    C*****送貨主檔欄位清空
+|    C*
+|    C                     MOVE *BLANK    SE01
+|    C                     MOVE *BLANK    SE02
+|    C                     MOVE *BLANK    SE03
+|    C                     MOVE *BLANK    SE04
+|    C                     MOVE *BLANK    SE05
+|    C                     Z-ADD0         SE06
+|    C                     MOVE *BLANK    SE07
+|    C                     Z-ADD0         SE08
+|    C                     MOVE *BLANK    SE09
+|    C                     MOVE *BLANK    SE10
+|    C                     MOVE *BLANK    SE11
+|    C                     MOVE *BLANK    SE12
+|    C                     MOVE *BLANK    SE13
+|    C                     MOVE *BLANK    SE14
+|    C                     MOVE *BLANK    SE15
+|    C                     MOVE *BLANK    SE16
+|    C                     MOVE *BLANK    SE17
+|    C                     MOVE *BLANK    SE18
+|    C                     MOVE *BLANK    SE19
+|    C                     Z-ADD0         SE20
+|    C                     Z-ADD0         SE21
+|    C                     MOVE *BLANK    SE22
+|    C                     Z-ADD0         SE23
+|    C                     Z-ADD0         SE24
+|    C                     MOVE *BLANK    SE25
+|    C                     MOVE *BLANK    SE26
+|    C                     MOVE *BLANK    SE27
+|    C                     MOVE *BLANK    SE28
+|    C                     MOVE *BLANK    SE29
+|    C                     MOVE *BLANK    SE30
+|    C                     MOVE *BLANK    SE31
+|    C                     MOVE *BLANK    SE32
+|    C                     MOVE *BLANK    SE33
+|    C                     MOVE *BLANK    SE34
+|    C                     MOVE *BLANK    SE35
+|    C                     MOVE *BLANK    SE36
+|    C                     Z-ADD0         SE37
+|    C                     MOVE *BLANK    SE38
+|    C                     Z-ADD0         SE39
+|    C                     MOVE *BLANK    SE40
+|    C                     Z-ADD0         SEXX
+|    C                     Z-ADD0         SEYY
+|    C                     MOVE *BLANK    SEZZ
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN120....INIT OTHER HEADING FILE 2
+      *==============================================================*
+05===C           RTN120    BEGSR
+|    C*****發票主檔欄位清空
+|    C*
+|    C                     MOVE *BLANK    SI01
+|    C                     MOVE *BLANK    SI02
+|    C                     MOVE *BLANK    SI03
+|    C                     MOVE *BLANK    SI04
+|    C                     MOVE *BLANK    SI05
+|    C                     Z-ADD0         SI06
+|    C                     MOVE *BLANK    SI07
+|    C                     MOVE *BLANK    SI08
+|    C                     MOVE *BLANK    SI09
+|    C                     MOVE *BLANK    SI10
+|    C                     MOVE *BLANK    SI11
+|    C                     MOVE *BLANK    SI12
+|    C                     MOVE *BLANK    SI13
+|    C                     MOVE *BLANK    SI14
+|    C                     MOVE *BLANK    SI15
+|    C                     MOVE *BLANK    SI16
+|    C                     Z-ADD0         SI17
+|    C                     MOVE *BLANK    SI18
+|    C                     MOVE *BLANK    SI19
+|    C                     MOVE *BLANK    SI20
+|    C                     Z-ADD0         SI21
+|    C                     MOVE *BLANK    SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         WSI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+|    C                     Z-ADD0         SI26
+|    C                     Z-ADD0         SI27
+|    C                     Z-ADD0         SI28
+|    C                     Z-ADD0         SI29
+|    C                     Z-ADD0         SI30
+|    C                     MOVE *BLANK    SI31
+|    C                     MOVE *BLANK    SI32
+|    C                     Z-ADD0         SI33
+|    C                     MOVE *BLANK    SI34
+|    C                     Z-ADD0         SI35
+|    C                     MOVE *BLANK    SIXX
+|    C                     MOVE *BLANK    SIYY
+|    C                     MOVE *BLANK    SIZZ
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN200....GET DETAIL  FILE   1
+      *==============================================================*
+06===C           RTN200    BEGSR
+|    C*
+|    C*送貨明細檔新增
+|    C           SC02      SETLLSD0
+|    C           SC02      READESD0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN210                     .INIT SOSFPF
+|   C                     EXSR RTN220                     .MOVE DATA
+|   C                     WRITESF0
+|   C           SC02      READESD0                      41
+| 01-C                     END
+|    C*送貨主檔新增
+|    C                     EXSR RTN230                     .MOVE DATA
+|    C                     WRITESE0
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN210....INIT OTHER DETAIL FILE 1
+      *==============================================================*
+07===C           RTN210    BEGSR
+|    C*****送貨明細檔欄位清空
+|    C*
+|    C                     MOVE *BLANK    SF01
+|    C                     MOVE *BLANK    SF02
+|    C                     MOVE *BLANK    SF03
+|    C                     Z-ADD0         SF04
+|    C                     Z-ADD0         SF05
+|    C                     Z-ADD0         SF06
+|    C                     Z-ADD0         SF07
+|    C                     Z-ADD0         SF08
+|    C                     Z-ADD0         SF09
+|    C                     Z-ADD0         SF10
+|    C                     Z-ADD0         SF11
+|    C                     Z-ADD0         SF12
+|    C                     Z-ADD0         SF13
+|    C                     Z-ADD0         SF14
+|    C                     Z-ADD0         SF15
+|    C                     MOVE *BLANK    SF16
+|    C                     MOVE *BLANK    SF17
+|    C                     MOVE *BLANK    SF18
+|    C                     Z-ADD0         SF19
+|    C                     Z-ADD0         SF20
+|    C*                    Z-ADD0         SF21
+|    C                     Z-ADD0         SF22
+|    C                     MOVE *BLANK    SF23
+|    C                     Z-ADD0         SF24
+|    C                     Z-ADD0         SF24
+|    C                     Z-ADD0         SF25
+|    C                     MOVE *BLANK    SF26
+|    C                     MOVE *BLANK    SF27
+|    C                     Z-ADD0         SF28
+|    C                     Z-ADD0         SF29
+|    C                     Z-ADD0         SF30
+|    C                     Z-ADD0         SFYY
+|    C                     MOVE *BLANK    SFZZ
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN220....MOVE DATA TO OTHER DETAIL FILE 1
+      *==============================================================*
+08===C           RTN220    BEGSR
+|    C*****搬移訂單明細資料至送貨明細檔
+|    C*
+|    C                     MOVE SD01      SF01
+|    C                     MOVE SE02      SF02
+|    C                     MOVE SD03      SF03
+|    C                     Z-ADDSD04      SF04
+|    C                     Z-ADDSD05      SF05
+|    C                     Z-ADDSD06      SF06
+|    C                     Z-ADDSD07      SF07
+|    C                     Z-ADDSD08      SF08
+|    C                     Z-ADDSD09      SF09
+|    C                     Z-ADDSD10      SF10
+|    C                     Z-ADDSD11      SF11
+|    C                     Z-ADDSD12      SF12
+|    C                     Z-ADDSD13      SF13
+M003AC                     Z-ADDSD131     SF131
+|    C                     Z-ADDSD14      SF14
+|    C                     Z-ADDSD15      SF15
+|    C                     MOVE SD16      SF16
+|    C                     MOVE 'C'       SF17
+|    C                     MOVE 'C'       SF18
+|    C                     Z-ADD0         SF19
+|    C                     Z-ADD0         SF20
+|    C*                    Z-ADD0         SF21
+|    C                     Z-ADD0         SF22
+|    C                     MOVE *BLANK    SF23
+|    C                     Z-ADD0         SF24
+|    C                     Z-ADD0         SF24
+|    C                     Z-ADDSD19      SF25
+|    C                     MOVE SD20      SF26
+|    C                     MOVE SD21      SF27
+|    C                     Z-ADDSD22      SF28
+|    C                     Z-ADDSD23      SF29
+|    C                     Z-ADDSD24      SF30
+|    C                     Z-ADDDATE      SFXX
+|    C                     TIME           SFYY
+|    C                     MOVE $USER     SFZZ
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN230....MOVE DATA TO OTHER HEADING FILE 1
+      *==============================================================*
+09===C           RTN230    BEGSR
+|    C*****搬移訂單資料至送貨主檔
+|    C*
+|    C                     MOVE SC01      SE01
+|    C*
+|    C                     MOVE SC04      SE04
+|    C                     MOVE SC05      SE05
+|    C                     Z-ADDSC08      SE06
+|    C                     MOVE SC11      SE07
+|    C                     Z-ADDSC12      SE08
+|    C                     MOVE 'C'       SE09
+|    C                     MOVE SC16      SE10
+|    C                     MOVE SC17      SE11
+|    C                     MOVE SC18      SE12
+|    C                     MOVE SC19      SE13
+|    C                     MOVE SC20      SE14
+|    C                     MOVE 'C'       SE15
+|    C                     MOVE 'C'       SE16
+|    C                     MOVE 'C'       SE17
+|    C                     MOVE 'C'       SE18
+|    C                     MOVE 'C'       SE19
+|    C                     Z-ADD0         SE20
+|    C                     Z-ADD0         SE21
+|    C                     MOVE *BLANK    SE22
+|    C                     Z-ADD0         SE23
+|    C                     Z-ADD0         SE24
+|    C                     MOVE *BLANK    SE25
+|    C                     MOVE SC36      SE26
+|    C                     MOVE SC33      SE27
+|    C                     MOVE SC34      SE28
+|    C                     MOVE SC02      SE29
+|    C*發票號碼
+| 01-C           #209      IFEQ 'Y'
+|   C                     MOVE SI02      SE30
+| 01*C                     ELSE
+|   C                     MOVE *ALL'*'   SE30
+| 01-C                     END
+|    C*
+|    C                     MOVE *BLANK    SE31
+|    C                     MOVE SC27      SE32
+|    C                     MOVE SC28      SE33
+|    C                     MOVE SC31      SE34
+|    C                     MOVE SC32      SE35
+|    C                     MOVE SC35      SE36
+|    C                     Z-ADDSE08      SE37
+|    C                     MOVE SC37      SE38
+|    C                     Z-ADDSC07      SE39
+|    C                     MOVE *BLANK    SE40
+|    C                     MOVE SC14      SE41
+|    C                     MOVE SC15      SE42
+|    C                     Z-ADDDATE      SEXX
+|    C                     TIME           SEYY
+|    C                     MOVE $USER     SEZZ
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN300....GET DETAIL  FILE   2
+      *==============================================================*
+10===C           RTN300    BEGSR
+|    C*
+|    C*發票明細檔新增
+|    C           SC02      SETLLSD0
+|    C           SC02      READESD0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN310                     .INIT SOSJPF
+|   C                     EXSR RTN320                     .MOVE DATA
+|   C                     WRITESJ0
+|   C           SC02      READESD0                      41
+| 01-C                     END
+|    C*發票主檔新增
+|    C                     EXSR RTN330                     .MOVE DATA
+|    C                     WRITESI0
+|    C**
+|    C*          KEYME     CHAINME0                  24
+|    C* N24                Z-ADDSI21      ME18
+|    C* N24                UPDATME0
+|    C*
+10===C                     ENDSR
+      * =============================================================*
+      *          RTN310....INIT OTHER DETAIL FILE 2
+      *==============================================================*
+11===C           RTN310    BEGSR
+|    C*****發票明細檔欄位清空
+|    C*
+|    C                     MOVE *BLANK    SJ01
+|    C                     MOVE *BLANK    SJ02
+|    C                     MOVE *BLANK    SJ03
+|    C                     Z-ADD0         SJ04
+|    C                     Z-ADD0         SJ05
+|    C                     Z-ADD0         SJ06
+|    C                     Z-ADD0         SJ07
+|    C                     Z-ADD0         SJ08
+|    C                     Z-ADD0         SJ09
+|    C                     Z-ADD0         SJ061
+|    C                     Z-ADD0         SJ071
+|    C                     Z-ADD0         SJ091
+|    C                     MOVE *BLANK    SJ10
+|    C                     MOVE *BLANK    SJ11
+|    C                     MOVE *BLANK    SJ12
+|    C                     Z-ADD0         SJ13
+|    C                     Z-ADD0         SJ14
+|    C                     Z-ADD0         SJ15
+|    C                     Z-ADD0         SJ16
+|    C                     Z-ADD0         SJXX
+|    C                     Z-ADD0         SJYY
+|    C                     MOVE *BLANK    SJZZ
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN320....MOVE DATA TO OTHER DETAIL FILE 2
+      *==============================================================*
+12===C           RTN320    BEGSR
+|    C*****搬移訂單明細資料至發票明細檔
+|    C*
+|    C                     MOVE SC01      SJ01
+|    C                     MOVE SI02      SJ02
+|    C                     MOVE SD03      SJ03
+|    C           SD04      ADD  SD05      SJ04
+|    C*產品歸屬
+|    C           SD03      CHAINMA0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVELMA07      SJ10
+| 01*C                     ELSE
+|   C                     MOVE *BLANK    SJ10
+|   C*FOR單價
+|   C                     Z-ADD0         MA40
+|   C                     Z-ADD0         MA41
+|   C                     Z-ADD0         MA45
+|   C                     Z-ADD0         MA46
+|   C                     Z-ADD0         MA39
+| 01-C                     END
+|    C*單價
+|    C           SC01      CHAIN#B0                  40
+| 02-C           *IN40     IFEQ '0'
+| 03-C           #B06      IFEQ 'A'
+| 04-C           SC08      IFLT MA39
+|   C                     Z-ADDMA40      SJ05
+| 04*C                     ELSE
+|   C                     Z-ADDMA45      SJ05
+| 04-C                     END
+| 03*C                     ELSE
+| 05-C           SC08      IFLT MA39
+|   C                     Z-ADDMA41      SJ05
+| 05*C                     ELSE
+|   C                     Z-ADDMA46      SJ05
+| 05-C                     END
+| 03-C                     END
+| 02*C                     ELSE
+|   C                     Z-ADD0         SJ05
+| 02-C                     END
+|    C*
+|    C                     Z-ADDSD05      SJ13
+|     *SJ07=(SJ05 - SD06) *(SJ04 - SJ13)
+|    C           SJ05      SUB  SD06      WFLD1  132
+|    C           SJ04      SUB  SJ13      WFLD2   50
+|     *SJ06=(SJ05) *(SJ04 - SJ13)
+|    C           WFLD2     MULT SJ05      SJ06      H
+|    C           WFLD1     MULT WFLD2     SJ07      H
+|    C*ERIC91124
+|    C           WFLD1     MULT WFLD2     SJ071     H
+|    C*銷售金額合計
+|    C                     ADD  SD07      WSI23
+|    C*
+|    C                     Z-ADD0         SJ08
+|    C                     Z-ADD0         SJ09
+|    C                     Z-ADD0         SJ091
+|    C*
+|    C                     MOVE SC14      SJ11
+|    C                     MOVE SC15      SJ12
+|    C*
+|    C                     Z-ADD0         SJ14
+|    C                     Z-ADD0         SJ15
+| 06-C           SC08      IFNE 0
+|    *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+|    *   verify
+|   C                     Z-ADDSC08      SJ16
+| 06*C                     ELSE
+|   C                     Z-ADDSC07      SJ16
+| 06-C                     END
+|    C*
+|    C*ERIC91124
+|    C                     Z-ADDSD131     SJ061     H
+|    C*
+|    C                     Z-ADDDATE      SJXX
+|    C                     TIME           SJYY
+|    C                     MOVE $USER     SJZZ
+|    C*
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN330....MOVE DATA TO OTHER HEADING FILE 2
+      *==============================================================*
+13===C           RTN330    BEGSR
+|    C*
+|    C*****搬移訂單資料至發票主檔
+|    C                     MOVE SC01      SI01
+|    C*
+|    C                     MOVE SC33      SI03
+|    C                     MOVE SC34      SI04
+|    C                     MOVE SC11      SI05
+|    C                     MOVE SC04      SI08
+|    C                     MOVE SC05      SI09
+|    C                     MOVE SC02      SI10
+|    C*送貨單號
+| 01-C                     SELEC
+|   C           #208      WHEQ 'Y'
+|   C                     MOVE SE02      SI11
+|   C           #208      WHEQ 'N'
+|   C                     MOVE *ALL'*'   SI11
+| 01-C                     ENDSL
+|    C*
+|    C                     MOVE SC14      SI12
+|    C                     MOVE SC15      SI13
+|    C                     MOVE SC16      SI14
+|    C                     MOVE SC17      SI15
+|    C                     MOVE #210      SI16
+|     *發票第二碼為數字表虛擬發票
+| 02-C           SI021     IFGE '0'
+|   C           SI02L     ANDNE'**'
+|   C                     MOVEL'Y'       SI16
+|   C                     MOVE *BLANK    SI07
+| 02-C                     END
+|     *
+|    C                     Z-ADDSC09      SI17
+|    C                     MOVE *BLANK    SI18
+|    C                     MOVE *BLANK    SI19
+|    C                     MOVE *BLANK    SI20
+| 03-C           SC08      IFNE 0
+|    *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+|    *   verify
+|   C                     Z-ADDSC08      SI21
+|   C                     Z-ADDSC08      SI06
+| 03*C                     ELSE
+|   C                     Z-ADDSC07      SI21
+|   C                     Z-ADDSC07      SI06
+| 03-C                     END
+|    C                     MOVE SC37      SI22
+|    C*銷售金額
+|    C                     Z-ADDWSI23     SI23
+|    C*營業稅
+| 04-C           SI22      IFEQ 'D'
+|   C*M002D     SI17      ANDEQ3
+|   C           *NAMVAR   DEFN           DA02
+|   C                     IN   DA02
+|   C           SI23      MULT DUTY      SI24      H
+| 04*C                     ELSE
+|   C                     Z-ADD0         SI24
+| 04-C                     END
+|    C*發票金額
+|    C           SI23      ADD  SI24      SI25
+|    C                     Z-ADD0         SI26
+|    C                     Z-ADD0         SI27
+|    C                     Z-ADD0         SI28
+|    C*應收日期
+| 05-C           SC08      IFNE 0
+|    *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+|    *   verify
+|   C                     Z-ADDSC08      WSC08   80
+| 05*C                     ELSE
+|   C                     Z-ADDSC07      WSC08
+| 05-C                     END
+|    C*
+|    C           SC14      CHAINMD0                  40
+|    C           *LOVAL    SETLLMD0
+| 06-C           *IN40     IFEQ '0'
+| 07-C                     SELEC
+|   C           MD23      WHEQ 'C'
+|   C                     Z-ADDWSC08     SI29
+|   C           MD23      WHEQ 'D'
+|   C*M001M     SC08      SUB  110000    SC08C   60
+|   C           SC08      SUB  19110000  SC08C   60
+|    *CVR0001 sev.00 Field SC08C is not a date or year
+|    *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+|    *   involving not-expanded and expanded date fields requiring
+|    *   add/remove century. Code must be adjusted manually
+|   C                     CALL 'P62'
+|   C                     PARM SC08C     P6201I  60
+|   C                     PARM MD25      P6202I  40
+|   C*M001M     SI29      PARM           P6211O  80
+|   C           W6        PARM           P6211O  60
+|   C*M001M               ADD  110000    SI29
+|   C           W6        ADD  19110000  SI29
+|   C           MD23      WHEQ 'M'
+| 08-C           SC08D     IFGT MD24
+|   C           SC08M     ADD  1         WSC08M
+| 08-C                     END
+|   C                     ADD  MD26M     WSC08M
+|   C*應收月份＞１２，日期更動
+| 09-C           WSC08M    IFGT 12
+|   C                     ADD  10000     WSC08
+|   C           WSC08M    SUB  12        WSC08M
+| 09-C                     END
+|   C*
+|   C*M001                MOVELWSC08Y    P2201I  60
+|   C*M001                MOVE WSC08M    P2201I
+|   C                     MOVELWSC08Y    W6      60
+|   C                     MOVE WSC08M    W6
+|   C           W6        SUB  191100    P2201I  40
+|    *CVR0001 sev.00 Field WSC08M is not a date or year
+|    *CVR0004 sev.00 Assumed to be the update of a date field in the zone
+|    *   that does not contain a year
+|   C*M001M               SUB  1100      P2201I
+|   C                     CALL 'P22'
+|   C                     PARM           P2201I
+|   C                     PARM           P2201O  1
+|   C                     PARM           P2202O  20
+|   C*
+| 10-C           MD26D     IFGT P2202O
+|   C                     Z-ADDP2202O    WSC08D
+| 10*C                     ELSE
+|   C                     Z-ADDMD26D     WSC08D
+| 10-C                     END
+|   C*
+|   C                     Z-ADDWSC08     SI29
+| 07-C                     ENDSL
+| 06-C                     END
+|    C*
+|    C                     Z-ADDSI25      SI30
+|    C                     MOVE SC27      SI31
+|    C                     MOVE SC28      SI32
+|    C                     Z-ADD0         SI33
+|    C                     MOVE *BLANKS   SI34
+|    C                     Z-ADD0         SI35
+|    C                     Z-ADDDATE      SIXX
+|    C                     TIME           SIYY
+|    C                     MOVE $USER     SIZZ
+|    C*
+13===C                     ENDSR
+      *===============================================================*
+14===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  LDA
+|    C*
+14===C           ENDLDA    ENDSR
+

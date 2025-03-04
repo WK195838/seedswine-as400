@@ -1,0 +1,210 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM-ID   : PIR1012                                    *
+     H*    PROGRAM NAME :每月盤盈虧報表                            *
+     H*    AUTHOR       : DEREK                                      *
+     H*    CREATE DATE  : 2016/01/29                                 *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :盤點系統                                  *
+     H*00A需求單號: 1050120                                        *
+     H*00A 2016/03/03 DEREK盤點量-庫存量=差異量                *
+     H****************************************************************
+     FPIZAPF  IP  E           K        DISK
+     FPIZBPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FINTBPF  IF  E           K        DISK
+     FPIR101F UF  E           K        DISK                      A
+     E*--------------------------------------------------------------*
+     IZA0
+     I*公司別
+     I                                              ZA01  L1
+     I*通路代號
+     I                                              ZA02  L1
+     I*分店代號
+     I                                              ZA04  L1
+     I*盤點日期
+     I                                              ZA03  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+     I                                      501 502 DZA01
+     I                                      503 5060DZA02
+     I                                      507 5120DZAYM
+     I****                                  513 513 DOPT
+     I                                      514 518 DZA04S
+     I                                      519 523 DZA04E
+     I                                      524 532 DZB05S
+     I                                      533 541 DZB05E
+     I                                      542 5490DZA03S
+     I                                      542 5450DZA03Y
+     I                                      546 5470DZA03M
+     I                                      550 5570DZA03E
+     I           IDS
+     I                                        1   80WZA03
+     I                                        1   60WZA3YM
+     I                                        1   40WZA03Y
+     I                                        5   60WZA03M
+     I                                        7   80WZA03D
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYNC     KLIST
+     C                     KFLD           ZA01             公司
+     C                     KFLD           WF05             產品代號
+     C           KEYNE     KLIST
+     C                     KFLD           ZA01             公司
+     C                     KFLD           ZA02             通路
+     C                     KFLD           ZA04             分店
+     C           KEYZB     KLIST
+     C                     KFLD           ZA01             公司
+     C                     KFLD           ZA02             通路
+     C                     KFLD           ZA05             盤點單號
+     C           KEYTB     KLIST
+     C                     KFLD           ZA01             公司
+     C                     KFLD           WZA3YM           年月
+     C                     KFLD           ZA02             通路
+     C                     KFLD           ZA04             分店
+     C           KEY101    KLIST
+     C                     KFLD           TB01             公司
+     C                     KFLD           TB03             通路
+     C                     KFLD           TB04             分店
+     C                     KFLD           TB05             產品代號
+     C*==============================================================*
+     C*                    DEFN ROUTINE
+     C*==============================================================*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C  N10                EXSR R0100                      .INIT
+     C*
+     C   L1                EXSR R7100
+     C                     EXSR R1000                                  L
+     C*
+     CL1 10                EXSR R8100
+     C*==============================================================*
+     C*          R0100 ... INITIAL
+     C*==============================================================*
+01===C           R0100     BEGSR
+|    C*
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R7100 ... LEVEL BREAK L1 --- INITIAL
+     C*==============================================================*
+02===C           R7100     BEGSR
+|    C*
+|    C           KEYNE     CHAINNE0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVELNE05      WF03A     P
+| 01*C                     ELSE
+|   C                     MOVEL*BLANK    WF03A
+| 01-C                     ENDIF
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          R1000 ... PROCESS
+     C*==============================================================*
+03===C           R1000     BEGSR
+|    C*
+|    C                     MOVELZA01      WF01      P      公司別
+|    C                     MOVELZA02      WF02      P      通路代號
+|    C                     MOVELZA04      WF03      P      分店代號
+|    C                     Z-ADDZA03      WF04             盤點日期
+|    C*
+|    C           KEYZB     SETLLZB0
+|    C           KEYZB     READEZB0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C*選取產品範圍
+| 02-C           ZB05      IFGE DZB05S
+|   C           ZB05      ANDLEDZB05E
+|   C                     MOVELZB05      WF05      P      產品代號
+|   C           KEYNC     CHAINNC0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVELNC05      WF05A     P      中文簡稱
+| 03*C                     ELSE
+|   C                     MOVEL*BLANK    WF05A            中文簡稱
+| 03-C                     ENDIF
+|   C*計算某日庫存量
+|   C                     CALL 'MCC710'
+|   C                     PARM ZA01      XTB01   2        公司別
+|   C                     PARM ZA02      XTB03   2        通路代號
+|   C                     PARM ZA04      XTB04   5        分店代號
+|   C                     PARM ZB05      XTB05   9        產品代號
+|   C                     PARM ZA03      XTX06   80       日期
+|   C                     PARM 0         XTB07   90       庫存數量
+|   C                     PARM 0         XTB17   90       陳列數量
+|   C*
+|   C           XTB07     ADD  XTB17     WF06             庫存量
+|   C                     Z-ADDZB06      WF07             盤點量
+|   C*00A-      WF06      SUB  WF07      WF08             差異量
+|00A+C           WF07      SUB  WF06      WF08             差異量
+|   C                     WRITEWF0
+| 02-C                     ENDIF
+|   C*
+|   C           KEYZB     READEZB0                      46
+| 01-C                     ENDDO
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          R8100 ... 補缺漏產品
+     C*==============================================================*
+04===C           R8100     BEGSR
+|    C*
+|    C                     Z-ADDZA03      WZA03
+| 01-C           WZA03D    IFGT 25
+| 02-C           WZA03M    IFEQ 12
+|   C                     Z-ADD1         WZA03M
+|   C                     ADD  1         WZA03Y
+| 02*C                     ELSE
+|   C                     ADD  1         WZA03M
+| 02-C                     ENDIF
+| 01-C                     ENDIF
+|    C*
+|    C           KEYTB     SETLLTB0
+|    C           KEYTB     READETB0                      46
+| 03-C           *IN46     DOWEQ'0'
+|   C           KEY101    CHAINWF0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVELTB01      WF01      P      公司別
+|   C                     MOVELTB03      WF02      P      通路代號
+|   C                     MOVELTB04      WF03      P      分店代號
+|   C                     Z-ADDZA03      WF04             盤點日期
+|   C*選取產品範圍
+| 05-C           TB05      IFGE DZB05S
+|   C           TB05      ANDLEDZB05E
+|   C                     MOVELTB05      WF05      P      產品代號
+|   C           KEYNC     CHAINNC0                  40
+| 06-C           *IN40     IFEQ '0'
+|   C                     MOVELNC05      WF05A     P      中文簡稱
+| 06*C                     ELSE
+|   C                     MOVEL*BLANK    WF05A            中文簡稱
+| 06-C                     ENDIF
+|   C*計算某日庫存量
+|   C                     CALL 'MCC710'
+|   C                     PARM TB01      XTB01   2        公司別
+|   C                     PARM TB03      XTB03   2        通路代號
+|   C                     PARM TB04      XTB04   5        分店代號
+|   C                     PARM TB05      XTB05   9        產品代號
+|   C                     PARM ZA03      XTX06   80       日期
+|   C                     PARM 0         XTB07   90       庫存數量
+|   C                     PARM 0         XTB17   90       陳列數量
+|   C*
+|   C           XTB07     ADD  XTB17     WF06             庫存量
+|   C                     Z-ADD0         WF07             盤點量
+|   C*00A-      WF06      SUB  WF07      WF08             差異量
+|00A+C           WF07      SUB  WF06      WF08             差異量
+|   C                     WRITEWF0
+| 05-C                     ENDIF
+| 04-C                     ENDIF
+|   C*
+|   C           KEYTB     READETB0                      46
+| 03-C                     ENDDO
+|    C*
+04===C                     ENDSR
+

@@ -1,0 +1,179 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0461                                       *
+      * AUTHER       : A1118 PHILIP TSAI                             *
+      * CREATE DATE  : 81/04/15                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款子系統                               *
+      * REMARK       :銷貨成本明細表                               *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.22  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FSOSIPF  IP  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FREWF10  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 601 DSI01
+     I                                      602 602 COMP
+     I                                      603 6080DSI35S
+     I                                      609 6140DSI35E
+     I*M001M                                615 6200WSI35S
+     I*M001M                                621 6260WSI35E
+M001MI                                      661 6680WSI35S
+M001MI                                      671 6780WSI35E
+     I                                      629 629 COMPS
+     I                                      630 630 COMPE
+     I                                      631 635 DSI12S
+     I                                      636 640 DSI12E
+     I            DS
+     I                                        1   2 SI01
+     I                                        1   1 SI01A
+     I                                        2   2 SI01B
+     I            DS
+     I                                        1   2 SD01
+     I                                        1   1 SD01A
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSJ     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C           KEYSD     KLIST
+     C                     KFLD           SI10
+     C                     KFLD           SJ03
+     C           KEYWF     KLIST
+     C                     KFLD           SI01A
+     C                     KFLD           SJ03
+     C*
+     C           *LIKE     DEFN WF1006    WF106W
+     C           *LIKE     DEFN WF1007    WF107W
+     C           *LIKE     DEFN WF1008    WF108W
+     C           *LIKE     DEFN WF1009    WF109W
+     C           *LIKE     DEFN WF1010    WF110W
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN100
+     C*==============================================================*
+     C*          RTN100....GET DETAIL
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C**發票明細檔讀取
+|    C           KEYSJ     SETLLSJ0
+|    C           KEYSJ     READESJ0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C**CHAIN WORK FILE
+|   C           KEYWF     CHAINWF100                40
+| 02-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN200
+| 02*C                     ELSE                              修改
+|   C                     EXSR RTN300
+| 02-C                     END
+|   C*
+|   C           KEYSJ     READESJ0                      41
+| 01-C                     END
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE WORK FILE
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C**
+|    C                     MOVE SI01A     WF1001           公司別
+|    C                     MOVE SI01B     WF1011           辦事處
+|    C                     MOVE SJ03      WF1002           產品編號
+|    C           SJ04      SUB  SJ13      WF1003           訂購
+|    C                     Z-ADDSJ13      WF103A           搭贈
+|    C                     Z-ADDSJ06      WF1004           銷售金額
+|    C**搭贈金額(舊算法)
+|    C*                    Z-ADD0         WF1006
+|    C*          SJ13      MULT SJ05      WF1006    H
+     C*
+|    C           KEYSD     CHAINSD0                  40
+| 01-C           *IN40     IFEQ '0'
+|    C**搭贈金額
+     C           SJ05      SUB  SD06      WF1006
+     C           SJ04      SUB  SJ13      WF106A  50
+     C           WF1006    MULT WF106A    WF1006    H
+     C           SJ07      SUB  WF1006    WF1006
+     C*
+|    C**正常折扣＆淨售＆ＦＯＢ＆ＦＨＩ＆公賣利益
+|   C                     Z-ADDSD13      WF1005
+|   C                     Z-ADDSD07      WF1007
+     C*匯齡搭贈不算成本
+     C           SD16      IFNE SD01A
+     C           WF1006    ANDEQ0
+     C           SJ04      SUB  SJ13      SJ04W   50
+|   C           SD10      MULT SJ04W     WF1008
+|   C           SD11      MULT SJ04W     WF1009
+|   C           SD12      MULT SJ04W     WF1010
+| 01*C                     ELSE
+|   C           SD10      MULT SJ04      WF1008
+|   C           SD11      MULT SJ04      WF1009
+|   C           SD12      MULT SJ04      WF1010
+     C                     END
+| 01*C                     ELSE
+|   C                     Z-ADD0         WF1005
+|   C                     Z-ADD0         WF1007
+|   C                     Z-ADD0         WF1008
+|   C                     Z-ADD0         WF1009
+|   C                     Z-ADD0         WF1010
+| 01-C                     END
+|    C*WRITE WORK FILE
+|    C                     WRITEWF100
+|    C***
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....UPDATE WORK FILE
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+|    C           SJ04      SUB  SJ13      WSJ04   50
+|    C                     ADD  WSJ04     WF1003           訂購
+|    C                     ADD  SJ13      WF103A           搭贈
+|    C                     ADD  SJ06      WF1004           銷售金額
+|    C**搭贈金額
+|    C*          SJ13      MULT SJ05      WF106W    H
+|    C*                    ADD  WF106W    WF1006
+|    C*
+|    C           KEYSD     CHAINSD0                  40
+| 01-C           *IN40     IFEQ '0'
+|    C**搭贈金額
+     C           SJ05      SUB  SD06      WF106W
+     C           SJ04      SUB  SJ13      WF106A  50
+     C           WF106W    MULT WF106A    WF106W    H
+     C           SJ07      SUB  WF106W    WF106W
+|    C                     ADD  WF106W    WF1006
+|    C**正常折扣＆淨售＆ＦＯＢ＆ＦＨＩ＆公賣利益
+|   C                     ADD  SD13      WF1005
+    C                     ADD  SD07      WF1007
+     C*匯齡搭贈不算成本
+     C           SD16      IFNE SD01A
+     C           WF106W    ANDEQ0
+|   C           SD10      MULT WSJ04     WF108W
+|   C           SD11      MULT WSJ04     WF109W
+|   C           SD12      MULT WSJ04     WF110W
+     C                     ELSE
+|   C           SD10      MULT SJ04      WF108W
+|   C           SD11      MULT SJ04      WF109W
+|   C           SD12      MULT SJ04      WF110W
+     C                     END
+|   C                     ADD  WF108W    WF1008
+|   C                     ADD  WF109W    WF1009
+|   C                     ADD  WF110W    WF1010
+| 01-C                     END
+|    C*WRITE WORK FILE
+|    C                     UPDATWF100
+|    C***
+03===C                     ENDSR
+

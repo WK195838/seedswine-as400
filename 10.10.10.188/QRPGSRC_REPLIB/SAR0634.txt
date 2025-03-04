@@ -1,0 +1,289 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : SAR0631                                       *
+      * AUTHER       : SKY拷貝至SAR063                             *
+      * CREATE DATE  : 99/04/22                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      *  REMARK      :產品銷售毛利合併報表 (針對送貨日期)        *
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FSOSGPF  IF  E           K        DISK
+     FSOSHPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     F*TMAPF  IF  E           K        DISK
+     FREWF48  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *產品
+     I                                      601 609 DSD03S
+     I                                      610 618 DSD03E
+     I                                      648 648 DSEL
+M001AI                                      651 651 DSEL1
+     I                                      660 664 DSC04S
+     I                                      665 669 DSC04E
+     I                                      670 673 DSC05S
+     I                                      674 677 DSC05E
+     I                                      680 680 DSC33S
+     I                                      681 681 DSC33E
+     I                                      682 683 DMA10S
+     I                                      684 685 DMA10E
+     I            DS
+     I                                        1   2 SC01
+     I                                        1   1 SC01L
+     I            DS
+     I                                        1   2 SG01
+     I                                        1   1 SG01L
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF4803    WORK03
+     C           *LIKE     DEFN WF4804    WORK04
+     C           *LIKE     DEFN WF4805    WORK05
+     C           *LIKE     DEFN WF4806    WORK06
+     C           *LIKE     DEFN WF4807    WORK07
+     C           *LIKE     DEFN WF4808    WORK08
+     C           *LIKE     DEFN WF4809    WORK09
+     C           *LIKE     DEFN WF4810    WORK10
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF4801
+     C                     KFLD           WF481A
+     C                     KFLD           WF4802
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *銷售
+     C                     READ SC0                      45
+  01-C           *IN45     DOWEQ'0'
+     *
+     *
+    C           SC02      SETLLSD0
+    C           SC02      READESD0                      46
+  02-C           *IN46     DOWEQ'0'
+     *
+  03-C           SD03      IFGE DSD03S
+    C           SD03      ANDLEDSD03E
+     *
+    C           SD03      CHAINMA0                  40
+  04-C           MA10      IFGE DMA10S
+    C           MA10      ANDLEDMA10E
+     *
+S01+ C                     MOVELSC02      WSC02  12
+S01+ C                     MOVELSD03      WSD03  15
+S01+ C                     MOVEL*BLANK    WSF03   9
+S01+ C                     Z-ADD*ZERO     WSF04   50
+S01+ C                     Z-ADD*ZERO     WSF05   40
+      *
+S01+ C/EXEC SQL DECLARE C1 CURSOR FOR
+SO1+ C+ SELECT SF04,SF05
+SO1+ C+ FROM SOSEPF,SOSFPF
+SO1+ C+ WHERE  SE29 = :WSC02
+SO1+ C+ AND    SF03 = :WSD03
+SO1+ C+ AND    SE02 = SF02
+S01+ C/END-EXEC
+      *
+S01+ C/EXEC SQL
+S01+ C+ OPEN C1
+S01+ C/END-EXEC
+      *
+S01+ C/EXEC SQL
+S01+ C+ FETCH NEXT FROM C1 INTO :WSF04, :WSF05
+S01+ C/END-EXEC
+S01+ C           SQLCOD    DOWEQ0
+S01+ C                     Z-ADD*ZERO     W#QTY   50
+S01+ C           SD04      ADD  SD05      W#QTY
+S01+ C                     ADD  SD04      W#SD4   50
+S01+ C                     ADD  SD05      W#SD5   50
+S01+ C                     ADD  WSF04     W#SF4   50
+S01+ C                     ADD  WSF05     W#SF5   50
+S01+ C           W#QTY     IFEQ 0
+S01+ C           SC39      ANDEQ0                          確認日期
+S01+ C                     Z-ADDWSF04     SD04
+S01+ C                     Z-ADDWSF05     SD05
+S01+ C                     ENDIF
+    C                     MOVELSD03      WF4801
+    C                     MOVELSD03      WF481A
+    C                     MOVELSD03      WF4802
+    C           KEYWF     CHAINWF480                40
+    C                     EXSR RTN100
+S01+ C/EXEC SQL
+S01+ C+ FETCH NEXT FROM C1 INTO :WSF04, :WSF05
+S01+ C/END-EXEC
+S01+ C                     ENDDO
+S01+ C/EXEC SQL
+S01+ C+ CLOSE C1
+S01+ C/END-EXEC
+  04-C                     END
+  03-C                     END
+     *
+    C           SC02      READESD0                      46
+  02-C                     END
+     *
+    C                     READ SC0                      45
+  01-C                     END
+     C*
+      *銷退
+     C                     READ SG0                      45
+  05-C           *IN45     DOWEQ'0'
+     *
+    C           SG04      CHAINMD0                  41
+  06-C           *IN41     IFEQ '0'
+    C           MD07      ANDGEDSC33S
+    C           MD07      ANDLEDSC33E
+     *
+    C           SG02      SETLLSH0
+    C           SG02      READESH0                      46
+  07-C           *IN46     DOWEQ'0'
+     *
+  08-C           SH03      IFGE DSD03S
+    C           SH03      ANDLEDSD03E
+     *
+    C           SH03      CHAINMA0                  40
+  09-C           MA10      IFGE DMA10S
+    C           MA10      ANDLEDMA10E
+     *
+    C                     MOVELSH03      WF4801
+    C                     MOVELSH03      WF481A
+    C                     MOVELSH03      WF4802
+    C           KEYWF     CHAINWF480                40
+    C                     EXSR RTN200
+  09-C                     END
+  08-C                     END
+     *
+    C           SG02      READESH0                      46
+  07-C                     END
+     *
+  06-C                     END
+    C                     READ SG0                      45
+  05-C                     END
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....WRITE OR UPDATE REWF48
+      *==============================================================*
+01===C           RTN100    BEGSR
+|     *
+|    C                     Z-ADD0         WORK03
+|    C                     Z-ADD0         WORK04
+|    C                     Z-ADD0         WORK05
+|    C                     Z-ADD0         WORK06
+|    C                     Z-ADD0         WORK07
+|    C                     Z-ADD0         WORK08
+|    C                     Z-ADD0         WORK09
+|    C                     Z-ADD0         WORK10
+|     *
+|    C                     Z-ADDSD07      WORK03
+| 01-C           SC33      IFEQ 'B'
+|   C           WORK03    DIV  1.05      WORK03    H
+| 01-C                     ENDIF
+|     *
+|    C           SD04      MULT SD22      WORK05    H
+|    C           SD04      MULT SD23      WORK06    H
+|    C           SD04      MULT SD24      WORK07    H
+|    C           SD05      MULT SD22      WORK08    H
+|    C           SD05      MULT SD23      WORK09    H
+|    C           SD05      MULT SD24      WORK10    H
+|     *
+| 02-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK03    WF4803
+|   C                     ADD  WORK04    WF4804
+|   C                     ADD  WORK05    WF4805
+|   C                     ADD  WORK06    WF4806
+|   C                     ADD  WORK07    WF4807
+|   C                     ADD  WORK08    WF4808
+|   C                     ADD  WORK09    WF4809
+|   C                     ADD  WORK10    WF4810
+|    *
+|   C                     UPDATWF480
+| 02*C                     ELSE
+|   C                     Z-ADDWORK03    WF4803
+|   C                     Z-ADDWORK04    WF4804
+|   C                     Z-ADDWORK05    WF4805
+|   C                     Z-ADDWORK06    WF4806
+|   C                     Z-ADDWORK07    WF4807
+|   C                     Z-ADDWORK08    WF4808
+|   C                     Z-ADDWORK09    WF4809
+|   C                     Z-ADDWORK10    WF4810
+|   C                     WRITEWF480
+|   C*
+| 02-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE OR UPDATE REWF48
+      *==============================================================*
+02===C           RTN200    BEGSR
+|     *
+|    C                     Z-ADD0         WORK03
+|    C                     Z-ADD0         WORK04
+|    C                     Z-ADD0         WORK05
+|    C                     Z-ADD0         WORK06
+|    C                     Z-ADD0         WORK07
+|    C                     Z-ADD0         WORK08
+|    C                     Z-ADD0         WORK09
+|    C                     Z-ADD0         WORK10
+|     *
+|    C                     Z-ADDSH07      WORK04
+|     *搭贈為０
+| 01-C           SH13      IFEQ 0
+|   C                     Z-SUBSH17      WORK05
+|   C                     Z-SUBSH18      WORK06
+|   C                     Z-SUBSH19      WORK07
+| 01*C                     ELSE
+|   C*搭贈-FOB,FHI,DUTY
+|   C           SH12      ADD  SH13      QTY     50
+|   C*
+| 02-C           QTY       IFNE 0
+|   C           SH17      DIV  QTY       QTY1   114H
+|   C           SH12      MULT QTY1      QTY2   114H      *訂購-FOB
+|   C           SH17      SUB  QTY2      QTY3   114H      *搭贈-FOB
+|   C                     Z-SUBQTY3      WORK08
+|   C                     Z-SUBQTY2      WORK05
+|   C           SH18      DIV  QTY       QTY11  114H
+|   C           SH12      MULT QTY11     QTY21  114H      *訂購-FHI
+|   C           SH18      SUB  QTY21     QTY31  114H      *搭贈-FHI
+|   C                     Z-SUBQTY31     WORK09
+|   C                     Z-SUBQTY21     WORK06
+|   C           SH19      DIV  QTY       QTY12  114H
+|   C           SH12      MULT QTY12     QTY22  114H      *訂購-DUTY
+|   C           SH19      SUB  QTY22     QTY32  114H      *搭贈-DUTY
+|   C                     Z-SUBQTY32     WORK10
+|   C                     Z-SUBQTY22     WORK07
+| 02-C                     END
+| 01-C                     END
+|     *
+| 03-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK03    WF4803
+|   C                     ADD  WORK04    WF4804
+|   C                     ADD  WORK05    WF4805
+|   C                     ADD  WORK06    WF4806
+|   C                     ADD  WORK07    WF4807
+|   C                     ADD  WORK08    WF4808
+|   C                     ADD  WORK09    WF4809
+|   C                     ADD  WORK10    WF4810
+|    *
+|   C                     UPDATWF480
+| 03*C                     ELSE
+|   C                     Z-ADDWORK03    WF4803
+|   C                     Z-ADDWORK04    WF4804
+|   C                     Z-ADDWORK05    WF4805
+|   C                     Z-ADDWORK06    WF4806
+|   C                     Z-ADDWORK07    WF4807
+|   C                     Z-ADDWORK08    WF4808
+|   C                     Z-ADDWORK09    WF4809
+|   C                     Z-ADDWORK10    WF4810
+|   C                     WRITEWF480
+|   C*
+| 03-C                     END
+|    C*
+02===C                     ENDSR
+

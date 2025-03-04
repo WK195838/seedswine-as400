@@ -1,0 +1,173 @@
+     F****************************************************************
+     F*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     F*                                                              *
+     F*    PROGRAM NAME : P51                                        *
+     F*    AUTHOR       : A1088   LUCY                               *
+     F*    CREATE DATE  : 79/09/26                                   *
+     F*    SYSTEM       : PANTECH PUBLIC PROGRAM                     *
+     F*    PURPOSE      :轉換日期為西元簡寫日期                    *
+     F****************************************************************
+     F* PARAMETER  : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION     *
+     F*              ===  =======  ===  =====  ====  ===========     *
+     F*              01   P5101I    I   *DEC    6 0 日期（不限格式）
+     F*              02   P5102I    I   *CHAR   3   日期格式       *
+     F*              03   P5103I    I   *CHAR   1   曆別1西,2中*
+     F*              04   P5111O    O   *CHAR  13   西元簡寫日期   *
+     F****************************************************************
+     E* WD :傳入日期
+     E* WF :傳入格式
+     E* WFD:格式資料
+     E* WM :月份資料
+     E* WFD:月份簡寫
+     E                    WD          3  2 0
+     E                    WF          3  1
+     E                    WFD     3   3  1
+     E                    WM     12  12  2 0
+     E                    WMD     6  12  4
+     I*
+     I            DS
+     I                                        1   60WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     IWRST        DS
+     I                                        1   4 WR1
+     I                                        5   5 WR2
+     I                                        6   70WR3
+     I                                        8   9 WR4
+     I                                       10  130WR5
+     I*
+     C*--------------------------------------------------------------*
+     C*                    PARAMETERS                                *
+     C*--------------------------------------------------------------*
+     C* P5101I: 傳入日期，不限格式
+     C* P5102I: 日期格式，由Y,M,D組合
+     C* P5103I: 曆別:國曆:"1",西曆:"2"
+     C* P5111O: 西元簡寫日:MMM. DD, YYYY
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           P5101I  60
+     C                     PARM           P5102I  3
+     C                     PARM           P5103I  1
+     C                     PARM WRST      P5111O 13
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C*--------------------------------------------------------------*
+     C*                    MAIN ROUTINE                              *
+     C*--------------------------------------------------------------*
+     C                     SETOF                     99
+     C                     EXSR RTN100                     *CHECK
+     C*
+     C   99                GOTO WEND
+     C*
+     C                     EXSR RTN200
+     C                     EXSR RTN300
+     C                     EXSR RTN400
+     C*
+     C           WEND      TAG
+     C                     SETON                     LR
+     C*--------------------------------------------------------------*
+     C*                 RTN100....CHECK
+     C*--------------------------------------------------------------*
+     C           RTN100    BEGSR
+     C*
+     C*檢查輸入格式資料,如果不是由Y,M,D三字元組成,
+     C*則搬*BLANK給P5111O,表示錯誤
+     C*
+     C                     MOVEAP5102I    WF
+     C                     DO   3         WX      20
+     C                     Z-ADD1         WY      20
+     C           WFD,WX    LOKUPWF,WY                    31*FND
+     C  N31                SETON                     99
+     C                     END                             *END DO
+     C   99                GOTO QUIT
+     C*
+     C*CHECK曆別:"1"為西曆,"2"國曆,不可為其它,
+     C*否則搬*BLANK給P5111O表示錯誤
+     C*
+     C           P5103I    IFNE '1'
+     C           P5103I    ANDNE'2'
+     C                     SETON                     99
+     C                     END                             *END IF
+     C   99                GOTO QUIT
+     C*
+     C           QUIT      TAG
+     C                     MOVE *BLANK    P5111O
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*                 RTN200....取出年．月．日．
+     C*--------------------------------------------------------------*
+     C           RTN200    BEGSR
+     C                     Z-ADDP5101I    WDATE
+     C                     Z-ADDWD1       WD,1
+     C                     Z-ADDWD2       WD,2
+     C                     Z-ADDWD3       WD,3
+     C                     DO   3         WX      20
+     C           WF,WX     IFEQ 'Y'
+     C                     MOVE WD,WX     WYY     20
+     C                     ELSE
+     C           WF,WX     IFEQ 'M'
+     C                     MOVE WD,WX     WMM     20
+     C                     ELSE
+     C                     MOVE WD,WX     WDD     20
+     C                     END
+     C                     END
+     C                     END
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*                 RTN300....產生年份
+     C*--------------------------------------------------------------*
+     C           RTN300    BEGSR
+     C*
+     C*適用年份為西元1980～2079年:
+     C*
+     C* 1.西曆
+     C* 2000～2079 "輸入年度+2000年
+     C* 1980～1999 "輸入年度+1900年
+     C*
+     C           P5103I    IFEQ '1'                        *西曆
+     C           WYY       IFLT 80
+     C           WYY       ADD  2000      WR5
+     C                     ELSE
+     C           WYY       ADD  1900      WR5
+     C                     END
+     C*
+     C* 2.國曆
+     C* 2011～2079 "輸入年度+2011年
+     C* 1980～2010 "輸入年度+1911年
+     C*
+     C                     ELSE                            *國曆
+     C           WYY       IFLT 69
+     C           WYY       ADD  2011      WR5
+     C                     ELSE
+     C           WYY       ADD  1911      WR5
+     C                     END
+     C                     END
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*                 RTN400....產生月份及日期
+     C*--------------------------------------------------------------*
+     C           RTN400    BEGSR
+     C                     Z-ADD1         WX      20
+     C           WMM       LOKUPWM,WX                    31*FND
+     C   31                MOVE WMD,WX    WR1
+     C  N31                MOVE *BLANKS   WRST
+     C  N31                MOVE WRST      P5111O
+     C*
+     C   31                Z-ADDWDD       WR3              *MOVE DATE
+     C   31                MOVE *BLANK    WR2              *OTHER DATA
+     C   31                MOVE ', '      WR4
+     C                     ENDSR
+     C*--------------------------------------------------------------*
+     C*                 DATA  OF  ARRAY
+     C*--------------------------------------------------------------*
+**
+YMD
+**
+010203040506070809101112
+**
+JAN.FEB.MAR.APR.MAY JUN.
+JUL.AUG.SEP.OCT.NOV.DEC.
+

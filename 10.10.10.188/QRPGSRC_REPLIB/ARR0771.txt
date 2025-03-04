@@ -1,0 +1,191 @@
+     A****************************************************************
+     A*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+     A*                                                              *
+     A*    AUTHOR       : MERCURY                                    *
+     A*    CREATE DATE  : 83/02/15                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    PROGRAM NAME : ARR077                                     *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :進銷存系統                                *
+     A*    REMARK       :折讓單簽收明細表                          *
+     A*===============================================================
+     A* CODE |  AUTHOR  |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M004 | MICHELLE | 00.06.15 |新增折讓稅額及折讓總金額欄
+     A*================================================================
+     A****************************************************************
+     FSOSGPF  IP  E           K        DISK
+M004AFSOSXPF  IF  E           K        DISK
+     FARAFPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     F*A#APF  IF  E           K        DISK
+B2CHKFARR077P O   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 601 DSG01
+     I                                      651 651 DSG01S
+     I                                      652 652 DSG01E
+     I                                      602 602 COMPS
+     I                                      603 603 COMPE
+     I                                      604 6090DSG26S
+     I                                      610 6150DSG26E
+     I                                      616 621 DSG11S
+     I                                      622 627 DSG11E
+     I                                      640 640 COMP
+     I            DS
+     I                                        1   2 SG01
+     I                                        1   1 SG01A
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           SG04
+     C                     KFLD           SG05
+     C           KEYAF     KLIST
+     C                     KFLD           AF03
+     C                     KFLD           AF04
+     C*
+M004AC           KEYSX     KLIST
+M004AC                     KFLD           SG02
+     C*          KEY#A     KLIST
+     C*                    KFLD           #A01
+     C*                    KFLD           #A02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+  01-C           *IN10     IFEQ '0'                        *SET INIT
+    C                     EXSR RTN010
+  01-C                     END
+     C                     EXSR RTN100
+     CLR                   EXSR RTN990
+     C*================================================================
+     C*          RTN010....SET INIT
+     C*================================================================
+01===C           RTN010    BEGSR
+| 02-C           COMP      IFEQ '1'
+|   C                     MOVE '台北'  #COMP
+| 02*C                     ELSE
+| 03-C           COMP      IFEQ '2'
+|   C                     MOVE '台中'  #COMP
+| 03*C                     ELSE
+| 04-C           COMP      IFEQ '3'
+|   C                     MOVE '高雄'  #COMP
+| 04*C                     ELSE
+| 05-C           COMP      IFEQ *BLANKS
+|   C                     MOVE '全部'  #COMP
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+|    C*
+|    C*                    MOVEL'COMPANY' #A01
+|    C*                    MOVELSG01A     #A02
+|    C*          KEY#A     CHAIN#A0                  40
+|    C* N40                MOVEL#A03      #SG01
+|    C*  40                MOVEL*BLANK    #SG01
+|    C                     WRITEPH1
+|    C                     SETON                     10
+01===C                     ENDSR
+     C*================================================================
+     C*          RTN100....PROC DATA
+     C*================================================================
+02===C           RTN100    BEGSR
+|    C*
+M004AC           KEYSX     CHAINSX0                  40
+M004AC           *IN40     IFEQ '0'
+M004AC           SG10      ADD  SX10      D1010
+M004AC                     ELSE
+M004AC                     Z-ADDSG10      D1010
+M004AC                     Z-ADD0         SX10
+M004AC                     END
+|    C********
+|    C*業務員
+|    C********
+|    C           SG11      CHAINMC0                  43
+|    C   43                MOVE *BLANK    MC02
+|    C*
+|    C********
+|    C*客戶簡稱
+|    C********
+|    C           KEYME     CHAINME0                  43
+|    C   43                MOVE *BLANK    ME04
+|    C*
+|    C   39                EXSR RTN900                     *PROC SKIP
+|    C                     Z-ADDSG26      DSG26
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+|    C                     PARM DSG26     S001I2  60
+|    C           DSG26     PARM           S001O1  60
+|    C                     WRITEPD1
+|    C*
+02===C                     ENDSR
+     C*================================================================
+     C*          RTN900....PROC SKIP
+     C*================================================================
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+  ERRC*          RTN990....END
+     C*==============================================================*
+04===C           RTN990    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE3
+| 01-C                     END
+|    C                     EXSR RTN991                     *ARAFPF
+|    C                     WRITEPE2
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN991....READ ARAFPF
+     C*==============================================================*
+05===C           RTN991    BEGSR
+|    C*
+|    C           *LOVAL    SETLLAF0
+|    C                     READ AF0                      45
+| 01-C           *IN45     DOWEQ'0'
+     C*
+M004AC           AF07      ADD  AF09      D0709
+     C*
+|   C*業務員，客戶簡稱
+|   C           KEYAF     CHAINME0                  46
+| 02-C           *IN46     IFEQ '1'
+|   C                     MOVEL*BLANKS   ME15
+|   C                     MOVEL*BLANKS   ME04
+| 02-C                     END
+|   C           ME15      CHAINMC0                  46
+| 03-C           *IN46     IFEQ '1'
+|   C                     MOVEL*BLANKS   MC02
+| 03-C                     END
+     C           ME15      IFGE DSG11S
+     C           ME15      ANDLEDSG11E
+|   C*
+|   C   39                EXSR RTN900                     *PROC SKIP
+|    C                     Z-ADDAF05      DAF05
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+|    C                     PARM DAF05     S001I2  60
+|    C           DAF05     PARM           S001O1  60
+|   C                     WRITEPD2
+     C                     END
+|   C*
+|    C                     READ AF0                      45
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+

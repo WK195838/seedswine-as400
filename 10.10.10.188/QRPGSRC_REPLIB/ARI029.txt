@@ -1,0 +1,211 @@
+     A****************************************************************
+     A*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+     A*                                                              *
+     A*    PROGRAM ID   : ARI029                                     *
+     A*    AUTHOR       : AN MING HSIA                               *
+     A*    DATE WRITTEN : 08/11/93                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收子系統                                *
+     A*    PROCEDURE    :統一發票號碼查詢                          *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M005      | 00.07.21 |顯示發票金額
+     A*================================================================
+     A****************************************************************
+     FSOSILF97IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARI029D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     E*: FUNCTION DATA :
+     E                    TEST    1   4 14
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN DBGN2     OBGN2            *START KEY
+     C*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYSI2    KLIST
+     C                     KFLD           DBGN2
+     C           KEYME     KLIST
+     C                     KFLD           SI08
+     C                     KFLD           SI09
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+      *
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN25     IFEQ '1'
+    C                     EXSR RTN192
+  02*C                     ELSE
+    C                     EXSR RTN170
+  02-C                     END
+    C  N03                EXSR RTN195
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE 'SCR001'  APPSCR  60
+|    C                     Z-ADD0         HRRN    40
+|    C                     Z-ADD0         DATE    60
+|    C                     MOVE *BLANK    DBGN2
+|    C                     MOVE *BLANK    OBGN2
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+M001DC*                    PARM $EGMDY    S001I2  80
+M001AC                     PARM $EGMDY    S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+M001DC*          DATE      PARM           S001O1  80
+M001AC           DATE      PARM           S001O1  60
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+02===C           RTN170    BEGSR
+|    C*
+| 01-C           DBGN2     IFNE OBGN2
+|   C                     Z-ADD0         HRRN
+|   C                     MOVE DBGN2     OBGN2
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*=========================================================*
+     C*          RTN191....INITIAL                              *
+     C*=========================================================*
+03===C           RTN191    BEGSR
+|    C*
+|    C                     Z-ADD1         DRRN    40
+|    C                     Z-ADD0         RRN     40
+|    C                     Z-ADD0         WRRN    40
+|    C                     Z-ADD7         WPRCD1  30
+|    C                     Z-ADD0         DSPRC1  40
+|    C           HRRN      DIV  WPRCD1    DSPRC1
+|    C                     MULT WPRCD1    DSPRC1
+|    C                     MOVE 'N'       WBOTOM  1
+|    C                     SETOF                     53
+|    C                     SETON                     5254
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C*
+|    C           KEYSI2    SETLLSI0
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+04===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+|   C                     EXSR RTN193
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+05===C           RTN193    BEGSR
+|    C*
+|    C                     Z-ADDWRRN      RRN
+|    C                     ADD  WPRCD1    DSPRC1
+|    C*
+| 01-C           RRN       DOWLTDSPRC1
+|   C                     READ SI0                      46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C*客戶簡稱
+|   C           KEYME     CHAINME0                  40
+|   C   40                MOVE *BLANK    ME04
+|   C*發票日期
+M001AC                     Z-ADDSI21      XSI21   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI21      S001I2  80
+M001AC                     PARM XSI21     S001I2  60
+|   C           DSI21     PARM           S001O1  60
+|   C*淨售金額
+|   C*M005M     SI23      SUB  SI24      TOTAL
+M005MC                     Z-ADDSI25      TOTAL
+|   C*發票狀況
+|   C                     MOVE *BLANK    DSI18
+| 03-C           SI18      IFEQ '*'
+|   C                     MOVELTEST,1    DSI18
+| 03-C                     END
+| 04-C           SI18      IFEQ 'V'
+|   C                     MOVELTEST,2    DSI18
+| 04-C                     END
+| 05-C           SI18      IFEQ 'D'
+|   C                     MOVELTEST,3    DSI18
+| 05-C                     END
+| 06-C           SI18      IFEQ ' '
+|   C           SI19      ANDEQ'V'
+|   C                     MOVELTEST,4    DSI18
+| 06-C                     END
+|   C*
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRC1
+|   C                     MOVE 'Y'       WBOTOM
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C                     Z-ADDRRN       DRRN
+|    C                     Z-ADDRRN       WRRN
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+06===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN       IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     94    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*                    Z-ADD0         D#ROW
+|    C*                    Z-ADD0         D#COL
+|    C*
+06===C                     ENDSR
+     C/COPY HBP2CVTR
+**
+待作廢
+作廢重開
+作廢無須重開
+作廢待重開
+

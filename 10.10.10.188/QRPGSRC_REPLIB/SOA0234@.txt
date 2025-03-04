@@ -1,0 +1,1302 @@
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.18 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A* M002      | 01.12.29 |開徵營業稅
+     A*---------------------------------------------------------------
+     A* M003      | 02.01.16 |康齡銷售給客戶，單價用含稅計算
+     A*---------------------------------------------------------------
+     A* M004      | 02.02.08 |派車車號誤用上一筆資料，以此修正
+     A*---------------------------------------------------------------
+     A*===============================================================
+     FSOSTLF3 UF  E           K        DISK
+     FIMIAPF  UF  E           K        DISK
+     FMTMHPF  UF  E           K        DISK
+     FSOSUPF  O   E           K        DISK
+     FSOSCPF  O   E           K        DISK
+     FSOSDPF  O   E           K        DISK
+     FSOSEPF  O   E           K        DISK
+     FSOSFPF  O   E           K        DISK
+     FSOSIPF  O   E           K        DISK
+     FSOSJPF  O   E           K        DISK
+     FMTMDPF  UF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FREWFA4  UF  E           K        DISK                      A
+     E*各五日數量
+     E                    Q1          6  5 2
+     E*各五日售價
+     E                    A1          6  5 2
+     I**********
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+M001AI                                      201 2080DATE
+     I                                      601 605 DST01S
+     I                                      606 610 DST01E
+M001MI                                      611 6180YST02S
+M001MI                                      619 6260YST02E
+M001MI                                      627 6300DST02
+M001MI                                      627 6280DST02M
+M001MI                                      629 6300DST02Y
+     IDA02        DS
+     I                                        1   43DUTY
+     I            DS
+B2MODI                                        1   60ST02
+B2MODI                                        1   40ST02Y
+B2MODI                                        5   60ST02M
+     I            DS
+     I                                        1   9 SD03
+     I                                        1   4 SD03L
+     I            DS
+     I                                        1   30MD26
+     I                                        1   10MD26M
+     I                                        2   30MD26D
+     I            DS
+B2MODI                                        1   80SC08
+B2MODI                                        1   60SC08YM
+B2MODI                                        1   40SC08Y
+B2MODI                                        5   60SC08M
+B2MODI                                        7   80SC08D
+     I            DS
+     I                                        1   60WSC08
+     I                                        1   20WSC08Y
+     I                                        3   40WSC08M
+     I                                        5   60WSC08D
+     I            DS
+     I                                        1  302Q1
+     I                                        1   72ST06
+     I                                        8  142ST07
+     I                                       15  212ST08
+     I                                       22  282ST09
+     I                                       29  352ST10
+     I                                       36  422ST11
+     I            DS
+     I                                        1  302A1
+     I                                        1   72ST6$
+     I                                        8  142ST7$
+     I                                       15  212ST8$
+     I                                       22  282ST9$
+     I                                       29  352ST0$
+     I                                       36  422ST1$
+     I            DS
+     I                                        1   2 SC01
+     I                                        1   1 SC01K
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN96     PARM *IN96     IN96    1
+      *==============================================================*
+      *                   *LIKE DEFN
+      *==============================================================*
+     C           *LIKE     DEFN ST01      WST01
+     C           *LIKE     DEFN ST15      WST15
+     C           *LIKE     DEFN ST13      WST13
+     C           *LIKE     DEFN SD03      KSD03
+     C           *LIKE     DEFN MA41      WMA41
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYIA     KLIST
+     C                     KFLD           IA01
+     C                     KFLD           ST01
+     C                     KFLD           ST04
+     C           KEYIA1    KLIST
+     C                     KFLD           SC01K
+     C                     KFLD           SD20
+     C                     KFLD           SD03
+     C           KEYWF     KLIST
+     C                     KFLD           ST01
+     C                     KFLD           ST03
+     C                     KFLD           ST04
+     C                     KFLD           STACOD
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010
+      *
+      *CHECH 可用量及牌價
+      *PROCESS  ST13=' '
+     C                     EXSR RTN100
+      *
+      *IN96 ='0' CHECK OK.
+  01-C           *IN96     IFEQ '0'
+      *PROCESS  ST13='*'
+    C                     EXSR RTN200
+      *PROCESS  ST13='1'
+    C                     EXSR RTN201
+      *PROCESS  ST13='2'
+    C                     EXSR RTN202
+      *PROCESS  ST13='3'
+    C                     EXSR RTN203
+      *PROCESS  ST13='4'
+    C                     EXSR RTN204
+      *PROCESS  ST13='5'
+    C                     EXSR RTN205
+      *PROCESS  ST13='6'
+    C                     EXSR RTN206
+  01-C                     END
+      *
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*計算本月最後一天DATEYM
+|    C                     Z-ADD0         W6      60
+|    C                     Z-ADD0         ST02
+B2000C*M001M               Z-ADDDST02Y    ST02Y
+M001AC                     MOVE DST02Y    HB2@YY  2
+M001AC                     EXSR HB@24Y
+M001AC                     MOVE HB2@Y4    FYY4    40
+M001AC                     Z-ADDFYY4      ST02Y
+|    C                     Z-ADDDST02M    ST02M
+|    C                     Z-ADD0         P3402O
+|    C                     Z-ADD0         ST02D   20
+B2MODC                     Z-ADD0         DATEYM  80
+|    C                     CALL 'P34'
+B2MODC                     PARM ST02      P3401I  60
+M001MC                     PARM '2'       P3402I  1
+|    C                     PARM '1'       P3403I  1
+|    C                     PARM           P3401O  1
+|    C           ST02D     PARM           P3402O  20
+B2000C                     MOVELST02      DATEYM
+B2CHKC                     MOVE ST02D     DATEYM
+B2INF *CVR0001 sev.00 Field ST02D is not a date or year
+B2INF *CVR0004 sev.00 Assumed to be the update of a date field in the zone
+B2INF *   that does not contain a year
+|    C                     MOVE 'K'       IA01
+|    C*
+|    C*CHANGE DATE MM/DD/YY
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+|    C*                    PARM $EGMDY    S001I2  60
+B2MODC*M001D     DATE      PARM           S001O1  80
+|    C*Z-ADD0 TO ARRAY
+|    C                     Z-ADD0         A1
+|    C                     Z-ADD0         Q1
+      *
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....CHECK可用量
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           *LOVAL    SETLLST0
+|    C                     READ ST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+|   C                     SETOF                     99
+| 02-C           ST13      IFEQ '@'
+|   C           ST13      OREQ *BLANK
+|   C           ST06      ADD  ST07      PTOT1
+|   C                     ADD  ST08      PTOT1
+|   C                     ADD  ST09      PTOT1
+|   C                     ADD  ST10      PTOT1
+|   C                     ADD  ST11      PTOT1
+| 03-C           PTOT1     IFNE 0
+|   C           ST04      CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+      *CHECK可用量
+|   C           KEYIA     CHAINIA0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         IA10
+| 04-C                     END
+      *CHECK可用量
+|   C           IA10      SUB  PTOT1     PTOT2
+| 05-C           PTOT2     IFLT 0
+      *可用量不足
+|   C                     SETON                     9699
+|   C                     MOVEL'A'       STACOD
+|   C                     EXSR RTN900
+| 05-C                     END
+|   C   99                GOTO UPD
+      *
+|   C           ST04      CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+B2000C           DATEYM    IFLT MA39
+|   C                     Z-ADDMA41      WMA41
+| 06*C                     ELSE
+|   C                     Z-ADDMA46      WMA41
+| 06-C                     END
+      *牌價未報
+| 07-C           WMA41     IFEQ 0
+|   C                     SETON                     9699
+|   C                     MOVEL'B'       STACOD
+|   C                     EXSR RTN900
+| 07-C                     END
+|   C   99                GOTO UPD
+      *CHECK OK.
+|   C                     SUB  PTOT1     IA10
+|   C                     ADD  PTOT1     IA09
+|   C                     UPDATIA0
+      *
+|   C           UPD       TAG
+      *
+| 08-C           *IN99     IFEQ '0'
+      *轉至保留量註記
+|   C                     MOVEL'*'       ST13
+| 08*C                     ELSE
+      *可用量不足註記
+|   C                     MOVEL'@'       ST13
+| 08-C                     END
+|   C                     UPDATST0
+      *
+| 03*C                     ELSE
+      *數量為０－上轉完註記
+|   C                     MOVEL'V'       ST13
+|   C                     UPDATST0
+| 03-C                     END
+| 02-C                     END
+|   C                     READ ST0                      45
+| 01-C                     END
+      *
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....PROCESS  ST13=' '
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C                     Z-ADD0         I       10
+      *未轉訂單部份
+|    C                     MOVEL'*'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+|   C           ST06      ADD  ST07      PTOT1
+|   C                     ADD  ST08      PTOT1
+|   C                     ADD  ST09      PTOT1
+|   C                     ADD  ST10      PTOT1
+|   C                     ADD  ST11      PTOT1
+| 02-C           PTOT1     IFNE 0
+      *計算產品數量
+|   C                     SETOF                     43
+|   C                     Z-ADD0         QTY     70
+|   C                     Z-ADD0         X       10
+| 03-C           X         DOWLT6
+|   C           *IN43     ANDEQ'0'
+      *
+|   C                     ADD  1         X
+| 04-C           ST05      IFEQ A1,X
+|   C                     ADD  Q1,X      QTY
+| 05-C           X         IFEQ 6
+|   C                     MOVE 'V'       ST13
+| 05-C                     END
+| 04*C                     ELSE
+|   C                     SETON                     43
+| 04-C                     END
+      *
+| 06-C           ST13      IFNE 'V'
+|   C                     MOVELX         ST13
+| 06-C                     END
+      *
+| 03-C                     END
+      *
+|   C                     Z-ADDST05      AMT    110
+      *
+| 07-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 08-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 08-C                     END
+| 07-C                     END
+      *QTY=0  NO PROCESS
+| 09-C           QTY       IFNE 0
+      *若為８比或不同專櫃，不同課稅別則產生另一訂單
+| 10-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 10-C                     END
+      *
+|   C                     ADD  1         I
+      *
+| 11-C           I         IFEQ 1
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 11-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 09-C                     END
+| 02*C                     ELSE
+|   C                     MOVE 'V'       ST13
+| 02-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 12-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 12-C                     END
+      *
+      *
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN201....PROCESS  ST13='1'
+     C*==============================================================*
+04===C           RTN201    BEGSR
+|    C*
+|    C                     Z-ADD0         I       10
+      *未轉訂單部份
+|    C                     MOVEL'1'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+      *計算產品數量
+|   C                     SETOF                     43
+|   C                     Z-ADDST06      QTY     70
+|   C                     Z-ADD1         X       10
+| 02-C           X         DOWLT6
+|   C           *IN43     ANDEQ'0'
+      *
+|   C                     ADD  1         X
+| 03-C           ST6$      IFEQ A1,X
+|   C                     ADD  Q1,X      QTY
+| 04-C           X         IFEQ 6
+|   C                     ADD  1         ST16
+|   C                     MOVE 'V'       ST13
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     ADD  1         ST16
+|   C                     SETON                     43
+| 03-C                     END
+      *
+| 05-C           ST13      IFNE 'V'
+|   C                     MOVELX         ST13
+| 05-C                     END
+      *
+| 02-C                     END
+      *
+|   C                     Z-ADDST6$      AMT    110
+| 06-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 07-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 07-C                     END
+| 06-C                     END
+      *QTY=0 NO PROCESS
+| 08-C           QTY       IFNE 0
+      *
+| 09-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 09-C                     END
+      *
+|   C                     ADD  1         I
+| 10-C           I         IFEQ 1
+      *GET ORDER NUMBER
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 10-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 08-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 11-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 11-C                     END
+      *
+      *
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN202....PROCESS  ST13='2'
+     C*==============================================================*
+05===C           RTN202    BEGSR
+|    C*
+|    C                     Z-ADD0         I       10
+      *未轉訂單部份
+|    C                     MOVEL'2'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+      *計算產品數量
+|   C                     SETOF                     43
+|   C                     Z-ADDST07      QTY     70
+|   C                     Z-ADD2         X       10
+| 02-C           X         DOWLT6
+|   C           *IN43     ANDEQ'0'
+      *
+|   C                     ADD  1         X
+| 03-C           ST7$      IFEQ A1,X
+|   C                     ADD  Q1,X      QTY
+| 04-C           X         IFEQ 6
+|   C                     ADD  1         ST16
+|   C                     MOVE 'V'       ST13
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     ADD  1         ST16
+|   C                     SETON                     43
+| 03-C                     END
+      *
+| 05-C           ST13      IFNE 'V'
+|   C                     MOVELX         ST13
+| 05-C                     END
+      *
+| 02-C                     END
+      *
+|   C                     Z-ADDST7$      AMT    110
+| 06-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 07-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 07-C                     END
+| 06-C                     END
+      *QTY=0 NO PROCESS
+| 08-C           QTY       IFNE 0
+      *
+| 09-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 09-C                     END
+      *
+|   C                     ADD  1         I
+| 10-C           I         IFEQ 1
+      *GET ORDER NUMBER
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 10-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 08-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 11-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 11-C                     END
+      *
+      *
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN203....PROCESS  ST13='3'
+     C*==============================================================*
+06===C           RTN203    BEGSR
+|    C*
+|    C                     Z-ADD0         I       10
+      *未轉訂單部份
+|    C                     MOVEL'3'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+      *計算產品數量
+|   C                     SETOF                     43
+|   C                     Z-ADDST08      QTY     70
+|   C                     Z-ADD3         X       10
+| 02-C           X         DOWLT6
+|   C           *IN43     ANDEQ'0'
+      *
+|   C                     ADD  1         X
+| 03-C           ST8$      IFEQ A1,X
+|   C                     ADD  Q1,X      QTY
+| 04-C           X         IFEQ 6
+|   C                     ADD  1         ST16
+|   C                     MOVE 'V'       ST13
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     SETON                     43
+|   C                     ADD  1         ST16
+| 03-C                     END
+      *
+| 05-C           ST13      IFNE 'V'
+|   C                     MOVELX         ST13
+| 05-C                     END
+      *
+| 02-C                     END
+      *
+|   C                     Z-ADDST8$      AMT    110
+| 06-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 07-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 07-C                     END
+| 06-C                     END
+      *QTY=0 NO PROCESS
+| 08-C           QTY       IFNE 0
+      *
+| 09-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 09-C                     END
+      *
+|   C                     ADD  1         I
+| 10-C           I         IFEQ 1
+      *GET ORDER NUMBER
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 10-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 08-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 11-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 11-C                     END
+      *
+      *
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN204....PROCESS  ST13='4'
+     C*==============================================================*
+07===C           RTN204    BEGSR
+|    C*
+|    C                     Z-ADD0         I       10
+      *未轉訂單部份
+|    C                     MOVEL'4'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+      *計算產品數量
+|   C                     SETOF                     43
+|   C                     Z-ADDST09      QTY     70
+|   C                     Z-ADD4         X       10
+| 02-C           X         DOWLT6
+|   C           *IN43     ANDEQ'0'
+      *
+|   C                     ADD  1         X
+| 03-C           ST9$      IFEQ A1,X
+|   C                     ADD  Q1,X      QTY
+| 04-C           X         IFEQ 6
+|   C                     ADD  1         ST16
+|   C                     MOVE 'V'       ST13
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     SETON                     43
+|   C                     ADD  1         ST16
+| 03-C                     END
+      *
+| 05-C           ST13      IFNE 'V'
+|   C                     MOVELX         ST13
+| 05-C                     END
+      *
+| 02-C                     END
+      *
+|   C                     Z-ADDST9$      AMT    110
+| 06-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 07-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 07-C                     END
+| 06-C                     END
+      *QTY=0 NO PROCESS
+| 08-C           QTY       IFNE 0
+      *
+| 09-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 09-C                     END
+      *
+|   C                     ADD  1         I
+| 10-C           I         IFEQ 1
+      *GET ORDER NUMBER
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 10-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 08-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 11-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 11-C                     END
+      *
+      *
+07===C                     ENDSR
+     C*==============================================================*
+     C*          RTN205....PROCESS  ST13='5'
+     C*==============================================================*
+08===C           RTN205    BEGSR
+|    C*
+|    C                     Z-ADD0         I       10
+      *未轉訂單部份
+|    C                     MOVEL'5'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+      *計算產品數量
+|   C                     SETOF                     43
+|   C                     Z-ADDST10      QTY     70
+|   C                     Z-ADD5         X       10
+| 02-C           X         DOWLT6
+|   C           *IN43     ANDEQ'0'
+      *
+|   C                     ADD  1         X
+| 03-C           ST0$      IFEQ A1,X
+|   C                     ADD  Q1,X      QTY
+| 04-C           X         IFEQ 6
+|   C                     ADD  1         ST16
+|   C                     MOVE 'V'       ST13
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     SETON                     43
+|   C                     ADD  1         ST16
+| 03-C                     END
+      *
+| 05-C           ST13      IFNE 'V'
+|   C                     MOVELX         ST13
+| 05-C                     END
+      *
+| 02-C                     END
+      *
+|   C                     Z-ADDST0$      AMT    110
+| 06-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 07-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 07-C                     END
+| 06-C                     END
+      *QTY=0 NO PROCESS
+| 08-C           QTY       IFNE 0
+      *
+| 09-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 09-C                     END
+      *
+|   C                     ADD  1         I
+| 10-C           I         IFEQ 1
+      *GET ORDER NUMBER
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 10-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 08-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 11-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 11-C                     END
+      *
+      *
+08===C                     ENDSR
+     C*==============================================================*
+     C*          RTN206....PROCESS  ST13='6'
+     C*==============================================================*
+09===C           RTN206    BEGSR
+|    C*
+|    C                     Z-ADD0         I
+      *未轉訂單部份
+|    C                     MOVEL'6'       WST13
+|    C           WST13     SETLLST0
+|    C           WST13     READEST0                      45
+      *
+| 01-C           *IN45     DOWEQ'0'
+      *計算產品數量
+|   C                     Z-ADDST11      QTY     70
+|   C                     MOVE 'V'       ST13
+|   C                     ADD  1         ST16
+      *
+|   C                     Z-ADDST1$      AMT    110
+| 02-C           QTY       IFNE 0
+      *搬第一次至KEEY FIELD
+| 03-C           I         IFEQ 0
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 03-C                     END
+| 02-C                     END
+      *QTY=0 NO PROCESS
+| 04-C           QTY       IFNE 0
+      *
+| 05-C           I         IFEQ 8
+|   C           ST01      ORNE WST01
+|   C           ST15      ORNE WST15
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+|   C                     Z-ADD0         I
+| 05-C                     END
+      *
+|   C                     ADD  1         I
+| 06-C           I         IFEQ 1
+      *GET ORDER NUMBER
+      *頭檔單號
+|   C                     EXSR RTN211
+      *頭檔初值
+|   C                     EXSR RTN210
+| 06-C                     END
+      *PROCESS DETIAL
+|   C                     EXSR RTN300
+      *KEEP專櫃代號及課稅別
+|   C                     MOVELST01      WST01
+|   C                     MOVELST15      WST15
+| 04-C                     END
+B2000C                     Z-ADDDATE      STXX
+B2000C                     TIME           STYY
+|   C                     MOVE $USER     STZZ
+|   C                     UPDATST0
+|   C           WST13     READEST0                      45
+| 01-C                     END
+      *
+| 07-C           I         IFNE 0
+      *PROCESS HANDING
+|   C                     EXSR RTN400
+| 07-C                     END
+      *
+      *
+09===C                     ENDSR
+     C*==============================================================*
+     C*          RTN211....單號
+     C*==============================================================*
+10===C           RTN211    BEGSR
+      *GET ORDER NUMBER
+|   C                     CALL 'RES004'
+|   C                     PARM 'K1'      S004I1  2
+|   C                     PARM 'S2'      S004I2  2
+B2MODC                     PARM DST02Y    S004I3  20
+|   C           SC02      PARM           S004O1 12
+      *GET ORDER NUMBER
+|   C                     CALL 'RES005'
+|   C                     PARM 'K1'      S004I1  2
+|   C                     PARM 'D2'      S004I2  2
+B2MODC                     PARM DST02Y    S004I3  20
+|   C           SE02      PARM           S004O1 12
+      *
+09===C                     ENDSR
+     C*==============================================================*
+     C*          RTN210....頭檔
+     C*==============================================================*
+10===C           RTN210    BEGSR
+|    C*
+|    C                     MOVEL'K1'      SC01
+|    C                     MOVEL'S2'      SC03
+|    C                     MOVELST01      SC04
+|    C                     MOVE *BLANK    SC05
+|    C                     MOVE *BLANK    SC06
+B2000C                     Z-ADDDATEYM    SC07
+B2000C                     Z-ADDDATEYM    SC08
+|    C                     MOVE *BLANKS   SC09
+|    C                     MOVE *BLANK    SC10
+|    C                     MOVELSC04      SC11
+|    C                     Z-ADD0         SC12
+|    C                     MOVEL'V'       SC13
+|    C                     MOVELST01      SC14
+|    C                     MOVE *BLANK    SC15
+|    C                     MOVELST01      SC16
+|    C                     MOVE *BLANK    SC17
+|    C                     MOVE *BLANK    SC18
+|    C                     MOVE *BLANK    SC19
+|    C                     MOVE *BLANK    SC20
+|    C                     MOVE *BLANK    SC21
+|    C                     MOVEL'C'       SC22
+|    C                     MOVEL'C'       SC23
+|    C                     MOVEL'C'       SC24
+|    C                     MOVEL'C'       SC25
+|    C                     MOVEL'C'       SC26
+|    C                     MOVE *BLANK    SC27
+|    C                     MOVE *BLANK    SC28
+|    C                     MOVE *BLANK    SC31
+|    C                     MOVE *BLANK    SC32
+|    C           ST01      CHAINME0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVELME07      SC31
+|   C                     MOVELME08      SC32
+|   C                     MOVELME15      SC27
+|   C           SC27      CHAINMC0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     MOVELMC03      SC28
+| 03-C                     END
+| 02-C                     END
+|    C                     MOVE *BLANKS   SC33
+|    C                     MOVE *BLANKS   SC34
+|    C           SC04      CHAINMD0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     Z-ADDMD18      SC09
+|   C                     MOVELMD07      SC33
+|   C                     MOVELMD08      SC34
+| 01-C                     END
+|    C                     MOVEL*ALL'*'   SC29
+|    C                     MOVE SC02      SC30
+|    C                     MOVEL'N'       SC35
+|    C                     MOVELST01      SC36
+|    C                     MOVELST15      SC37
+|    C                     MOVEL'V'       SC38
+B2000C                     Z-ADDDATEYM    SC39
+B2000C                     Z-ADDDATE      SCXX
+B2000C                     TIME           SCYY
+|    C                     MOVE $USER     SCZZ
+      *
+10===C                     ENDSR
+     C*==============================================================*
+     C*          RTN300....PROCESS DETAIL  SOSDPF
+     C*==============================================================*
+11===C           RTN300    BEGSR
+|    C*
+|    C*
+|    C                     MOVELSC01      SD01
+|    C                     MOVELSC02      SD02
+|    C                     MOVELST04      SD03
+|    C           SD03      CHAINMA0                  40
+|    C           *LOVAL    SETLLMA0
+|    C                     Z-ADDQTY       SD04
+|    C                     Z-ADD0         SD05
+|    C                     Z-ADDAMT       SD06
+|    C           SD04      MULT SD06      SD07
+|    C                     Z-ADDST05      SD08
+|    C                     Z-ADD0         SD09
+|   C                     Z-ADDMA31      SD10
+|   C                     Z-ADDMA32      SD11
+|   C                     Z-ADDMA33      SD12
+|   C                     Z-ADDSD06      SD13
+|   C                     Z-ADDSD06      SD14
+      *累加至頭檔
+|    C                     ADD  SD07      SC12
+      *
+B2000C           SC07      IFLT MA39
+|   C                     Z-ADDMA41      SD15
+| 01*C                     ELSE
+|   C                     Z-ADDMA46      SD15
+| 01-C                     END
+      *
+|    C                     MOVELST17      SD16
+|   C                     MOVEL'C'       SD17
+|    C                     MOVEL'C'       SD18
+B2000C                     Z-ADDDATEYM    SD19
+|    C                     MOVELST01      SD20
+|    C                     MOVELST01      SD21
+|    C                     Z-ADDMA31      SD22
+|    C                     Z-ADDMA32      SD23
+|    C                     Z-ADDMA33      SD24
+B2000C                     Z-ADDDATE      SDXX
+B2000C                     TIME           SDYY
+|    C                     MOVE $USER     SDZZ
+|    C                     WRITESD0
+      *SOSJPF
+|    C                     EXSR RTN310
+      *IMIAPF,MTMHPF
+|    C                     EXSR RTN320
+      *SOSUPF
+|    C                     EXSR RTN330
+      *
+|    C                     EXSR RTN340
+      *
+11===C                     ENDSR
+     C*==============================================================*
+     C*          RTN310....PROCESS DETAIL  SOSJPF
+     C*==============================================================*
+12===C           RTN310    BEGSR
+|    C*
+|    C                     MOVELSC01      SJ01
+|    C                     MOVE SC02      SJ02
+|    C                     MOVELST04      SJ03
+|    C                     Z-ADDSD04      SJ04
+|    C                     Z-ADDSD15      SJ05
+|    C           SD15      MULT SD04      SJ06
+|    C           SD15      SUB  AMT       WFLD   112
+|    C           WFLD      MULT SD04      SJ07
+|    C                     Z-ADD0         SJ08
+|    C                     Z-ADD0         SJ09
+|    C                     MOVELSD16      SJ10
+|    C                     MOVELST01      SJ11
+|    C                     MOVE *BLANK    SJ12
+|    C                     Z-ADD0         SJ13
+|    C                     Z-ADD0         SJ14
+|    C                     Z-ADD0         SJ15
+B2000C                     Z-ADDDATEYM    SJ16
+B2000C                     Z-ADDDATE      SJXX
+B2000C                     TIME           SJYY
+|    C                     MOVE $USER     SJZZ
+|    C                     WRITESJ0
+      *
+12===C                     ENDSR
+     C*==============================================================*
+     C*          RTN320....PROCESS DETAIL  IMIAPF,MTMAPF,MTMDPF
+     C*==============================================================*
+13===C           RTN320    BEGSR
+|    C*IMIAPF
+|    C           KEYIA1    CHAINIA0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     SUB  SD04      IA06
+|   C                     SUB  SD04      IA07
+|   C                     SUB  SD04      IA09
+B2000C                     Z-ADDDATE      IAXX
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+|   C                     UPDATIA0
+| 01-C                     END
+      *MTMAPF
+|    C           SD03      CHAINMA0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     SUB  SD04      MA30
+|   C           SD04      MULT MA31      WFLD
+|   C                     SUB  WFLD      MA26
+|   C           SD04      MULT MA32      WFLD
+|   C                     SUB  WFLD      MA27
+|   C           SD04      MULT MA33      WFLD
+|   C                     SUB  WFLD      MA28
+B2000C                     Z-ADDDATE      MAXX
+B2000C                     TIME           MAYY
+|   C                     MOVE $USER     MAZZ
+|   C                     UPDATMA0
+| 02-C                     END
+      *
+13===C                     ENDSR
+     C*==============================================================*
+     C*          RTN330....PROCESS DETAIL  SOSUPF
+     C*==============================================================*
+15===C           RTN330    BEGSR
+|    C*
+|    C                     MOVELST01      SU01
+B2000C                     Z-ADDST02      SU02
+|    C                     MOVELST03      SU03
+|    C                     MOVELST04      SU04
+|    C                     Z-ADDST16      SU05
+|    C                     Z-ADDQTY       SU06
+|    C                     Z-ADDAMT       SU07
+|    C                     MOVELSD02      SU08
+B2000C                     Z-ADDDATE      SUXX
+B2000C                     TIME           SUYY
+|    C                     MOVE $USER     SUZZ
+|    C                     WRITESU0
+      *
+15===C                     ENDSR
+     C*==============================================================*
+     C*          RTN340....PROCESS DETAIL  SOSFPF
+     C*==============================================================*
+12===C           RTN340    BEGSR
+      *
+|    C                     MOVELSD01      SF01
+|    C                     MOVELSE02      SF02
+|    C                     MOVELSD03      SF03
+|    C                     Z-ADDSD04      SF04
+|    C                     Z-ADDSD05      SF05
+|    C                     Z-ADDSD06      SF06
+|    C                     Z-ADDSD07      SF07
+|    C                     Z-ADDSD08      SF08
+|    C                     Z-ADDSD09      SF09
+|   C                     Z-ADDSD10      SF10
+|   C                     Z-ADDSD11      SF11
+|   C                     Z-ADDSD12      SF12
+|   C                     Z-ADDSD13      SF13
+|   C                     Z-ADDSD14      SF14
+|   C                     Z-ADDSD15      SF15
+|    C                     MOVELSD16      SF16
+|   C                     MOVELSD17      SF17
+|    C                     MOVELSD18      SF18
+|    C                     Z-ADDSD04      SF19
+|    C                     Z-ADDSD05      SF20
+B2000C                     Z-ADDDATEYM    SF22
+|    C*M004M               MOVELSE04      SF23
+M004MC                     MOVELSC04      SF23
+|    C                     Z-ADD1         SF24
+B2000C                     Z-ADDDATEYM    SF25
+|    C                     MOVELSD20      SF26
+|    C                     MOVELSD21      SF27
+|    C                     Z-ADDSD22      SF28
+|    C                     Z-ADDSD23      SF29
+|    C                     Z-ADDSD24      SF30
+B2000C                     Z-ADDDATE      SFXX
+B2000C                     TIME           SFYY
+|    C                     MOVE $USER     SFZZ
+|    C                     WRITESF0
+|    C*
+12===C                     ENDSR
+     C*==============================================================*
+     C*          RTN400....PROCESS HANDING SOSCPF
+     C*==============================================================*
+16===C           RTN400    BEGSR
+|    C*
+|    C*
+|    C                     WRITESC0
+      *SOSIPF
+|    C                     EXSR RTN410
+      *MTMDPF
+|    C                     EXSR RTN420
+      *SISEPF
+|    C                     EXSR RTN430
+      *
+16===C                     ENDSR
+     C*==============================================================*
+     C*          RTN410....PROCESS HANDING SOSIPF
+     C*==============================================================*
+17===C           RTN410    BEGSR
+|    C*
+|    C                     MOVELSC01      SI01
+|    C                     MOVE SC02      SI02
+|    C                     MOVELSC33      SI03
+|    C                     MOVELSC34      SI04
+|    C                     MOVE *BLANK    SI05
+B2000C                     Z-ADDDATEYM    SI06
+|    C                     MOVE *BLANK    SI07
+|    C                     MOVE SC04      SI08
+|    C                     MOVE *BLANK    SI09
+|    C                     MOVE SC02      SI10
+|    C                     MOVE SE02      SI11
+|    C                     MOVE SC04      SI12
+|    C                     MOVE *BLANK    SI13
+|    C                     MOVE SC04      SI14
+|    C                     MOVE *BLANK    SI15
+|    C                     MOVE 'Y'       SI16
+|    C                     Z-ADD3         SI17
+|    C                     MOVE *BLANK    SI18
+|    C                     MOVE *BLANK    SI19
+|    C                     MOVE *BLANK    SI20
+B2000C                     Z-ADDDATEYM    SI21
+|    C                     MOVE SC37      SI22
+|    C*M002M               Z-ADDSC12      SI25
+M002MC*M003M               Z-ADDSC12      SI23
+M003MC                     Z-ADDSC12      SI25
+|    C*營業稅
+| 01-C           SI22      IFEQ 'D'
+|   C           *NAMVAR   DEFN           DA02
+|   C                     IN   DA02
+|   C           DUTY      ADD  1         WRKFLD  43
+|   C*M002M     SI25      DIV  WRKFLD    SI23      H
+M002MC*M003M     SI23      MULT WRKFLD    SI25      H
+M003MC           SI25      DIV  WRKFLD    SI23      H
+|   C           SI25      SUB  SI23      SI24
+| 01*C                     ELSE
+|   C                     Z-ADD0         SI24
+|   C*M002M               Z-ADDSI25      SI23
+M002MC*M002M               Z-ADDSI23      SI25
+M003MC                     Z-ADDSI25      SI23
+| 01-C                     END
+|    C                     Z-ADD0         SI26
+|    C                     Z-ADD0         SI27
+|    C                     Z-ADD0         SI28
+|    C*
+B2000C                     Z-ADDSC08      WSC08
+|    C           SC14      CHAINMD0                  40
+|    C           *LOVAL    SETLLMD0
+| 02-C           *IN40     IFEQ '0'
+|   C                     SELEC
+|   C           MD23      WHEQ 'C'
+B2000C                     Z-ADDSC08      SI29
+|   C           MD23      WHEQ 'D'
+B2???C*M001M     SC08      SUB  110000    SC08C   60
+M001MC           SC08      SUB  19110000  SC08C   60
+B2INF *CVR0001 sev.00 Field SC08C is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|   C                     CALL 'P62'
+|   C                     PARM SC08C     P6201I  60
+|   C                     PARM MD25      P6202I  40
+B2MODC           W6        PARM           P6211O  60
+B2CHKC           W6        ADD  19110000  SI29
+|   C           MD23      WHEQ 'M'
+| 03-C           SC08D     IFGT MD24
+|   C           SC08M     ADD  1         WSC08M
+| 03-C                     END
+|   C                     ADD  MD26M     WSC08M
+|   C*應收月份＞１２，日期更動
+| 04-C           WSC08M    IFGT 12
+B2CHKC                     ADD  10000     WSC08
+|   C           WSC08M    SUB  12        WSC08M
+| 04-C                     END
+|   C*
+M001AC                     MOVE WSC08Y    HB2@YY  2
+M001AC                     EXSR HB@24Y
+M001AC                     MOVE HB2@Y4    FYY4    40
+M001AC           FYY4      SUB  1911      W2      20
+M001MC                     MOVELW2        P2201I  40
+M001MC                     MOVE WSC08M    P2201I  40
+B2INF *CVR0001 sev.00 Field WSC08M is not a date or year
+B2INF *CVR0004 sev.00 Assumed to be the update of a date field in the zone
+B2INF *   that does not contain a year
+B2CHKC*M001M               SUB  1100      P2201I
+|   C                     CALL 'P22'
+|   C                     PARM           P2201I
+|   C                     PARM           P2201O  1
+|   C                     PARM           P2202O  20
+|   C*
+| 05-C           MD26D     IFGT P2202O
+|   C                     Z-ADDP2202O    WSC08D
+| 05*C                     ELSE
+|   C                     Z-ADDMD26D     WSC08D
+| 05-C                     END
+|   C*
+B2000C*M001M               Z-ADDWSC08     SI29
+M001AC                     MOVE WSC08     HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    W8      80
+M001AC                     Z-ADDW8        SI29
+|   C                     ENDSL
+| 02-C                     END
+|    C*
+|    C                     Z-ADDSI25      SI30
+|    C                     MOVELSC27      SI31
+|    C                     MOVELSC28      SI32
+|    C                     Z-ADD0         SI33
+|    C                     MOVE *BLANK    SI34
+B2000C                     Z-ADDSC39      SI35
+B2000C                     Z-ADDDATE      SIXX
+B2000C                     TIME           SIYY
+|    C                     MOVE $USER     SIZZ
+|    C                     WRITESI0
+      *
+17===C                     ENDSR
+     C*==============================================================*
+     C*          RTN420....PROCESS HANDING MTMDPF
+     C*==============================================================*
+18===C           RTN420    BEGSR
+|    C* UPDATE 客戶主檔(MTMDPF)
+|    C           SC04      CHAINMD0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  SC12      MD29
+|   C                     ADD  SC12      MD31
+|   C                     UPDATMD0
+| 01-C                     END
+      *
+18===C                     ENDSR
+     C*==============================================================*
+     C*          RTN430.... SOSEPF 頭檔
+     C*==============================================================*
+10===C           RTN430    BEGSR
+|    C*
+|    C                     MOVELSC01      SE01
+|    C                     MOVEL'D2'      SE03
+|    C                     MOVELSC04      SE04
+|    C                     MOVELSC05      SE05
+B2000C                     Z-ADDDATEYM    SE06
+|    C                     MOVELSC04      SE07
+|    C                     Z-ADDSC12      SE08
+|    C                     MOVEL'V'       SE09
+|    C                     MOVELSC04      SE10
+|    C                     MOVELSC05      SE11
+|    C                     MOVEL*BLANK    SE12
+|    C                     MOVEL*BLANK    SE13
+|    C                     MOVEL*BLANK    SE14
+|    C                     MOVEL'C'       SE15
+|    C                     MOVEL'C'       SE16
+|    C                     MOVEL'C'       SE17
+|    C                     MOVEL'C'       SE18
+|    C                     MOVEL'C'       SE19
+|    C                     Z-ADD1         SE20
+B2000C                     Z-ADDDATEYM    SE21
+|    C                     MOVELSC04      SE22
+|    C                     Z-ADD1         SE23
+B2000C                     Z-ADDDATEYM    SE24
+|    C                     MOVEL'V'       SE25
+|    C                     MOVELSC04      SE26
+|    C                     MOVELSC33      SE27
+|    C                     MOVELSC34      SE28
+|    C                     MOVELSC02      SE29
+|    C                     MOVELSI02      SE30
+|    C                     MOVEL*BLANK    SE31
+|    C                     MOVELSC27      SE32
+|    C                     MOVELSC28      SE33
+|    C                     MOVELSC31      SE34
+|    C                     MOVELSC32      SE35
+|    C                     MOVEL'N'       SE36
+|    C                     MOVELSE08      SE37
+|    C                     MOVELSC37      SE38
+B2000C                     Z-ADDDATEYM    SE39
+|    C                     MOVEL'V'       SE40
+|    C                     MOVELSE04      SE41
+|    C                     MOVELSE05      SE42
+B2000C                     Z-ADDDATE      SEXX
+B2000C                     TIME           SEYY
+|    C                     MOVE $USER     SEZZ
+|    C                     WRITESE0
+      *
+10===C                     ENDSR
+     C*==============================================================*
+     C*          RTN900....WRITE TO WORK FILE
+     C*==============================================================*
+19===C           RTN900    BEGSR
+|    C*
+|    C           KEYWF     CHAINWFA40                42
+| 01-C           *IN42     IFEQ '1'
+|   C                     WRITEWFA40
+| 01-C                     END
+|    C*
+19===C                     ENDSR
+M001AC/COPY HBP2CVTR
+

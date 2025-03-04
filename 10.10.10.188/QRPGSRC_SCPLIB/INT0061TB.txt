@@ -1,0 +1,244 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INT0061TS                                     *
+      * AUTHER       : A1546  VINCENT                                *
+      * CREATE DATE  : 97/10/28                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存月結批次處理主程式                       *
+      ****************************************************************
+     FINTOLF03IF  E           K        DISK
+     F            CM0                               KRENAMECM0L3
+     F            TF0                               KRENAMETF0L3
+     F            TH0                               KRENAMETH0L3
+     F            TJ0                               KRENAMETJ0L3
+     F            TM0                               KRENAMETM0L3
+     F                                              KINFDS TORCD3
+     FINTAPF  IF  E           K        DISK
+     FPOCCLF02IF  E           K        DISK
+     E*
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      201 2080A8YMD
+     I            DS
+     I                                        1   80KCC07
+     I                                        1   40KCC07Y
+     ITORCD3      DS
+     I                                     *RECORD  RCDR3
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN CC09      WCC09
+     C           *LIKE     DEFN TO04      KTO04
+     C           *LIKE     DEFN TO04      WTO04
+     C           *LIKE     DEFN TA10      WQTY
+     C           *LIKE     DEFN TA09      WTA09
+     C           *LIKE     DEFN TA08      TTAMT
+     C           *LIKE     DEFN TA07      WTA07
+     C           *LIKE     DEFN TA08      WFLD1
+     C           *LIKE     DEFN TA10      WFLD2
+     C           *LIKE     DEFN TA01      KTA01
+     C           *LIKE     DEFN TA02      KTA02
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYTO     KLIST
+     C                     KFLD           EH01
+     C                     KFLD           KTO04
+     C                     KFLD           BDATE
+     C           KEYTA     KLIST
+     C                     KFLD           TA01
+     C                     KFLD           TA02
+     C                     KFLD           TA03
+     C           KEYTA1    KLIST
+     C                     KFLD           KTA01
+     C                     KFLD           KTA02
+     C           KEYCC     KLIST
+     C                     KFLD           KCC01   2
+     C                     KFLD           KCC02   2
+     C                     KFLD           KCC04   9
+     C                     KFLD           KCC06   1
+     C                     KFLD           KCC07
+     C           KEYCC1    KLIST
+     C                     KFLD           KCC01
+     C                     KFLD           KCC02
+     C                     KFLD           KCC04
+     C                     KFLD           KCC06
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+  01-C                     EXSR RTN100
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN040....取得最新年度報價單價
+     C*==============================================================*
+04===C           RTN040    BEGSR
+|     *
+|    C           KEYCC     SETGTCC0
+|    C           KEYCC1    REDPECC0                      47
+| 01-C           *IN47     IFEQ '0'
+|   C           KCC07Y    ANDEQCC05
+|    *
+| 02-C           CC08      IFNE 0
+| 03-C           KCC07     IFLE CC08
+|   C           KCC07     ANDGECC07
+|   C                     Z-ADDCC09      WCC09
+| 03-C                     ENDIF
+| 02*C                     ELSE
+| 04-C           KCC07     IFGE CC07
+|   C                     Z-ADDCC09      WCC09
+| 04-C                     ENDIF
+| 02-C                     ENDIF
+|    *
+| 01*C                     ELSE
+|   C                     Z-ADD0         WCC09
+| 01-C                     ENDIF
+|     *
+04===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....MODE 1 指定公司
+      *===============================================================*
+07===C           RTN100    BEGSR
+|    C*
+|    C                     Z-ADD20081101  BDATE   80
+|    C                     Z-ADD20081130  EDATE   80
+|    C*
+|    C*計算單位成本及帳列庫存金額
+|    C                     EXSR RTN400
+|    C*
+07===C           END100    ENDSR
+      *===============================================================*
+      *          RTN400....計算單位成本
+      *===============================================================*
+16===C           RTN400    BEGSR
+|    C*
+|    C                     MOVE 'S1'      EH01    2
+|    C                     MOVE 'S1'      KTA01
+|    C                     Z-ADD200811    KTA02
+|    C                     SETOF                     52    ON無負庫存
+|    C           OK400     TAG
+|    C*
+|    C*讀取每一筆總庫產品
+|    C           KEYTA1    SETLLTA0
+|    C           KEYTA1    READETA0                      44
+| 01-C           *IN44     DOWEQ'0'
+|   C*
+|   C                     Z-ADD0         WQTY
+|   C                     Z-ADD0         WTA09            成本調整金額
+|   C                     Z-ADD0         TTAMT
+|   C                     SETOF                     53
+|   C*讀取同產品異動明細
+|   C                     MOVELTA03      KTO04
+|   C           KEYTO     SETLLINTOLF03
+|   C                     READ INTOLF03                 45
+| 02-C           *IN45     DOWEQ'0'
+| 03-C           TO01      IFEQ EH01
+|   C           TO04      ANDEQKTO04
+|   C           TO05      ANDLEEDATE
+|   C                     SETON                     53
+|   C                     EXSR RTN401                     累計單據數量
+|   C                     READ INTOLF03                 45
+| 03*C                     ELSE
+|   C  N52 53             EXSR RTN402                     檢核負值
+|   C   52                EXSR RTN403                     UPDATE INTAP
+|   C                     SETON                     45
+| 03-C                     ENDIF
+| 02-C                     ENDDO
+|   C*
+|   C           KEYTA1    READETA0                      44
+| 01-C                     ENDDO
+|    C*
+| 04-C           *IN99     IFEQ '0'
+|   C           *IN52     ANDEQ'0'
+|   C                     SETON                     52
+|   C                     GOTO OK400
+| 04-C                     ENDIF
+|    C*
+16===C                     ENDSR
+      *===============================================================*
+      *          RTN401....累計單據數量及金額
+      *===============================================================*
+17===C           RTN401    BEGSR
+|    C*
+| 01-C           RCDR3     IFEQ 'TM0L3'                    <產品成本調整
+|   C                     ADD  TO104     WTA09            調整金額
+| 01*C                     ELSE
+| 02-C                     SELEC
+|   C           RCDR3     WHEQ 'CM0L3'                    <驗收單
+|   C           TO101     MULT TO121     WAMT1  112H      當時進價
+|   C                     ADD  WAMT1     TTAMT
+|   C           RCDR3     WHEQ 'TF0L3'                    <進貨退出單
+|   C                     MOVELTO01      KCC01            公司別
+|   C                     MOVELTO14      KCC02            通路別
+|   C                     MOVELTO04      KCC04            產品代號
+|   C                     MOVEL'1'       KCC06            年度報價
+|   C                     Z-ADDTO05      KCC07            退出日期
+|   C                     EXSR RTN040
+|   C           WCC09     MULT TO121     WAMT1     H      最新年度價
+|   C                     SUB  WAMT1     TTAMT
+|   C           RCDR3     WHEQ 'TH0L3'                    <陳列轉進貨單
+|   C           TO101     MULT TO121     WAMT1     H      當時進價
+|   C                     ADD  WAMT1     TTAMT
+|   C           RCDR3     WHEQ 'TJ0L3'                    <存貨調整單
+|   C           TA04      MULT TO121     WAMT1     H      上月單位成本
+|   C                     ADD  WAMT1     TTAMT
+| 02-C                     ENDSL
+|   C*
+| 03-C           RCDR3     IFEQ 'TF0L3'                    <進貨退出單
+|   C                     SUB  TO121     WQTY
+| 03*C                     ELSE
+|   C                     ADD  TO121     WQTY
+| 03-C                     ENDIF
+|   C*
+| 01-C                     ENDIF
+|    C*
+17===C                     ENDSR
+      *===============================================================*
+      *          RTN402....檢核負庫存
+      *===============================================================*
+18===C           RTN402    BEGSR
+|    C*
+|    C* 負庫存量或金額
+| 01-C           WQTY      IFLT 0
+|   C           TTAMT     ORLT 0
+|   C                     SETON                     99
+| 01-C                     ENDIF
+|    C*
+18===C                     ENDSR
+      *===============================================================*
+      *          RTN403....UPDATE INTAPF
+      *===============================================================*
+19===C           RTN403    BEGSR
+|    C*
+|    C*本月有異動
+| 01-C           *IN53     IFEQ '1'
+|   C           TA05      ADD  TTAMT     WFLD1
+|   C                     ADD  WTA09     WFLD1
+|   C           TA06      ADD  WQTY      WFLD2
+|   C           WFLD1     DIV  WFLD2     TA07      H      單位成本
+|   C*
+|   C           TA06      ADD  TA11      TATT2   60       帳列庫存量
+|   C                     SUB  TA12      TATT2
+|   C                     ADD  TA13      TATT2
+|   C                     SUB  TA14      TATT2
+|   C                     ADD  TA15      TATT2
+|   C                     SUB  TA16      TATT2
+|   C           TA07      MULT TATT2     TA08      H      庫存金額
+|   C                     Z-ADDWTA09     TA09             成本調整金額
+| 01*C                     ELSE
+|   C*本月無異動（上月->本月）
+|   C                     Z-ADDTA04      TA07             單位成本
+|   C                     Z-ADDTA05      TA08             庫存金額
+|   C                     Z-ADD0         TA09             成本調整金額
+| 01-C                     ENDIF
+|    C*
+19===C                     ENDSR
+

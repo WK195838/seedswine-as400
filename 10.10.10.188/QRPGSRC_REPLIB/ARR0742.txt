@@ -1,0 +1,166 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0741                                       *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 82/12/08                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款系統                                 *
+     A* REMARK       :轉帳折讓明細表                               *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M004  MICHELLE   00.06.12 新增稅額欄－菸酒稅法         */
+     /*=============================================================*/
+      ****************************************************************
+     FARAFPF  IF  E           K        DISK
+     FSOSIPF  IF  E           K        DISK
+     FARR074APO   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      620 620 COMP
+     I                                      674 675 DSG01S
+     I                                      676 677 DSG01E
+     I*(MM/DD/YY)
+     I                                      631 6360DSG26S
+     I                                      637 6420DSG26E
+     I*(YY/MM/DD)
+     I                                      650 6550YSG26S
+     I                                      656 6610YSG26E
+     I                                      685 686 PDD
+     I            DS
+     I                                        1   60WSI21
+     I                                        1   2 PSIYY
+     I                                        3   4 PSIMM
+     I                                        5   6 PSIDD
+     I            DS
+     I                                        1  10 SI02
+     I                                        1   1 SI02L
+     I                                        1   2 PSI02F
+     I                                        3  10 PSI02B
+M004AIDA02        DS
+M004AI                                        1   43DUTY1
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSI     KLIST
+     C                     KFLD           AF01
+     C                     KFLD           AF06
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRM
+     C*
+     C                     READ AF0                      45
+  01-C           *IN45     DOWEQ'0'
+    C*
+    C* GET 發票資料
+    C           KEYSI     CHAINSI0                  40
+    C*
+  02-C           *IN40     IFEQ '0'
+    C           SI16      ANDNE'Y'
+    C                     EXSR RTN100                     *FILE TO SCR
+  02-C                     END
+    C*
+    C                     READ AF0                      45
+  01-C                     END
+     C*
+    C                     EXSR RTN200
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INIT ENVIRMENT
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+     C                     SETOF                     39
+|    C                     Z-ADD0         DATA1
+|    C                     Z-ADD0         DATA2
+|    C                     Z-ADD0         T1TOT1
+|    C                     Z-ADD0         T1TOT2
+|    C                     Z-ADD0         TOTA
+|    C                     Z-ADD0         TOTB
+|    C                     MOVEL'折　讓'CHAR
+     C*
+     C           COMP      IFEQ ' '
+     C                     MOVEL'全部'  TEXT
+     C                     ELSE
+     C           COMP      IFEQ '1'
+     C                     MOVEL'台北'  TEXT
+     C                     ELSE
+     C           COMP      IFEQ '2'
+     C                     MOVEL'台中'  TEXT
+     C                     ELSE
+     C                     MOVEL'高雄'  TEXT
+    -C                     END
+    -C                     END
+    -C                     END
+|    C                     WRITEPH1
+|    C*
+M004AC           *NAMVAR   DEFN           DA02
+M004AC                     IN   DA02
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....MOVE DATA TO SCREEN
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*
+B2???C           SI21      SUB  110000    WSI21
+|    C* GET 發票金額／營業稅額
+| 01-C           SI22      IFEQ 'D'
+|   C*M004D     AF07      MULT 100       WDATA1 234
+|   C*M004D     WDATA1    DIV  105       DATA1     H
+      *課稅別5%
+|   C*M004D     DATA1     MULT 5         WDATA2 234
+|   C*M004D     WDATA2    DIV  100       DATA2     H
+M004AC                     Z-ADDAF07      DATA1
+M004AC                     Z-ADDAF09      DATA2
+| 01*C                     ELSE
+|   C                     Z-ADDAF07      DATA1
+M004AC                     Z-ADD0         DATA2
+| 01-C                     END
+|    C*
+     C   39                EXSR RTN910
+|    C                     WRITEPD1
+|    C*
+|    C                     ADD  DATA1     T1TOT1
+|    C                     ADD  DATA2     T1TOT2
+|    C                     ADD  DATA1     TOTA
+|    C                     ADD  DATA2     TOTB
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE 合計＋備註
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*
+|    C                     WRITEPT2
+|    C                     WRITEPE2
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN910....換下頁
+      *==============================================================*
+03===C           RTN910    BEGSR
+|    C*
+|    C                     WRITEPT1
+|    C                     WRITEPE1
+|    C                     Z-ADD0         T1TOT1
+|    C                     Z-ADD0         T1TOT2
+|    C*
+| 01-C           *IN39     IFEQ '1'
+|   C                     WRITEPH1                        *換頁
+| 01-C                     END
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+

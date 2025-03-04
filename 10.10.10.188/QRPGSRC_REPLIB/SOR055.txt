@@ -1,0 +1,198 @@
+     FSOR055D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*(MM/DD/YY)
+     I                                      621 6260DSC08S
+     I                                      627 6320DSC08E
+     I*(YY/MM/DD)
+     I                                      640 6450YSC08S
+     I                                      646 6510YSC08E
+     I*物流點
+     I                                      652 656 DSC11S
+     I                                      657 661 DSC11E
+     I*增加辦事處的挑選
+     I                                      671 671 COMPS
+     I                                      672 672 COMPE
+     I                                      673 673 COMP
+M001AI*(YYYY/MM/DD)
+M001AI                                      850 857 YMD8S
+M001AI                                      858 865 YMD8E
+     I*
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  02-C           *IN03     IFEQ '0'
+  03-C           *IN04     IFEQ '1'
+    C**********************
+    C*  F4 PROMPT PROCESS *
+    C**********************
+    C                     EXSR RTNF4
+  03*C                     ELSE
+    C                     EXSR RTN100                     .CHECK      ?
+      *
+  02-C                     END
+  01-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         DSC08S
+|    C                     Z-ADD0         DSC08E
+|    C                     MOVE *BLANK    COMPS
+|    C                     MOVE *BLANK    COMPE
+|    C                     MOVE *BLANK    DSC11S
+|    C                     MOVE *BLANK    DSC11E
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*(CHECK WHEN DATE EQUAL 0)
+| 07-C           DSC08S    IFEQ 0
+M001DC*                    Z-ADD010101    DSC08S
+M001AC                     Z-ADD010192    DSC08S
+| 07-C                     END
+|    C*
+| 08-C           DSC08E    IFEQ 0
+M001DC*                    Z-ADD123199    DSC08E
+M001AC                     Z-ADD123129    DSC08E
+| 08-C                     END
+|    C*
+|    C*(CHECK START DATE)-送貨日期
+|    C                     CALL 'P09'
+|    C                     PARM DSC08S    P0901I  60
+|    C                     PARM           P0911O  1
+| 09-C           P0911O    IFEQ 'N'
+|   C                     SETON                     649499
+| 09-C                     END
+|    C   99                GOTO END100
+|    C*(CHECK END DATE)-送貨日期
+|    C                     CALL 'P09'
+|    C                     PARM DSC08E    P0901I  60
+|    C                     PARM           P0911O  1
+| 10-C           P0911O    IFEQ 'N'
+|   C                     SETON                     659499
+| 10-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*
+|    C*(CHENK STRART <= END DATE)
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM DSC08S    S001I2  60
+|    C           YSC08S    PARM           S001OI  60
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM DSC08E    S001I2  60
+|    C           YSC08E    PARM           S001OI  60
+M001AC                     MOVE YSC08S    HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    YMD8S
+|   C**
+M001AC                     MOVE YSC08E    HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    YMD8E
+|   C**
+M001DC*          YSC08S    IFGT YSC08E
+M001AC           YMD8S     IFGT YMD8E
+|    C*
+|   C                     SETON                     6465
+|   C                     SETON                     9399
+| 11-C                     END
+|    C   99                GOTO END100
+|    C*　　
+|    C*物流點
+| 01-C           DSC11S    IFEQ *BLANK
+|   C                     MOVE *LOVAL    DSC11S
+| 01-C                     END
+|    C*
+| 02-C           DSC11E    IFEQ *BLANK
+|   C                     MOVE *HIVAL    DSC11E
+| 02-C                     END
+|    C*
+| 03-C           DSC11S    IFGT DSC11E
+|   C                     SETON                     6263
+|   C                     SETON                     9299
+| 03-C                     END
+|    C   99                GOTO END100
+|    C***********
+|    C* CHK公司
+|    C***********
+| 01-C           COMP      IFEQ *BLANKS
+|   C                     MOVE *LOVAL    COMPS
+|   C                     MOVE *HIVAL    COMPE
+|   C                     ELSE
+|   C                     MOVE COMP      COMPS
+|   C                     MOVE COMP      COMPE
+| 01-C                     END
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C                     SETON                     99
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C*
+| 02-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE37
+|   C           D#COL     ANDLE38
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+03===C           ENDF4     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+     C/COPY HBP2CVTR
+

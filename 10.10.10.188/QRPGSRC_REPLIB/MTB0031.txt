@@ -1,0 +1,194 @@
+     A*===============================================================
+     A* CODE | AUTHOR |  DATE  | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M003 |MICHELLE|00.04.27| FOR DUTY菸酒稅法實施
+     A*---------------------------------------------------------------
+     A* M004 |MICHELLE|03.05.26|額度計算必須使用發票客戶代號
+     A*---------------------------------------------------------------
+     A*===============================================================
+     FMTMDPF  UF  E           K        DISK
+     FSOSILF07IF  E           K        DISK
+     FSOSELF08IF  E           K        DISK
+M004MF*SOSCLF02IF  E           K        DISK
+M004MFSOSCLF08IF  E           K        DISK
+     FARACLF09IF  E           K        DISK
+     FARACLF03IF  E           K        DISK
+     F            AC0                               KRENAMEAC0L
+     FERROPF  O   E           K        DISK
+     I**********
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+M001MI                                      201 2080YMD
+     I*           DS
+     I*                                       1   9 CD04
+     I*                                       1   1 CD04L
+M003AIDA02        DS
+M003AI                                        1   43DUTY1
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+      *==============================================================*
+      *                   *LIKE DEFN
+      *==============================================================*
+     C*          *LIKE     DEFN CD16      WORK16
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C*          MD01      KLIST
+     C*                    KFLD           MD01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *
+     C                     Z-ADD0         WORK1  100
+     C                     Z-ADD0         WORK2  100
+     C                     Z-ADD0         WORK3  100
+     C                     Z-ADD0         WORK4  100
+     C                     MOVEL*BLANK    ERRFLG  1
+     C                     Z-ADD0         ER04
+     C                     Z-ADD0         ER05
+     C                     Z-ADD0         ER06
+M003AC           *NAMVAR   DEFN           DA02
+M003AC                     IN   DA02
+     C*
+     C                     READ MD0                      45
+  01-C           *IN45     DOWEQ'0'
+    C*SOSILF07
+    C                     EXSR RTN100
+    C*ARARLF03
+    C                     EXSR RTN200
+    C*SOSCLF02
+    C                     EXSR RTN300
+    C*
+    C           MD31      ADD  MD32      WORK4
+    C*ERROR OUTPUT
+  02-C           WORK4     IFNE MD29
+    C                     MOVEL'Y'       ERRFLG
+B2000C                     Z-ADDYMD       ER01
+    C                     MOVELMD01      ER02
+    C           WORK4     SUB  MD29      ER03
+  02-C                     END
+    C*
+  03-C           ERRFLG    IFEQ 'Y'
+    C                     WRITEER0
+  03-C                     END
+    C*
+    C*UPDAT MD0
+    C                     Z-ADDWORK4     MD29
+    C*
+    C                     UPDATMD0
+    C                     MOVEL*BLANK    ERRFLG
+    C                     Z-ADD0         WORK1
+    C                     Z-ADD0         WORK2
+    C                     Z-ADD0         WORK3
+    C                     Z-ADD0         WORK4
+    C                     Z-ADD0         ER04
+    C                     Z-ADD0         ER05
+    C                     Z-ADD0         ER06
+    C                     READ MD0                      45
+  01-C                     END
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN100....SOSILF  (CALL SUBPGM)
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C           MD01      SETLLSI0                  41
+|    C*應收帳款為０
+| 04-C           *IN41     IFEQ '1'
+|   C                     Z-ADD0         WORK1
+| 04*C                     ELSE
+|   C           MD01      READESI0                      40
+| 05-C           *IN40     DOWEQ'0'
+|   C                     ADD  SI30      WORK1
+|   C           MD01      READESI0                      40
+| 05-C                     END
+| 04-C                     END
+|    C*作廢待重開之送貨單
+|    C           MD01      SETLLSE0                  41
+|    C           MD01      READESE0                      40
+| 06-C           *IN40     DOWEQ'0'
+|   C                     ADD  SE08      WORK1
+M003AC           SE38      IFEQ 'D'
+M003AC           SE08      MULT DUTY1     TAX     70H
+M003AC                     ADD  TAX       WORK1
+M003AC                     END
+|   C           MD01      READESE0                      40
+| 06-C                     END
+|    C*未分配須扣除，因ARA008 已扣除
+|    C           MD01      SETLLAC0                  41
+|    C           MD01      READEAC0                      40
+| 07-C           *IN40     DOWEQ'0'
+|   C                     SUB  AC10      WORK1
+|   C           MD01      READEAC0                      40
+| 07-C                     END
+|    C*ERROR OUTPUT
+| 08-C           WORK1     IFNE MD31
+|   C                     MOVEL'Y'       ERRFLG
+B2000C                     Z-ADDYMD       ER01
+|   C                     MOVELMD01      ER02
+|   C           WORK1     SUB  MD31      ER05
+| 08-C                     END
+|    C*UPDAT MD0
+|    C                     Z-ADDWORK1     MD31
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....ARACLF  (CALL SUBPGM)
+     C*==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C           MD01      SETLLAC0L                 41
+|    C*應收票據為０
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADD0         WORK2
+| 01*C                     ELSE
+|   C           MD01      READEAC0L                     40
+| 02-C           *IN40     DOWEQ'0'
+|   C                     ADD  AC08      WORK2
+|   C           MD01      READEAC0L                     40
+| 02-C                     END
+| 01-C                     END
+|    C*ERROR OUTPUT
+| 03-C           WORK2     IFNE MD32
+B2000C                     Z-ADDYMD       ER01
+|   C                     MOVELMD01      ER02
+|   C           WORK2     SUB  MD32      ER06
+| 03-C                     END
+|    C*UPDAT MD0
+|    C                     Z-ADDWORK2     MD32
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN300....SOSCLF  (CALL SUBPGM)
+     C*==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+|    C           MD01      SETLLSC0                  41
+|    C*預計使用額度
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADD0         WORK3
+| 01*C                     ELSE
+|   C           MD01      READESC0                      40
+| 02-C           *IN40     DOWEQ'0'
+|   C                     ADD  SC12      WORK3
+M003AC           SC37      IFEQ 'D'
+M003AC           SC12      MULT DUTY1     TAX     70H
+M003AC                     ADD  TAX       WORK3
+M003AC                     END
+|   C           MD01      READESC0                      40
+| 02-C                     END
+| 01-C                     END
+|    C*ERROR OUTPUT
+| 03-C           WORK3     IFNE MD30
+|   C                     MOVEL'Y'       ERRFLG
+B2000C                     Z-ADDYMD       ER01
+|   C                     MOVELMD01      ER02
+|   C           WORK3     SUB  MD30      ER04
+| 03-C                     END
+|    C*UPDAT MD0
+|    C                     Z-ADDWORK3     MD30
+|    C*
+03===C                     ENDSR
+

@@ -1,0 +1,255 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : WEB027                                     *
+     A*    AUTHOR       : DEREK                                      *
+     A*    CREATE DATE  : 108/12/05                                  *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存STORE PROCEDURE                 *
+     A*    SUBSYSTEM    :前台管理系統                              *
+     A*    REMARK       : WEB每月盤點單FOR新增匯出EXCEL          *
+     A*==============================================================*
+     A* MODI CODE |   DATE   | DESCRIPTION                           *
+     A*==============================================================*
+     FSCWB09PFUF  E           K        DISK                      A
+     FC#EHPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANDPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FINTBPF  IF  E           K        DISK
+     FPIZALF06IF  E           K        DISK
+     E*==============================================================*
+     E                    MSG     1  16 60               *訊息
+     I*==============================================================*
+     I           UDS
+     I                                      187 1920DATES
+     I                                      201 2080DATE
+     IPARM3       DS
+     I                                        1   80P3YMD
+     I                                        1   60P3YM
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PARM1   2        公司代號
+     C                     PARM           PARM2   2        通路代號
+     C                     PARM           PARM3   8        盤點日期
+     C                     PARM           PARM4   5        分店代號
+     C                     PARM           MODE    1        MODE
+     C                     PARM           ERRRD   3        ERR RCD NO.
+     C                     PARM           RTNCD   2        RETURN CODE
+     C                     PARM           RTNDSC 60        RETURN DESC.
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN TB02      WTB02            年月
+     C           *LIKE     DEFN TB06      TBTT2            帳列庫存量
+     C           *LIKE     DEFN TB06      TBTT3            陳列庫存量
+     C           *LIKE     DEFN ZA03      WZA03            盤點日期
+     C           *LIKE     DEFN ZA06      WZA06            單別
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYL6     KLIST
+     C                     KFLD           PARM1            公司別
+     C                     KFLD           PARM2            通路代號
+     C                     KFLD           WZA03            盤點日期
+     C                     KFLD           PARM4            分店代號
+     C                     KFLD           WZA06            單別
+     C           KEYNC     KLIST
+     C                     KFLD           PARM1            公司別
+     C                     KFLD           TB05             產品代號
+     C           KEYND     KLIST
+     C                     KFLD           PARM1            公司別
+     C                     KFLD           PARM2            通路代號
+     C           KEYNE     KLIST
+     C                     KFLD           PARM1            公司別
+     C                     KFLD           PARM2            通路代號
+     C                     KFLD           PARM4            分店代號
+     C           KEYTB     KLIST
+     C                     KFLD           PARM1            公司別
+     C                     KFLD           WTB02            年月
+     C                     KFLD           PARM2            通路代號
+     C                     KFLD           PARM4            分店代號
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C* CHK HEADING
+     C                     EXSR RTN100
+     C* PROCESS HEADING & DETAIL FILES
+     C  N99                EXSR RTN300
+     C*
+     C                     MOVE WRDNO     ERRRD
+     C  N99                MOVE '00'      RTNCD
+     C  N99                MOVE *BLANKS   RTNDSC
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN100....CHECK HEADING
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C                     Z-ADD0         WRDNO   30
+|    C* CHK MODE
+| 01-C           MODE      IFNE 'A'
+|   C                     MOVEL'11'      RTNCD
+|   C                     MOVELMSG,11    RTNDSC
+|   C                     SETON                     99
+| 01-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C* CHK公司代號
+|    C           PARM1     CHAIN#B0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL'01'      RTNCD
+|   C                     MOVELMSG,01    RTNDSC
+|   C                     SETON                     99
+| 02-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C* CHK通路代號
+|    C           KEYND     CHAINND0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL'02'      RTNCD
+|   C                     MOVELMSG,02    RTNDSC
+|   C                     SETON                     99
+| 03-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C* CHK分店代號
+|    C           KEYNE     CHAINNE0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     MOVEL'04'      RTNCD
+|   C                     MOVELMSG,04    RTNDSC
+|   C                     SETON                     99
+| 04-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C* CHK盤點日期是否小於帳務區間起日
+|    C           PARM1     CHAINEH0                  40
+| 05-C           *IN40     IFEQ '1'
+|   C                     MOVEL'14'      RTNCD
+|   C                     MOVELMSG,14    RTNDSC
+|   C                     SETON                     99
+| 05*C                     ELSE
+|   C                     Z-ADDEH02      WTB02            年月
+| 05-C                     ENDIF
+|    C   99                GOTO END100
+|    C***        P3YMD     IFLT EH07
+|    C***                  MOVEL'15'      RTNCD
+|    C***                  MOVELMSG,15    RTNDSC
+|    C***                  SETON                     99
+|    C***                  ENDIF
+|    C***99                GOTO END100
+|    C*盤點日期不得大於系統日期
+| 06-C           P3YMD     IFGT DATE
+|   C                     MOVEL'06'      RTNCD
+|   C                     MOVELMSG,06    RTNDSC
+|   C                     SETON                     99
+| 06-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C*新增模式CHK 一日只能一張盤點單
+| 07-C           MODE      IFEQ 'A'                        ADD MODE
+|   C                     MOVEL'Z1'      WZA06
+|   C                     Z-ADDP3YMD     WZA03
+|   C           KEYL6     CHAINZA0                  40
+| 08-C           *IN40     IFEQ '0'
+|   C                     MOVEL'05'      RTNCD
+|   C                     MOVELMSG,05    RTNDSC
+|   C                     SETON                     99
+| 08-C                     ENDIF
+|   C   99                GOTO END100
+| 07-C                     ENDIF                           IF MODE A
+|    C*
+01===C           END100    ENDSR
+     C*==============================================================*
+     C*          RTN300....PROCESS SCWB09PF
+     C*==============================================================*
+02===C           RTN300    BEGSR
+|    C*
+|    C* CLEAR SCWB09PF
+|    C           KEYNE     SETLLWB09
+|    C           KEYNE     READEWB09                     46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     DELETWB09
+|   C           KEYNE     READEWB09                     46
+| 01-C                     ENDDO
+|    C*
+|    C           KEYTB     SETLLTB0
+|    C           KEYTB     READETB0                      46
+| 02-C           *IN46     DOWEQ'0'
+|   C                     EXSR RTN301
+|   C           KEYTB     READETB0                      46
+| 02-C                     ENDDO
+|    C*
+02===C           END300    ENDSR
+     C*==============================================================*
+     C*          RTN301....產生盤點資料
+     C*==============================================================*
+03===CSR         RTN301    BEGSR
+|    C*
+|    C*帳列庫存量=期初庫存量+進貨量-退出量
+|    C*            +調整入庫量-調整出庫量
+|    C*            +銷售入庫量-銷售出庫量
+|    C*            +調撥入在途量-調撥出在途量
+|    C           TB06      ADD  TB08      TBTT2            帳列庫存量
+|    C                     SUB  TB09      TBTT2
+|    C                     ADD  TB10      TBTT2
+|    C                     SUB  TB11      TBTT2
+|    C                     ADD  TB12      TBTT2
+|    C                     SUB  TB13      TBTT2
+|    C                     ADD  TB14      TBTT2
+|    C                     SUB  TB15      TBTT2
+|    C*陳列庫存量=陳列異動量+陳列期初量-陳列借貨量
+|    C           TB16      ADD  TB17      TBTT3            陳列庫存量
+|    C                     SUB  TB18      TBTT3
+|    C*
+|    C           KEYNC     CHAINNC0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANK    NC25             狀態碼
+|   C                     MOVEL*BLANK    NC03             供應商
+|   C                     MOVEL*BLANK    NC04             中文全稱
+| 01-C                     ENDIF
+|    C*帳列庫存量AND陳列庫存量=0 OR陳列下架='Y'不列出
+|00A-C*          TBTT2     IFEQ 0
+|00A-C*          TBTT3     ANDEQ0
+|00A-C*          NC25      OREQ 'Y'
+|00A+C           NC25      IFEQ 'Y'
+|   C                     GOTO END301
+| 02-C                     ENDIF
+|    C*
+|    C                     MOVELPARM1     WB0901    P      公司別
+|    C                     MOVELPARM2     WB0902    P      通路代號
+|    C                     MOVELPARM4     WB0903    P      分店代號
+|    C                     MOVELTB05      WB0904    P      產品代號
+|    C                     Z-ADDP3YMD     WB0905           盤點日期
+|    C                     Z-ADD0         WB0906           盤點數量
+|    C                     MOVELNC03      WB0907    P      供應商代號
+|    C                     MOVELNC04      WB0908    P      產品名稱
+|00A+C                     Z-ADDTBTT2     WB0909           帳列庫存
+|00A+C                     Z-ADDTBTT3     WB0910           陳列庫存
+|    C*
+|    C                     WRITEWB09
+|    C*
+03===C           END301    ENDSR
+      *==============================================================*
+** /MSG
+公司代號不存在。                                          01
+通路代號不存在。                                        02
+                                                            03
+分店代號不存在。                                          04
+每家分店一天只能有一張盤點單。                            05
+盤點日期不得大於系統日期。                                06
+盤點單工作檔無產品明細。                                  07
+盤點單主檔正被其它人使用中，請聯絡總公司。                08
+此盤點單不存於盤點單檔案。                                09
+單據狀態已變更，不可更新。                                10
+處理模式代碼錯誤MODE(A)。                               11
+盤點數量必須大於零。                                      12
+供應商代號錯誤。                                          13
+無該公司的帳務區間資料。                                  14
+盤點日期不得小於帳務區間起日。                            15
+盤點日期不得大於帳務區間迄日。                            16
+

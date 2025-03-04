@@ -1,0 +1,4130 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250
+     H*
+     H*    PROGRAM ID   : JLB011
+     H*    PROGRAM NAME : 銷售傳票批次
+     H*    AUTHOR       : D910121 CHARLES
+     H*    CREATE DATE  : 1993.05.22
+     H*    UPDATE DATE  :
+     H*    SYSTEM       : 進銷存收TO總帳
+     H*===============================================================
+     H* MODI CODE     DATE     DESCRIPTION
+     H*---------------------------------------------------------------
+     H*  M001      98.12.09    FOR專櫃會計科目
+     A*           | 00.04.28   |專櫃擴點
+     H*---------------------------------------------------------------
+     A*  M002     | 98.12.09   | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A*  M003     | 99.02.11   |開放指定客戶A0003
+     A*---------------------------------------------------------------
+     A*  M004     | 00.04.28   |菸酒稅法實施，增加銷項稅額
+     A*---------------------------------------------------------------
+     A*  M005     | 01.12.30   | JL1003邏輯錯誤
+     A*---------------------------------------------------------------
+     A*  M006     | 01.12.31   |進項稅額新科目
+     A*---------------------------------------------------------------
+     A*  M007     | 02.01.11   | DECIMAL DATA ERROR
+     A*---------------------------------------------------------------
+     A*  M008     | 02.01.14   |康齡訂單稅額控制碼統一用*IN90
+     A*           |            |不同的產品歸屬跑不同的子程式
+     A*---------------------------------------------------------------
+     A*  M009     | 02.01.23   |發票作廢未重開的訂單，不處理過傳票帳
+      *           |            |已作廢的發票亦不處理
+     A*---------------------------------------------------------------
+     F****************************************************************
+     FWFJL10PFUF  E           K        DISK                      A
+     FWFJL10LFIF  E           K        DISK
+     F            WFJL10R                           KRENAMEWFJL10L
+     FWFJL11PFUF  E           K        DISK                      A
+     FWFJL12PFUF  E           K        DISK                      A
+     FPA#GPF  UF  E           K        DISK                      A
+     FSOSCPF  IF  E           K        DISK
+     FSOSCLF  IF  E           K        DISK
+     F            SC0                               KRENAMESC0L
+     FSOSDPF  IF  E           K        DISK
+     FSOSIPF  IF  E           K        DISK
+     FSOSJPF  IF  E           K        DISK
+     FSOSPLF01IF  E           K        DISK
+M006AFSOSPLF02IF  E           K        DISK
+     F            SP0                               KRENAMESP0L
+     FGLAAPF  IF  E           K        DISK
+     FGLAFPF  IF  E           K        DISK
+     FGLAHPF  O   E           K        DISK
+     F*WF#GPF  O   E           K        DISK
+     E*---------------------------------------------------------------*
+     E*輸入欄位代碼 ... EX.( 10 )=>AH05A
+     E                    CHK1        7  2
+     E*輸入欄位內容 ... EX.( R&D )=>AH05
+     E                    CHK2        4 20
+     E*輸入欄位說明 EX.(研發部)=>CALL 檢核程式&AA04得之.
+     E                    CHK3        7 20
+     I*CURSOR POSTITON
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I*LOCAL DATA AREA
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$ADMDY
+B2MODI                                      187 1920$ADYMD
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      152 161 $USERN
+B2MODI                                      201 2080ADYYMD
+     I            DS
+     I                                        1   2 SC01
+     I                                        1   1 WSC01
+     I            DS
+     I                                        1   9 SD03
+     I                                        3   4 SD03A
+     I            DS
+     I                                        1   5 SC14
+     I                                        1   1 SC14L
+      *轉帳訂單前二碼為公司別
+M006AI            DS
+M006AI                                        1  12 SP02
+M006AI                                        1   2 WSP02
+     I*檢核程式之參數.....................................
+     ICHKPGM      DS
+     I                                        1   2 AH01
+     I                                        3  22 WPARM1
+     I                                       23  32 WPARM2
+     I                                       33  33 WCHK
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *LIKE     DEFN #G01      W#G01
+     C           *LIKE     DEFN AH03      WAH03
+     C           *LIKE     DEFN SJ01      WSJ01
+     C           *LIKE     DEFN SJ02      WSJ02
+B2000C           *LIKE     DEFN JL1001    WL1001
+     C           *LIKE     DEFN JL1002    WL1002
+     C           *LIKE     DEFN J1002$    W1002$
+     C           *LIKE     DEFN JL1003    WL1003
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYAA     KLIST
+     C                     KFLD           AH01
+     C                     KFLD           CHK1,I
+     C           KEYSJ1    KLIST                           *WL
+     C                     KFLD           SC01             *公司別
+     C                     KFLD           SC30             *發票號碼
+     C                     KFLD           SD03             *產品編號
+     C           KEYSJ2    KLIST                           *RE/CN
+     C                     KFLD           WSJ01            *公司別
+     C                     KFLD           WSJ02            *發票號碼
+     C                     KFLD           SD03             *產品編號
+     C           KEYSI     KLIST
+     C                     KFLD           SC01             *公司別
+     C                     KFLD           SC30             *發票號碼
+M006AC           KEYSP     KLIST
+M006AC                     KFLD           WSP02            *公司別
+M006AC                     KFLD           SP04             *發票號碼
+     C           KEYW10    KLIST
+     C                     KFLD           JL1001           *確認日期
+     C                     KFLD           JL1002           *公司別2
+     C                     KFLD           J1002$           *辦事處1
+     C                     KFLD           JL1003           *傳票別
+     C                     KFLD           JL1004           *會計科目
+     C                     KFLD           JL1005           *成本中心
+     C                     KFLD           JL1006           *對項別
+     C                     KFLD           JL1007           *相關號碼１
+     C                     KFLD           JL1008           *相關號碼２
+     C                     KFLD           JL1009           *日期
+     C                     KFLD           JL1010           *數量
+     C                     KFLD           JL1011           *其它
+     C           KEYW11    KLIST
+     C                     KFLD           JL1102           *公司別2
+     C                     KFLD           J1102$           *辦事處1
+     C                     KFLD           JL1101           *確認日期
+     C                     KFLD           J1103$           *科目
+     C                     KFLD           JL1103           *單別
+     C                     KFLD           JL1104           *訂單號碼
+     C           KEYW12    KLIST
+     C                     KFLD           JL1201           *確認日期
+     C                     KFLD           JL1202           *公司別2
+     C                     KFLD           J1202$           *辦事處1
+     C                     KFLD           J1203$           *科目
+     C                     KFLD           JL1203           *單別
+     C                     KFLD           J1204$           *產品識別
+     C                     KFLD           JL1204           *產品代號
+     C           KEY#G     KLIST
+     C                     KFLD           W#G01
+     C           KEYAF     KLIST
+     C                     KFLD           AH01             *公司別
+     C                     KFLD           AH04             *會計科目
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR R0100                      *INITIAL
+     C*
+     C                     EXSR R2000
+     C                     EXSR R4000
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R0100 ....INITIAL VALUE
+     C*==============================================================*
+01===C           R0100     BEGSR
+|    C*--------------------------------------------------------------*
+|    C                     Z-ADD*ZERO     W01    132
+|    C                     Z-ADD*ZERO     W02    132
+|    C                     Z-ADD*ZERO     W03    132
+|    C                     Z-ADD*ZERO     W04    132
+|    C                     Z-ADD*ZERO     W05    132
+|    C                     Z-ADD*ZERO     W06    132
+|    C                     Z-ADD*ZERO     W07    132
+|    C                     Z-ADD*ZERO     W08    132
+|    C                     Z-ADD0         WQTY    70
+|    C                     Z-ADD0         WCOST  132
+|    C                     Z-ADD0         WAMT   154
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          R2000 .計算銷售訂單檔           P3-2.3-(4)
+     C*==============================================================*
+02===C           R2000     BEGSR
+|    C*
+|    C           *LOVAL    SETLLSC0
+|    C                     READ SC0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+|   C                     MOVELSC02      W#G01
+|   C           KEY#G     SETLL#G0                      42
+|   C   42                GOTO TAG#2
+|   C*
+M009AC           KEYSI     CHAINSI0                  45
+M009AC           *IN45     IFEQ '0'
+M009AC           SI18      IFEQ '*'
+M009AC                     GOTO TAG#2
+M009AC                     END
+M009AC                     END
+      *
+|   C                     SETOF                     888990
+M004AC                     SETOF                     919293
+M004AC                     SETOF                     949596
+M006AC                     SETOF                     87
+      *INITIAL檔案共同欄位WFJL10PF/WFJL11PF/WFJL12PF  KEY VALUES
+|   C                     EXSR RINT
+      *
+|   C           SC02      SETLLSD0
+|   C           SC02      READESD0                      46
+| 02-C           *IN46     DOWEQ'0'
+|   C*<<批發牌價 SJ05 >>
+|   C                     Z-ADD*ZEROS    SJ05
+|   C                     Z-ADD*ZEROS    SI24
+|   C           KEYSJ1    CHAINSJ0                  44
+      *------------------------------------------------
+|   C*判斷新舊列印方式
+|   C           SJ05      SUB  SD06      CHKFLD 150
+|   C                     MULT SD04      CHKFLD
+| 03-C           CHKFLD    IFEQ SJ07
+|   C*新折扣方式*IN25='1'
+|   C                     SETON                     25
+| 03*C                     ELSE
+|   C*舊折扣方式*IN25='0'
+|   C                     SETOF                     25
+| 03-C                     END
+      *------------------------------------------------
+      *WQTY數量－訂購＋搭贈
+|   C           SD04      ADD  SD05      WQTY
+      *WCOST成本
+|   C           SD10      ADD  SD11      WCOST
+|   C                     ADD  SD12      WCOST
+      *傳票WFJL10PF
+|   C                     EXSR R2A00
+      *銷貨收入明細WFJL11PF
+|   C                     EXSR R2C00
+      *銷貨成本彙總WFJL12PF
+|   C                     EXSR R2D00
+|   C           SC02      READESD0                      46
+| 02-C                     END
+|   C*
+|   C                     EXSR R2E00
+|   C*
+|   C           TAG#2     TAG
+|   C                     READ SC0                      45
+| 01-C                     END
+|    C*
+02===C           E2000     ENDSR
+     C*==============================================================*
+     C*          RINT  ....INITIAL KEY VALUES
+     C*INITIAL檔案共同欄位WFJL10PF/WFJL11PF/WFJL12PF
+     C*==============================================================*
+03===C           RINT      BEGSR
+|    C*--------------------------------------------------------------*
+|    C*INITIAL檔案共同欄位WFJL10PF
+B2000C                     Z-ADDSC39      JL1001
+|    C                     MOVE SC01      J1002$           辦事處
+|    C                     MOVEL*BLANKS   JL1005
+|    C                     MOVEL*BLANKS   JL1006
+|    C                     MOVEL*BLANKS   JL1007
+|    C                     MOVEL*BLANKS   JL1008
+|    C                     Z-ADD0         JL1009
+|    C                     Z-ADD0         JL1010
+|    C                     MOVEL*BLANKS   JL1011
+|    C*INITIAL檔案共同欄位WFJL11PF
+B2000C                     Z-ADDSC39      JL1101
+      *公司R1/R2/R3/W1/W2/W3
+|    C                     MOVE SC01      JL1102
+|    C                     MOVE SC01      J1102$           辦事處
+|    C                     MOVE SC03      JL1103
+|    C                     MOVE SC02      JL1104
+|    C*
+|    C*INITIAL檔案共同欄位WFJL12PF
+B2000C                     Z-ADDSC39      JL1201
+      *公司R1/R2/R3/W1/W2/W3
+|    C                     MOVE SC01      JL1202
+|    C                     MOVE SC01      J1202$           辦事處
+|    C                     MOVE SC03      JL1203
+      *科目
+|    C                     MOVEL*BLANKS   J1103$
+|    C                     MOVEL*BLANKS   J1203$
+| 01-C           SC03      IFNE 'SB'
+      *
+| 02-C           SC14      IFEQ 'A0001'
+|   C                     MOVEL'01'      J1103$
+|   C                     MOVEL'01'      J1203$
+| 02-C                     END
+| 03-C           SC14      IFEQ 'A0002'
+|   C                     MOVEL'02'      J1103$
+|   C                     MOVEL'02'      J1203$
+| 03-C                     END
+| 04-C*M003D     SC14      IFEQ 'A0003'
+|   C*M003D               MOVEL'03'      J1103$
+|   C*M003D               MOVEL'03'      J1203$
+| 04-C*M003D               END
+| 05-C           SC14      IFEQ 'B0001'
+|   C                     MOVEL'11'      J1103$
+|   C                     MOVEL'11'      J1203$
+| 05-C                     END
+| 06-C           SC14      IFEQ 'B0002'
+|   C                     MOVEL'12'      J1103$
+|   C                     MOVEL'12'      J1203$
+| 06-C                     END
+| 07-C           SC14      IFEQ 'B0003'
+|   C                     MOVEL'13'      J1103$
+|   C                     MOVEL'13'      J1203$
+| 07-C                     END
+| 08-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'14'      J1103$
+|   C                     MOVEL'14'      J1203$
+| 08-C                     END
+| 09-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'15'      J1103$
+|   C                     MOVEL'15'      J1203$
+| 09-C                     END
+| 10-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'16'      J1103$
+|   C                     MOVEL'16'      J1203$
+| 10-C                     END
+| 11-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'17'      J1103$
+|   C                     MOVEL'17'      J1203$
+| 11-C                     END
+| 12-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'18'      J1103$
+|   C                     MOVEL'18'      J1203$
+| 12-C                     END
+| 13-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'19'      J1103$
+|   C                     MOVEL'19'      J1203$
+| 13-C                     END
+| 14-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'20'      J1103$
+|   C                     MOVEL'20'      J1203$
+| 14-C                     END
+| 15-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'21'      J1103$
+|   C                     MOVEL'21'      J1203$
+| 15-C                     END
+| 16-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'22'      J1103$
+|   C                     MOVEL'22'      J1203$
+| 16-C                     END
+| 17-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'23'      J1103$
+|   C                     MOVEL'23'      J1203$
+| 17-C                     END
+| 18-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'24'      J1103$
+|   C                     MOVEL'24'      J1203$
+| 18-C                     END
+| 19-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'25'      J1103$
+|   C                     MOVEL'25'      J1203$
+| 19-C                     END
+| 20-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'26'      J1103$
+|   C                     MOVEL'26'      J1203$
+| 20-C                     END
+| 21-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'27'      J1103$
+|   C                     MOVEL'27'      J1203$
+| 21-C                     END
+| 22-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'28'      J1103$
+|   C                     MOVEL'28'      J1203$
+| 22-C                     END
+| 23-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'29'      J1103$
+|   C                     MOVEL'29'      J1203$
+| 23-C                     END
+| 24-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'30'      J1103$
+|   C                     MOVEL'30'      J1203$
+| 24-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'31'      J1103$
+M001AC                     MOVEL'31'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'32'      J1103$
+M001AC                     MOVEL'32'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'33'      J1103$
+M001AC                     MOVEL'33'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'34'      J1103$
+M001AC                     MOVEL'34'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'35'      J1103$
+M001AC                     MOVEL'35'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'36'      J1103$
+M001AC                     MOVEL'36'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'37'      J1103$
+M001AC                     MOVEL'37'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'38'      J1103$
+M001AC                     MOVEL'38'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'39'      J1103$
+M001AC                     MOVEL'39'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'40'      J1103$
+M001AC                     MOVEL'40'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'41'      J1103$
+M001AC                     MOVEL'41'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'42'      J1103$
+M001AC                     MOVEL'42'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'43'      J1103$
+M001AC                     MOVEL'43'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'44'      J1103$
+M001AC                     MOVEL'44'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'45'      J1103$
+M001AC                     MOVEL'45'      J1203$
+M001AC                     END
+| 25-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'99'      J1103$
+|   C                     MOVEL'99'      J1203$
+| 25-C                     END
+      *
+| 26-C           SC14L     IFNE 'B'
+|   C           SC14      ANDNE'A0001'
+|   C           SC14      ANDNE'A0002'
+|   C*M003D     SC14      ANDNE'A0003'
+|   C                     MOVEL'04'      J1103$
+|   C                     MOVEL'04'      J1203$
+| 26-C                     END
+      *
+| 01*C                     ELSE
+      *得原訂單發票客戶PS:若找不到則會計科目為*BLANK
+|   C           W#G01     CHAINSP0                  40
+| 27-C           *IN40     IFEQ '0'
+|   C           SP01      CHAINSC0L                 40
+| 28-C           *IN40     IFEQ '0'
+| 29-C           SC14      IFEQ 'B0001'
+|   C                     MOVEL'11'      J1103$
+|   C                     MOVEL'11'      J1203$
+| 29-C                     END
+| 30-C           SC14      IFEQ 'B0002'
+|   C                     MOVEL'12'      J1103$
+|   C                     MOVEL'12'      J1203$
+| 30-C                     END
+| 31-C           SC14      IFEQ 'B0003'
+|   C                     MOVEL'13'      J1103$
+|   C                     MOVEL'13'      J1203$
+| 31-C                     END
+| 32-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'14'      J1103$
+|   C                     MOVEL'14'      J1203$
+| 32-C                     END
+| 33-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'15'      J1103$
+|   C                     MOVEL'15'      J1203$
+| 33-C                     END
+| 34-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'16'      J1103$
+|   C                     MOVEL'16'      J1203$
+| 34-C                     END
+| 35-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'17'      J1103$
+|   C                     MOVEL'17'      J1203$
+| 35-C                     END
+| 36-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'18'      J1103$
+|   C                     MOVEL'18'      J1203$
+| 36-C                     END
+| 37-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'19'      J1103$
+|   C                     MOVEL'19'      J1203$
+| 37-C                     END
+| 38-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'20'      J1103$
+|   C                     MOVEL'20'      J1203$
+| 38-C                     END
+| 39-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'21'      J1103$
+|   C                     MOVEL'21'      J1203$
+| 39-C                     END
+| 40-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'22'      J1103$
+|   C                     MOVEL'22'      J1203$
+| 40-C                     END
+| 41-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'23'      J1103$
+|   C                     MOVEL'23'      J1203$
+| 41-C                     END
+| 42-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'24'      J1103$
+|   C                     MOVEL'24'      J1203$
+| 42-C                     END
+| 43-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'25'      J1103$
+|   C                     MOVEL'25'      J1203$
+| 43-C                     END
+| 44-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'26'      J1103$
+|   C                     MOVEL'26'      J1203$
+| 44-C                     END
+| 45-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'27'      J1103$
+|   C                     MOVEL'27'      J1203$
+| 45-C                     END
+| 46-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'28'      J1103$
+|   C                     MOVEL'28'      J1203$
+| 46-C                     END
+| 47-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'29'      J1103$
+|   C                     MOVEL'29'      J1203$
+| 47-C                     END
+| 48-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'30'      J1103$
+|   C                     MOVEL'30'      J1203$
+| 48-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'31'      J1103$
+M001AC                     MOVEL'31'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'32'      J1103$
+M001AC                     MOVEL'32'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'33'      J1103$
+M001AC                     MOVEL'33'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'34'      J1103$
+M001AC                     MOVEL'34'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'35'      J1103$
+M001AC                     MOVEL'35'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'36'      J1103$
+M001AC                     MOVEL'36'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'37'      J1103$
+M001AC                     MOVEL'37'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'38'      J1103$
+M001AC                     MOVEL'38'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'39'      J1103$
+M001AC                     MOVEL'39'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'40'      J1103$
+M001AC                     MOVEL'40'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'41'      J1103$
+M001AC                     MOVEL'41'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'42'      J1103$
+M001AC                     MOVEL'42'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'43'      J1103$
+M001AC                     MOVEL'43'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'44'      J1103$
+M001AC                     MOVEL'44'      J1203$
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'45'      J1103$
+M001AC                     MOVEL'45'      J1203$
+M001AC                     END
+| 49-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'99'      J1103$
+|   C                     MOVEL'99'      J1203$
+| 49-C                     END
+| 28-C                     END
+| 27-C                     END
+      *找回原訂單資料
+|   C           W#G01     CHAINSC0                  45
+      *
+| 01-C                     END
+|    C*--------------------------------------------------------------*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          R2E00 ... READ SOSCPF=>WRITE PA#GPF
+     C*==============================================================*
+04===C           R2E00     BEGSR
+|    C*
+| 01-C           SC03      IFEQ 'S1'
+|   C           SC03      OREQ 'S2'
+|   C           SC03      OREQ 'S3'
+|   C           SC03      OREQ 'S7'
+|   C           SC03      OREQ 'SA'
+|   C           SC03      OREQ 'SB'
+|   C           SC03      OREQ 'SC'
+|   C           SC03      OREQ 'SG'
+|   C*
+|   C                     MOVELSC02      #G01
+B2000C                     Z-ADDSC39      #G02
+B2000C*M002M               Z-ADD$ADYMD    #GXX
+M002MC                     Z-ADDADYYMD    #GXX
+B2000C                     TIME           #GYY
+|   C                     MOVEL$USER     #GZZ
+|   C                     WRITE#G0
+|   C*                    WRITEWF#GR
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          R2A00 ... 計算銷售訂單檔                 P3-2.3-(4)
+     C*                    (SOSCPF/SOSDPF)
+     C*==============================================================*
+05===C           R2A00     BEGSR
+|    C*
+| 01-C           SC03      IFEQ 'S1'
+|   C           SC03      OREQ 'S2'
+|   C           SC03      OREQ 'S3'
+|   C           SC03      OREQ 'S7'
+|   C                     EXSR R2A10
+| 01-C                     END
+|    C*
+| 02-C           SC03      IFEQ 'SA'
+|   C           SC03      OREQ 'SB'
+|   C           SC03      OREQ 'SC'
+|   C           SC03      OREQ 'SG'
+|   C                     EXSR R2B10
+| 02-C                     END
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          R2A10 ... 計算銷售訂單檔
+     C*         處理狀況... S1=一般銷售
+     C*                       S2=專櫃結單
+     C*                       S3=寄賣結單
+     C*                       S7=經銷商代送訂單
+     C*==============================================================*
+06===C           R2A10     BEGSR
+|    C*<< S1=一般銷售
+|    C*<< S3=寄賣結單
+| 01-C           SC03      IFEQ 'S1'
+|   C           SC03      OREQ 'S3'
+|   C*<< 且產品歸屬SD16＝公司別第一碼WSC01
+| 02-C           SD16      IFEQ WSC01
+|   C                     EXSR R2A11
+| 02-C                     END
+|   C*<< 且產品歸屬SD16＜＞公司別第一碼WSC01
+| 03-C           SD16      IFNE WSC01
+|   C                     EXSR R2A12
+| 03-C                     END
+| 01-C                     END
+|    C*<< S2=專櫃結單
+|    C*<< 且產品歸屬SD16＝公司別第一碼WSC01
+| 04-C           SC03      IFEQ 'S2'
+|   C           SD16      ANDEQWSC01
+|   C                     EXSR R2A13
+| 04-C                     END
+|    C*<< 且產品歸屬SD16＜＞公司別第一碼WSC01
+| 05-C           SC03      IFEQ 'S2'
+|   C           SD16      ANDNEWSC01
+|   C                     EXSR R2A14
+| 05-C                     END
+|    C*<< S7=經銷商代送訂單
+|    C*<< 且產品歸屬SD16＝公司別第一碼WSC01
+| 06-C           SC03      IFEQ 'S7'
+|   C           SD16      ANDEQWSC01
+|   C                     EXSR R2A15
+| 06-C                     END
+|    C*<< 且產品歸屬SD16＜＞公司別第一碼WSC01
+| 07-C           SC03      IFEQ 'S7'
+|   C           SD16      ANDNEWSC01
+|   C                     EXSR R2A16
+| 07-C                     END
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          R2A11 ... 寫入暫存檔－傳票
+     C*             CASE..  S1=一般銷售
+     C*                     S3=寄賣結單
+     C*                    且產品歸屬SD16＝公司別第一碼SC01
+     C*==============================================================*
+07===C           R2A11     BEGSR
+      *----------------------------------------------------------------
+     C*M004A 增加銷項稅額處理，改變銷貨收入的抓取來源
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN88控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+|    C                     MOVEL'1'       JL1003
+| 01-C           *IN88     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     88
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別RE/WL/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 02-C                     END
+| 03-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 03-C                     END
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－客戶
+|    C                     MOVEL'1132    'JL1004
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 02-C           SI25      IFGE 0
+|   C                     Z-ADDSI25      W01
+| 02*C                     ELSE
+|   C           SI25      MULT -1        W02
+| 02-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN88
+| 01-C                     END
+M009AC                     END
+|    C*
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004A *----------------------------------------------------------------
+M004AC*（１）三................銷貨收入傳票
+M004A *會計科目－銷貨收入－客戶
+M004AC                     MOVEL'410104  'JL1004
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+M004AC*
+M004AC           *IN25     IFEQ '1'
+M004A *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+M004A *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+      *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－客戶
+|    C                     MOVEL'410804  'JL1004
+|    C*
+| 05-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 05*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 05-C                     END
+|    C                     SUB  SD07      WAMT
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 06-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 06*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 06-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－客戶
+|    C                     MOVEL'410104  'JL1004
+|    C*
+| 07-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 07*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 07-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 08-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 08*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－客戶
+      *
+|    C                     MOVEL'2'       JL1003
+|    C                     MOVEL'510104  'JL1004
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C           WCOST     MULT SD04      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 09-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 09*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 09-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－產品促銷－搭贈－人頭馬／其他品牌
+| 10-C           SD03A     IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080101'JL1004
+|   C                     MOVELSD03      JL1006
+| 10*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080201'JL1004
+|   C                     MOVELSD03A     JL1006
+| 10-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD05
+|    C           WCOST     MULT SD05      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 11-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 11*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 11-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+|    C*
+      *----------------------------------------------------------------
+|    C*（２）三................銷貨成本傳票
+      *會計科目－存貨－或寄賣
+| 12-C           SC03      IFEQ 'S1'
+|   C                     MOVEL'1141    'JL1004
+| 12-C                     END
+| 13-C           SC03      IFEQ 'S3'
+|   C                     MOVEL'1143    'JL1004
+| 13-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 14-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 14*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 14-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+07===C                     ENDSR
+     C*==============================================================*
+     C*          R2A12 ... 寫入暫存檔－傳票
+     C*             CASE..  S1=一般銷售
+     C*                     S3=寄賣結單
+     C*                    且產品歸屬SD16＜＞公司別第一碼SC01
+     C*==============================================================*
+08===C           R2A12     BEGSR
+      *----------------------------------------------------------------
+     C*M004A 增加銷項稅額處理，改變銷貨收入的抓取來源
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN88控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN88     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     88
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別RE/WL/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 02-C                     END
+| 03-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 03-C                     END
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－客戶
+|    C*M005D               MOVEL'1'       JL1003
+|    C                     MOVEL'1132    'JL1004
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 02-C           SI25      IFGE 0
+|   C                     Z-ADDSI25      W01
+| 02*C                     ELSE
+|   C           SI25      MULT -1        W02
+| 02-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN88
+| 01-C                     END
+M009AC                     END
+|    C*
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004A *----------------------------------------------------------------
+M004AC*（１）三................銷貨收入傳票
+M004A *會計科目－銷貨收入－客戶
+M004AC                     MOVEL'410104  'JL1004
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+M004AC*
+M004AC           *IN25     IFEQ '1'
+M004A *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+M004A *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+      *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－客戶
+|    C                     MOVEL'410804  'JL1004
+|    C*
+| 05-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 05*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 05-C                     END
+|    C                     SUB  SD07      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 06-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 06*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 06-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－客戶
+|    C                     MOVEL'410104  'JL1004
+|    C*
+| 07-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 07*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 07-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 08-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 08*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－客戶
+|    C                     MOVEL'2'       JL1003
+|    C                     MOVEL'510104  'JL1004
+|    C*
+| 09-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 09*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 09-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 10-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 10*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 10-C                     END
+|    C*
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－存貨
+|    C                     MOVEL'1141    'JL1004
+|    C*
+| 11-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 11*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 11-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 12-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 12*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 12-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（３）一................進貨成本傳票
+      *會計科目－存貨
+|    C                     MOVEL'1'       JL1003
+|    C                     MOVEL'1141    'JL1004
+|    C*
+| 13-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 13*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 13-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 14-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 14*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 14-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（３）二................進貨成本傳票
+      *會計科目－應付帳款－匯東／康齡
+| 15-C           SD16      IFEQ 'R'
+      *應付－匯東
+|   C                     MOVEL'21230201'JL1004
+| 15-C                     END
+| 16-C           SD16      IFEQ 'C'
+      *應付－康齡
+|   C                     MOVEL'21230203'JL1004
+| 16-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C           WCOST     MULT SD04      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 17-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 17*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 17-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+M006AC*利用原始單號讀取轉帳發票，取得進項稅額，以一次為限
+M006AC*
+M006AC           *IN87     IFEQ '0'
+M006AC           SC02      CHAINSP0L                 45
+M006AC                     SETON                     87
+M006AC           *IN45     IFEQ '0'
+M006AC           KEYSP     CHAINSI0                  46
+M006AC           *IN46     IFEQ '0'
+M006AC           SI22      ANDEQ'D'
+M006AC                     Z-ADD0         W01
+M006AC                     Z-ADD0         W02
+M006AC           SI24      IFLE 0
+M006AC           SI24      MULT -1        W01
+M006AC                     ELSE
+M006AC                     Z-ADDSI24      W02
+M006AC                     END
+M006AC           KEYW10    CHAINWFJL10R              41
+M006AC                     EXSR RWF10
+     C*
+M006AC                     MOVE *BLANKS   JL1004
+M006AC                     MOVEL'115501  'JL1004
+M006AC                     Z-ADD0         W01
+M006AC                     Z-ADD0         W02
+M006AC           SI24      IFGE 0
+M006AC                     Z-ADDSI24      W01
+M006AC                     ELSE
+M006AC           SI24      MULT -1        W02
+M006AC                     END
+M006AC           KEYW10    CHAINWFJL10R              41
+M006AC                     EXSR RWF10
+M006AC                     END
+M006AC                     END
+M006AC                     END
+      *
+      *----------------------------------------------------------------
+      *舊發票才產生
+| 18-C           *IN25     IFEQ '0'
+|   C*（３）三................進貨成本傳票
+      *會計科目－進貨折讓－匯東／康齡
+| 19-C           SD16      IFEQ 'R'
+      *進貨折讓－匯東
+|   C                     MOVEL'511601  'JL1004
+| 19-C                     END
+| 20-C           SD16      IFEQ 'C'
+      *進貨折讓－康齡
+|   C                     MOVEL'511603  'JL1004
+| 20-C                     END
+|   C*
+      *WAMT = (SD10+SD11+SD12) * SD05
+|   C           WCOST     MULT SD05      WAMT
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 21-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 21*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 21-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+| 18-C                     END
+|    C*
+08===C                     ENDSR
+     C*==============================================================*
+     C*          R2A13 ... 寫入暫存檔－傳票
+     C*             CASE..  S2=專櫃銷售
+     C*                    且產品歸屬SD16＝公司別第一碼SC01
+     C*==============================================================*
+09===C           R2A13     BEGSR
+|    C*
+|    C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN90控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN90     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     90
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別WL
+|   C                     MOVEL'KN'      JL1002
+      *
+      *----------------------------------------------------------------
+|   C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－客戶
+|   C*M005D               MOVEL'1'       JL1003
+|   C                     MOVEL'1132    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 02-C           SI25      IFGE 0
+|   C                     Z-ADDSI25      W01
+| 02*C                     ELSE
+|   C           SI25      MULT -1        W02
+| 02-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）二................銷貨收入傳票
+      *會計科目－銷貨收入－中信／統領／環亞
+      *
+| 03-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'410111  'JL1004
+| 03-C                     END
+| 04-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'410112  'JL1004
+| 04-C                     END
+| 05-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'410113  'JL1004
+| 05-C                     END
+| 06-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'410114  'JL1004
+| 06-C                     END
+| 07-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'410115  'JL1004
+| 07-C                     END
+| 08-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'410116  'JL1004
+| 08-C                     END
+| 09-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'410117  'JL1004
+| 09-C                     END
+| 10-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'410118  'JL1004
+| 10-C                     END
+| 11-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'410119  'JL1004
+| 11-C                     END
+| 12-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'410120  'JL1004
+| 12-C                     END
+| 13-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'410121  'JL1004
+| 13-C                     END
+| 14-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'410122  'JL1004
+| 14-C                     END
+| 15-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'410123  'JL1004
+| 15-C                     END
+| 16-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'410124  'JL1004
+| 16-C                     END
+| 17-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'410125  'JL1004
+| 17-C                     END
+| 18-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'410126  'JL1004
+| 18-C                     END
+| 19-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'410127  'JL1004
+| 19-C                     END
+| 20-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'410128  'JL1004
+| 20-C                     END
+| 21-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'410129  'JL1004
+| 21-C                     END
+| 22-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'410130  'JL1004
+| 22-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'410131  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'410132  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'410133  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'410134  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'410135  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'410136  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'410137  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'410138  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'410139  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'410140  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'410141  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'410142  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'410143  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'410144  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'410145  'JL1004
+M001AC                     END
+| 23-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'410199  'JL1004
+| 23-C                     END
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 24-C           SI23      IFLE 0
+|   C           SI23      MULT -1        W01
+| 24*C                     ELSE
+|   C                     Z-ADDSI23      W02
+| 24-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+|   C*
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN90
+| 01-C                     END
+M009AC                     END
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－中信／統領／環亞
+|    C                     MOVEL'2'       JL1003
+      *
+| 26-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'510111  'JL1004
+| 26-C                     END
+| 27-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'510112  'JL1004
+| 27-C                     END
+| 28-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'510113  'JL1004
+| 28-C                     END
+| 29-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'510114  'JL1004
+| 29-C                     END
+| 30-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'510115  'JL1004
+| 30-C                     END
+| 31-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'510116  'JL1004
+| 31-C                     END
+| 32-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'510117  'JL1004
+| 32-C                     END
+| 33-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'510118  'JL1004
+| 33-C                     END
+| 34-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'510119  'JL1004
+| 34-C                     END
+| 35-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'510120  'JL1004
+| 35-C                     END
+| 36-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'510121  'JL1004
+| 36-C                     END
+| 37-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'510122  'JL1004
+| 37-C                     END
+| 38-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'510123  'JL1004
+| 38-C                     END
+| 39-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'510124  'JL1004
+| 39-C                     END
+| 40-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'510125  'JL1004
+| 40-C                     END
+| 41-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'510126  'JL1004
+| 41-C                     END
+| 42-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'510127  'JL1004
+| 42-C                     END
+| 43-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'510128  'JL1004
+| 43-C                     END
+| 44-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'510129  'JL1004
+| 44-C                     END
+| 45-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'510130  'JL1004
+| 45-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'510131  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'510132  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'510133  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'510134  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'510135  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'510136  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'510137  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'510138  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'510139  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'510140  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'510141  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'510142  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'510143  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'510144  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'510145  'JL1004
+M001AC                     END
+| 46-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'510199  'JL1004
+| 46-C                     END
+      *
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 47-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 47*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 47-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－存貨
+|    C                     MOVEL'1141    'JL1004
+|    C*
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 48-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 48*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 48-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+09===C                     ENDSR
+     C*==============================================================*
+     C*          R2A14 ... 寫入暫存檔－傳票
+     C*             CASE..  S2=專櫃銷售
+     C*                    且產品歸屬SD16＜＞公司別第一碼SC01
+     C*==============================================================*
+10===C           R2A14     BEGSR
+|    C*<<一張訂單不分產品歸屬只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<因此利用與R2A13子程式相同的燈號控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C*M008M     *IN91     IFEQ '0'
+M008MC           *IN90     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C*                    SETON                     91
+M008MC                     SETON                     90
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別WL
+|   C                     MOVEL'KN'      JL1002
+      *
+      *----------------------------------------------------------------
+|   C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－客戶
+|   C*M005D               MOVEL'1'       JL1003
+|   C                     MOVEL'1132    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 02-C           SI25      IFGE 0
+|   C                     Z-ADDSI25      W01
+| 02*C                     ELSE
+|   C           SI25      MULT -1        W02
+| 02-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）二................銷貨收入傳票
+      *會計科目－銷貨收入－中信／統領／環亞
+      *
+| 03-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'410111  'JL1004
+| 03-C                     END
+| 04-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'410112  'JL1004
+| 04-C                     END
+| 05-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'410113  'JL1004
+| 05-C                     END
+| 06-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'410114  'JL1004
+| 06-C                     END
+| 07-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'410115  'JL1004
+| 07-C                     END
+| 08-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'410116  'JL1004
+| 08-C                     END
+| 09-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'410117  'JL1004
+| 09-C                     END
+| 10-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'410118  'JL1004
+| 10-C                     END
+| 11-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'410119  'JL1004
+| 11-C                     END
+| 12-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'410120  'JL1004
+| 12-C                     END
+| 13-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'410121  'JL1004
+| 13-C                     END
+| 14-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'410122  'JL1004
+| 14-C                     END
+| 15-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'410123  'JL1004
+| 15-C                     END
+| 16-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'410124  'JL1004
+| 16-C                     END
+| 17-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'410125  'JL1004
+| 17-C                     END
+| 18-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'410126  'JL1004
+| 18-C                     END
+| 19-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'410127  'JL1004
+| 19-C                     END
+| 20-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'410128  'JL1004
+| 20-C                     END
+| 21-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'410129  'JL1004
+| 21-C                     END
+| 22-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'410130  'JL1004
+| 22-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'410131  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'410132  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'410133  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'410134  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'410135  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'410136  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'410137  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'410138  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'410139  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'410140  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'410141  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'410142  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'410143  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'410144  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'410145  'JL1004
+M001AC                     END
+| 23-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'410199  'JL1004
+| 23-C                     END
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 24-C           SI23      IFLE 0
+|   C           SI23      MULT -1        W01
+| 24*C                     ELSE
+|   C                     Z-ADDSI23      W02
+| 24-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+|   C*
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN91
+| 01-C                     END
+M009AC                     END
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－中信／統領／環亞
+|    C                     MOVEL'2'       JL1003
+      *
+| 26-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'510111  'JL1004
+| 26-C                     END
+| 27-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'510112  'JL1004
+| 27-C                     END
+| 28-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'510113  'JL1004
+| 28-C                     END
+| 29-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'510114  'JL1004
+| 29-C                     END
+| 30-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'510115  'JL1004
+| 30-C                     END
+| 31-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'510116  'JL1004
+| 31-C                     END
+| 32-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'510117  'JL1004
+| 32-C                     END
+| 33-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'510118  'JL1004
+| 33-C                     END
+| 34-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'510119  'JL1004
+| 34-C                     END
+| 35-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'510120  'JL1004
+| 35-C                     END
+| 36-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'510121  'JL1004
+| 36-C                     END
+| 37-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'510122  'JL1004
+| 37-C                     END
+| 38-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'510123  'JL1004
+| 38-C                     END
+| 39-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'510124  'JL1004
+| 39-C                     END
+| 40-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'510125  'JL1004
+| 40-C                     END
+| 41-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'510126  'JL1004
+| 41-C                     END
+| 42-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'510127  'JL1004
+| 42-C                     END
+| 43-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'510128  'JL1004
+| 43-C                     END
+| 44-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'510129  'JL1004
+| 44-C                     END
+| 45-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'510130  'JL1004
+| 45-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'510131  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'510132  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'510133  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'510134  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'510135  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'510136  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'510137  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'510138  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'510139  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'510140  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'510141  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'510142  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'510143  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'510144  'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'510145  'JL1004
+M001AC                     END
+| 46-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'510199  'JL1004
+| 46-C                     END
+      *
+| 47-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 47*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 47-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 48-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 48*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 48-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－存貨
+|    C                     MOVEL'1141    'JL1004
+| 49-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 49*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 49-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 50-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 50*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 50-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（３）一................進貨成本傳票
+      *會計科目－存貨
+|    C*                    MOVEL'1'       JL1003
+|    C*                    MOVEL'1141    'JL1004
+| 51-C*          *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C*          WCOST     MULT SD04      WAMT
+| 51*C*                    ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C*          WCOST     MULT WQTY      WAMT
+| 51-C*                    END
+      *
+|    C*                    Z-ADD0         W01
+|    C*                    Z-ADD0         W02
+| 52-C*          WAMT      IFGE 0
+|   C*                    Z-ADDWAMT      W01
+| 52*C*                    ELSE
+|   C*          WAMT      MULT -1        W02
+| 52-C*                    END
+|    C*
+|    C*          KEYW10    CHAINWFJL10R              41
+|    C*                    EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（３）二................進貨成本傳票
+      *會計科目－應付帳款－匯東／康齡
+      *
+| 53-C*          SD16      IFEQ 'R'
+      *應付帳款－匯東
+|   C*                    MOVEL'21230201'JL1004
+| 53-C*                    END
+| 54-C*          SD16      IFEQ 'C'
+      *應付帳款－康齡
+|   C*                    MOVEL'21230203'JL1004
+| 54-C*                    END
+      *
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C*          WCOST     MULT SD04      WAMT
+|    C*                    Z-ADD0         W01
+|    C*                    Z-ADD0         W02
+| 55-C*          WAMT      IFLE 0
+|   C*          WAMT      MULT -1        W01
+| 55*C*                    ELSE
+|   C*                    Z-ADDWAMT      W02
+| 55-C*                    END
+|    C*
+|    C*          KEYW10    CHAINWFJL10R              41
+|    C*                    EXSR RWF10
+      *----------------------------------------------------------------
+      *舊發票才產生
+| 56-C           *IN25     IFEQ '0'
+|   C*（３）三................進貨成本傳票
+      *會計科目－進貨折讓－匯東／康齡
+      *
+| 57-C           SD16      IFEQ 'R'
+      *進貨折讓－匯東
+|   C                     MOVEL'511601  'JL1004
+| 57-C                     END
+| 58-C           SD16      IFEQ 'C'
+      *進貨折讓－康齡
+|   C                     MOVEL'511603  'JL1004
+| 58-C                     END
+      *
+      *WAMT = (SD10+SD11+SD12) * SD05
+|   C           WCOST     MULT SD05      WAMT
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 59-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 59*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 59-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+| 56-C                     END
+|    C*
+10===C                     ENDSR
+     C*==============================================================*
+     C*          R2A15 ... 寫入暫存檔－傳票
+     C*             CASE..  S7=經銷商代送訂單
+     C*                    且產品歸屬SD16＝公司別第一碼SC01
+     C*==============================================================*
+11===C           R2A15     BEGSR
+      *----------------------------------------------------------------
+     C*M004A 增加銷項稅額處理，改變銷貨收入的抓取來源
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN92控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN92     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     92
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別RE/WL/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 02-C                     END
+| 03-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 03-C                     END
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－客戶
+|    C*M005D               MOVEL'1'       JL1003
+|    C                     MOVEL'1132    'JL1004
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 02-C           SI25      IFGE 0
+|   C                     Z-ADDSI25      W01
+| 02*C                     ELSE
+|   C           SI25      MULT -1        W02
+| 02-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN92
+| 01-C                     END
+M009AC                     END
+|    C*
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004A *----------------------------------------------------------------
+M004AC*（１）三................銷貨收入傳票
+M004A *會計科目－銷貨收入－客戶
+M004AC                     MOVEL'410104  'JL1004
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+M004AC*
+M004AC           *IN25     IFEQ '1'
+M004A *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+M004A *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+      *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－客戶
+|    C                     MOVEL'410804  'JL1004
+|    C*
+| 05-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 05*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 05-C                     END
+|    C                     SUB  SD07      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 06-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 06*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 06-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－客戶
+|    C                     MOVEL'410104  'JL1004
+|    C*
+| 07-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 07*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 07-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 08-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 08*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－客戶
+|    C                     MOVEL'2'       JL1003
+|    C                     MOVEL'510104  'JL1004
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C           WCOST     MULT SD04      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 09-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 09*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 09-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－產品促銷－搭贈－人頭馬／其他品牌
+| 10-C           SD03A     IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080101'JL1004
+|   C                     MOVELSD03      JL1006
+| 10*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080201'JL1004
+|   C                     MOVELSD03A     JL1006
+| 10-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD05
+|    C           WCOST     MULT SD05      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 11-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 11*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 11-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+|    C*
+      *----------------------------------------------------------------
+|    C*（２）三................銷貨成本傳票
+      *會計科目－存貨積欠
+|    C                     MOVEL'1144    'JL1004
+|    C*
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 12-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 12*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 12-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+11===C                     ENDSR
+     C*==============================================================*
+     C*          R2A16 ... 寫入暫存檔－傳票
+     C*             CASE..  S7=經銷商代送訂單
+     C*                    且產品歸屬SD16＜＞公司別第一碼SC01
+     C*==============================================================*
+12===C           R2A16     BEGSR
+      *----------------------------------------------------------------
+     C*M004A 增加銷項稅額處理，改變銷貨收入的抓取來源
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN92控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN92     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     92
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別RE/WL/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 02-C                     END
+| 03-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 03-C                     END
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－客戶
+|    C*M005D               MOVEL'1'       JL1003
+|    C                     MOVEL'1132    'JL1004
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 02-C           SI25      IFGE 0
+|   C                     Z-ADDSI25      W01
+| 02*C                     ELSE
+|   C           SI25      MULT -1        W02
+| 02-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN93
+| 01-C                     END
+M009AC                     END
+|    C*
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004A *----------------------------------------------------------------
+M004AC*（１）三................銷貨收入傳票
+M004A *會計科目－銷貨收入－客戶
+M004AC                     MOVEL'410104  'JL1004
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+M004AC*
+M004AC           *IN25     IFEQ '1'
+M004A *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+M004A *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+      *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－客戶
+|    C                     MOVEL'410804  'JL1004
+|    C*
+| 05-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 05*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 05-C                     END
+|    C                     SUB  SD07      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 06-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 06*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 06-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－客戶
+|    C                     MOVEL'410104  'JL1004
+|    C*
+| 07-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 07*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 07-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 08-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 08*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 08-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－客戶
+|    C                     MOVEL'2'       JL1003
+|    C                     MOVEL'510104  'JL1004
+| 09-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 09*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 09-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 10-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 10*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 10-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－存貨積欠
+|    C                     MOVEL'1144    'JL1004
+| 11-C           *IN25     IFEQ '1'
+      *新
+      *WAMT = (SD10+SD11+SD12) * (SD04)
+|   C           WCOST     MULT SD04      WAMT
+| 11*C                     ELSE
+      *舊
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|   C           WCOST     MULT WQTY      WAMT
+| 11-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 12-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 12*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 12-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+12===C                     ENDSR
+     C*==============================================================*
+     C*          R2B10 ... 計算銷售訂單檔
+     C*         處理狀況... SA=一般銷售
+     C*                       SB=專櫃結單
+     C*                       SC=寄賣結單
+     C*                       SG=經銷商代送訂單
+     C*==============================================================*
+13===C           R2B10     BEGSR
+|    C*<< SA=一般銷售
+|    C*<< SC=寄賣結單
+| 01-C           SC03      IFEQ 'SA'
+|   C           SC03      OREQ 'SC'
+|   C                     EXSR R2B11
+| 01-C                     END
+|    C*<< SB=專櫃結單
+| 02-C           SC03      IFEQ 'SB'
+|   C                     EXSR R2B13
+| 02-C                     END
+|    C*<< SG=經銷商代送訂單
+| 03-C           SC03      IFEQ 'SG'
+|   C                     EXSR R2B15
+| 03-C                     END
+|    C*
+13===C                     ENDSR
+     C*==============================================================*
+     C*          R2B11 ... 寫入暫存檔－傳票
+     C*             CASE..  SA=一般銷售
+     C*                     SC=寄賣結單
+     C*==============================================================*
+14===C           R2B11     BEGSR
+      *----------------------------------------------------------------
+     C*M004A 增加銷項稅額處理，改變銷貨收入的抓取來源
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN94控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN94     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     94
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+      *公司別RE/WL/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 02-C                     END
+| 03-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 03-C                     END
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－匯齡／匯東／康齡
+|    C*M005D               MOVEL'1'       JL1003
+      *
+| 04-C           SC14      IFEQ 'A0001'
+      *應收帳款－匯東
+|   C                     MOVEL'11350201'JL1004
+| 04-C                     END
+| 05-C           SC14      IFEQ 'A0002'
+      *應收帳款－匯齡
+|   C                     MOVEL'11350202'JL1004
+| 05-C                     END
+| 06-C           SC14      IFEQ 'A0001'
+      *應收帳款－康齡
+|   C                     MOVEL'11350203'JL1004
+| 06-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 07-C*M004M     SD07      IFGE 0
+|   C*M004M               Z-ADDSD07      W01
+| 07*C*M004M               ELSE
+|   C*M004M     SD07      MULT -1        W02
+| 07-C*M004M               END
+M004MC           SI25      IFGE 0
+M004MC                     Z-ADDSI25      W01
+M004MC                     ELSE
+M004MC           SI25      MULT -1        W02
+M004MC                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN94
+| 01-C                     END
+M009AC                     END
+M004AC*
+      *----------------------------------------------------------------
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004AC*（１）三................銷貨收入傳票
+M004A *會計科目－銷貨收入－匯齡／匯東／康齡
+M004AC           SC14      IFEQ 'A0001'
+M004A *銷貨收入－匯東
+M004AC                     MOVEL'410101  'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'A0002'
+      *銷貨收入－匯齡
+M004AC                     MOVEL'41010202'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'A0001'
+      *銷貨收入－康齡
+M004AC                     MOVEL'410103  'JL1004
+M004AC                     END
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+     C*
+M004AC           *IN25     IFEQ '1'
+      *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+      *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+M004A *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－匯齡／匯東／康齡
+      *
+| 08-C           SC14      IFEQ 'A0001'
+      *事前折扣－匯東
+|   C                     MOVEL'410801  'JL1004
+| 08-C                     END
+| 09-C           SC14      IFEQ 'A0002'
+      *事前折扣－匯齡
+|   C                     MOVEL'41080202'JL1004
+| 09-C                     END
+| 10-C           SC14      IFEQ 'A0001'
+      *事前折扣－康齡
+|   C                     MOVEL'410803  'JL1004
+| 10-C                     END
+      *
+| 11-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 11*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 11-C                     END
+|    C                     SUB  SD07      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 12-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 12*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 12-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－匯齡／匯東／康齡
+| 13-C           SC14      IFEQ 'A0001'
+      *銷貨收入－匯東
+|   C                     MOVEL'410101  'JL1004
+| 13-C                     END
+| 14-C           SC14      IFEQ 'A0002'
+      *銷貨收入－匯齡
+|   C                     MOVEL'41010202'JL1004
+| 14-C                     END
+| 15-C           SC14      IFEQ 'A0001'
+      *銷貨收入－康齡
+|   C                     MOVEL'410103  'JL1004
+| 15-C                     END
+      *
+| 16-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 16*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 16-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 17-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 17*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 17-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－匯齡／匯東／康齡
+|    C                     MOVEL'2'       JL1003
+      *
+| 18-C           SC14      IFEQ 'A0001'
+      *銷貨成本－匯東
+|   C                     MOVEL'510101  'JL1004
+| 18-C                     END
+| 19-C           SC14      IFEQ 'A0002'
+      *銷貨成本－匯齡
+|   C                     MOVEL'51010202'JL1004
+| 19-C                     END
+| 20-C           SC14      IFEQ 'A0001'
+      *銷貨成本－康齡
+|   C                     MOVEL'510103  'JL1004
+| 20-C                     END
+      *
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C           WCOST     MULT SD04      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 21-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 21*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 21-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－產品促銷－搭贈－人頭馬／其他品牌
+| 22-C           SD03A     IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080101'JL1004
+|   C                     MOVELSD03      JL1006
+| 22*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080201'JL1004
+|   C                     MOVELSD03A     JL1006
+| 22-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD05
+|    C           WCOST     MULT SD05      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 23-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 23*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 23-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+|    C*
+      *----------------------------------------------------------------
+|    C*（２）三................銷貨成本傳票
+      *會計科目－存貨／寄賣品
+| 24-C           SC03      IFEQ 'SA'
+|   C                     MOVEL'1141    'JL1004
+| 24-C                     END
+| 25-C           SC03      IFEQ 'SC'
+|   C                     MOVEL'1143    'JL1004
+| 25-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 26-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 26*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 26-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+14===C                     ENDSR
+     C*==============================================================*
+     C*          R2B13 ... 寫入暫存檔－傳票
+     C*             CASE..  SB=專櫃銷售
+     C*==============================================================*
+15===C           R2B13     BEGSR
+|    C*
+      *----------------------------------------------------------------
+      *公司別RE/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 02-C                     END
+      *
+     C*M004A 增加銷項稅額處理
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN95控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN95     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     95
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－匯齡／匯東／康齡
+|    C*M005D               MOVEL'1'       JL1003
+      *
+| 03-C           SC14      IFEQ 'A0001'
+      *應收帳款－匯東
+|   C                     MOVEL'11350201'JL1004
+| 03-C                     END
+| 04-C           SC14      IFEQ 'A0002'
+      *應收帳款－匯齡
+|   C                     MOVEL'11350202'JL1004
+| 04-C                     END
+| 05-C           SC14      IFEQ 'A0001'
+      *應收帳款－康齡
+|   C                     MOVEL'11350203'JL1004
+| 05-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 07-C*M004M     SD07      IFGE 0
+|   C*M004M               Z-ADDSD07      W01
+| 07*C*M004M               ELSE
+|   C*M004M     SD07      MULT -1        W02
+| 07-C*M004M               END
+M004MC           SI25      IFGE 0
+M004MC                     Z-ADDSI25      W01
+M004MC                     ELSE
+M004MC           SI25      MULT -1        W02
+M004MC                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN95
+| 01-C                     END
+M009AC                     END
+M004AC*
+      *----------------------------------------------------------------
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004AC*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－中信／統領／環亞
+M004AC                     MOVEL*BLANKS   JL1004
+      *得原訂單發票客戶PS:若找不到則會計科目為*BLANK
+M004AC           W#G01     CHAINSP0                  40
+M004AC           *IN40     IFEQ '0'
+M004AC           SP01      CHAINSC0L                 40
+M004AC           *IN40     IFEQ '0'
+M004AC           SC14      IFEQ 'B0001'
+      *中信
+M004AC                     MOVEL'41010211'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0002'
+      *統領
+M004AC                     MOVEL'41010212'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0003'
+      *環亞
+M004AC                     MOVEL'41010213'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0004'
+M004AC                     MOVEL'41010214'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0005'
+M004AC                     MOVEL'41010215'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0006'
+M004AC                     MOVEL'41010216'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0007'
+M004AC                     MOVEL'41010217'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0008'
+M004AC                     MOVEL'41010218'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0009'
+M004AC                     MOVEL'41010219'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0010'
+M004AC                     MOVEL'41010220'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0011'
+M004AC                     MOVEL'41010221'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0012'
+M004AC                     MOVEL'41010222'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0013'
+M004AC                     MOVEL'41010223'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0014'
+M004AC                     MOVEL'41010224'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0015'
+M004AC                     MOVEL'41010225'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0016'
+M004AC                     MOVEL'41010226'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0017'
+M004AC                     MOVEL'41010227'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0018'
+M004AC                     MOVEL'41010228'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0019'
+M004AC                     MOVEL'41010229'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'B0020'
+M004AC                     MOVEL'41010230'JL1004
+M004AC                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'41010231'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'41010232'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'41010233'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'41010234'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'41010235'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'41010236'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'41010237'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'41010238'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'41010239'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'41010240'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'41010241'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'41010242'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'41010243'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'41010244'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'41010245'JL1004
+M001AC                     END
+M004AC           SC14      IFEQ 'B0099'
+M004AC                     MOVEL'41010299'JL1004
+M004AC                     END
+M004AC                     END
+M004AC                     END
+      *找回原訂單資料
+M004AC           W#G01     CHAINSC0                  45
+      *
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+     C*
+M004AC           *IN25     IFEQ '1'
+      *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+      *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+M004A *----------------------------------------------------------------
+      *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－中信／統領／環亞
+|    C                     MOVEL*BLANKS   JL1004
+      *得原訂單發票客戶PS:若找不到則會計科目為*BLANK
+|    C           W#G01     CHAINSP0                  40
+| 07-C           *IN40     IFEQ '0'
+|   C           SP01      CHAINSC0L                 40
+| 08-C           *IN40     IFEQ '0'
+| 09-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'41080211'JL1004
+| 09-C                     END
+| 10-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'41080212'JL1004
+| 10-C                     END
+| 11-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'41080213'JL1004
+| 11-C                     END
+| 12-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'41080214'JL1004
+| 12-C                     END
+| 13-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'41080215'JL1004
+| 13-C                     END
+| 14-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'41080216'JL1004
+| 14-C                     END
+| 15-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'41080217'JL1004
+| 15-C                     END
+| 16-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'41080218'JL1004
+| 16-C                     END
+| 17-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'41080219'JL1004
+| 17-C                     END
+| 18-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'41080220'JL1004
+| 18-C                     END
+| 19-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'41080221'JL1004
+| 19-C                     END
+| 20-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'41080222'JL1004
+| 20-C                     END
+| 21-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'41080223'JL1004
+| 21-C                     END
+| 22-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'41080224'JL1004
+| 22-C                     END
+| 23-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'41080225'JL1004
+| 23-C                     END
+| 24-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'41080226'JL1004
+| 24-C                     END
+| 25-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'41080227'JL1004
+| 25-C                     END
+| 26-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'41080228'JL1004
+| 26-C                     END
+| 27-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'41080229'JL1004
+| 27-C                     END
+| 28-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'41080230'JL1004
+| 28-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'41080231'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'41080232'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'41080233'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'41080234'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'41080235'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'41080236'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'41080237'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'41080238'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'41080239'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'41080240'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'41080241'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'41080242'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'41080243'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'41080244'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'41080245'JL1004
+M001AC                     END
+| 29-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'41080299'JL1004
+| 29-C                     END
+| 08-C                     END
+| 07-C                     END
+      *找回原訂單資料
+|    C           W#G01     CHAINSC0                  45
+      *
+| 30-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 30*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 30-C                     END
+|    C                     SUB  SD07      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 31-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 31*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 31-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－中信／統領／環亞
+|    C                     MOVEL*BLANKS   JL1004
+      *得原訂單發票客戶PS:若找不到則會計科目為*BLANK
+|    C           W#G01     CHAINSP0                  40
+| 32-C           *IN40     IFEQ '0'
+|   C           SP01      CHAINSC0L                 40
+| 33-C           *IN40     IFEQ '0'
+| 34-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'41010211'JL1004
+| 34-C                     END
+| 35-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'41010212'JL1004
+| 35-C                     END
+| 36-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'41010213'JL1004
+| 36-C                     END
+| 37-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'41010214'JL1004
+| 37-C                     END
+| 38-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'41010215'JL1004
+| 38-C                     END
+| 39-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'41010216'JL1004
+| 39-C                     END
+| 40-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'41010217'JL1004
+| 40-C                     END
+| 41-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'41010218'JL1004
+| 41-C                     END
+| 42-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'41010219'JL1004
+| 42-C                     END
+| 43-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'41010220'JL1004
+| 43-C                     END
+| 44-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'41010221'JL1004
+| 44-C                     END
+| 45-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'41010222'JL1004
+| 45-C                     END
+| 46-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'41010223'JL1004
+| 46-C                     END
+| 47-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'41010224'JL1004
+| 47-C                     END
+| 48-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'41010225'JL1004
+| 48-C                     END
+| 49-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'41010226'JL1004
+| 49-C                     END
+| 50-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'41010227'JL1004
+| 50-C                     END
+| 51-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'41010228'JL1004
+| 51-C                     END
+| 52-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'41010229'JL1004
+| 52-C                     END
+| 53-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'41010230'JL1004
+| 53-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'41010231'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'41010232'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'41010233'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'41010234'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'41010235'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'41010236'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'41010237'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'41010238'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'41010239'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'41010240'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'41010241'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'41010242'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'41010243'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'41010244'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'41010245'JL1004
+M001AC                     END
+| 54-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'41010299'JL1004
+| 54-C                     END
+| 33-C                     END
+| 32-C                     END
+      *找回原訂單資料
+|    C           W#G01     CHAINSC0                  45
+      *
+| 55-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 55*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 55-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 56-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 56*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 56-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+|    C*
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－中信／統領／環亞
+|    C                     MOVEL'2'       JL1003
+|    C                     MOVEL*BLANKS   JL1004
+      *得原訂單發票客戶PS:若找不到則會計科目為*BLANK
+|    C           W#G01     CHAINSP0                  40
+| 57-C           *IN40     IFEQ '0'
+|   C           SP01      CHAINSC0L                 40
+| 58-C           *IN40     IFEQ '0'
+| 59-C           SC14      IFEQ 'B0001'
+      *中信
+|   C                     MOVEL'51010211'JL1004
+| 59-C                     END
+| 60-C           SC14      IFEQ 'B0002'
+      *統領
+|   C                     MOVEL'51010212'JL1004
+| 60-C                     END
+| 61-C           SC14      IFEQ 'B0003'
+      *環亞
+|   C                     MOVEL'51010213'JL1004
+| 61-C                     END
+| 62-C           SC14      IFEQ 'B0004'
+|   C                     MOVEL'51010214'JL1004
+| 62-C                     END
+| 63-C           SC14      IFEQ 'B0005'
+|   C                     MOVEL'51010215'JL1004
+| 63-C                     END
+| 64-C           SC14      IFEQ 'B0006'
+|   C                     MOVEL'51010216'JL1004
+| 64-C                     END
+| 65-C           SC14      IFEQ 'B0007'
+|   C                     MOVEL'51010217'JL1004
+| 65-C                     END
+| 66-C           SC14      IFEQ 'B0008'
+|   C                     MOVEL'51010218'JL1004
+| 66-C                     END
+| 67-C           SC14      IFEQ 'B0009'
+|   C                     MOVEL'51010219'JL1004
+| 67-C                     END
+| 68-C           SC14      IFEQ 'B0010'
+|   C                     MOVEL'51010220'JL1004
+| 68-C                     END
+| 69-C           SC14      IFEQ 'B0011'
+|   C                     MOVEL'51010221'JL1004
+| 69-C                     END
+| 70-C           SC14      IFEQ 'B0012'
+|   C                     MOVEL'51010222'JL1004
+| 70-C                     END
+| 71-C           SC14      IFEQ 'B0013'
+|   C                     MOVEL'51010223'JL1004
+| 71-C                     END
+| 72-C           SC14      IFEQ 'B0014'
+|   C                     MOVEL'51010224'JL1004
+| 72-C                     END
+| 73-C           SC14      IFEQ 'B0015'
+|   C                     MOVEL'51010225'JL1004
+| 73-C                     END
+| 74-C           SC14      IFEQ 'B0016'
+|   C                     MOVEL'51010226'JL1004
+| 74-C                     END
+| 75-C           SC14      IFEQ 'B0017'
+|   C                     MOVEL'51010227'JL1004
+| 75-C                     END
+| 76-C           SC14      IFEQ 'B0018'
+|   C                     MOVEL'51010228'JL1004
+| 76-C                     END
+| 77-C           SC14      IFEQ 'B0019'
+|   C                     MOVEL'51010229'JL1004
+| 77-C                     END
+| 78-C           SC14      IFEQ 'B0020'
+|   C                     MOVEL'51010230'JL1004
+| 78-C                     END
+M001AC           SC14      IFEQ 'B0021'
+M001AC                     MOVEL'51010231'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0022'
+M001AC                     MOVEL'51010232'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0023'
+M001AC                     MOVEL'51010233'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0024'
+M001AC                     MOVEL'51010234'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0025'
+M001AC                     MOVEL'51010235'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0026'
+M001AC                     MOVEL'51010236'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0027'
+M001AC                     MOVEL'51010237'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0028'
+M001AC                     MOVEL'51010238'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0029'
+M001AC                     MOVEL'51010239'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0030'
+M001AC                     MOVEL'51010240'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0031'
+M001AC                     MOVEL'51010241'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0032'
+M001AC                     MOVEL'51010242'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0033'
+M001AC                     MOVEL'51010243'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0034'
+M001AC                     MOVEL'51010244'JL1004
+M001AC                     END
+M001AC           SC14      IFEQ 'B0035'
+M001AC                     MOVEL'51010245'JL1004
+M001AC                     END
+| 79-C           SC14      IFEQ 'B0099'
+|   C                     MOVEL'51010299'JL1004
+| 79-C                     END
+| 58-C                     END
+| 57-C                     END
+      *找回原訂單資料
+|    C           W#G01     CHAINSC0                  45
+      *
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C           WCOST     MULT SD04      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 80-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 80*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 80-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－產品促銷－搭贈－人頭馬／其他品牌
+| 81-C           SD03A     IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080101'JL1004
+|   C                     MOVELSD03      JL1006
+| 81*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080201'JL1004
+|   C                     MOVELSD03A     JL1006
+| 81-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD05
+|    C           WCOST     MULT SD05      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 82-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 82*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 82-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+      *----------------------------------------------------------------
+|    C*（２）三................銷貨成本傳票
+      *會計科目－寄賣品
+|    C                     MOVEL'1143    'JL1004
+|    C*
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 83-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 83*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 83-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+15===C                     ENDSR
+     C*==============================================================*
+     C*          R2B15 ... 寫入暫存檔－傳票
+     C*             CASE..  SG=經銷商代送訂單
+     C*==============================================================*
+16===C           R2B15     BEGSR
+      *----------------------------------------------------------------
+      *公司別RE/WL/CN
+| 01-C           WSC01     IFEQ 'R'
+|   C                     MOVEL'RE'      JL1002
+| 01-C                     END
+| 02-C           WSC01     IFEQ 'W'
+|   C                     MOVEL'WL'      JL1002
+| 02-C                     END
+| 03-C           WSC01     IFEQ 'K'
+|   C                     MOVEL'KN'      JL1002
+| 03-C                     END
+      *
+     C*M004A 增加銷項稅額處理，改變銷貨收入的抓取來源
+     C*
+     C*<<一張訂單只抓一次稅額，固BY SOSCPF而非SOSDPF >>
+|    C*<<此處利用*IN96控制次數>>
+|    C                     MOVEL*BLANKS   SI22
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+M005AC                     MOVEL'1'       JL1003
+| 01-C           *IN96     IFEQ '0'
+|   C           KEYSI     CHAINSI0                  45
+|   C                     SETON                     96
+M009AC           SI19      IFNE 'V'
+      *----------------------------------------------------------------
+|    C*（１）一................銷貨收入傳票
+      *會計科目－應收帳款－匯齡／匯東／康齡
+|    C*M005D               MOVEL'1'       JL1003
+      *
+| 04-C           SC14      IFEQ 'A0001'
+      *應收帳款－匯東
+|   C                     MOVEL'11350201'JL1004
+| 04-C                     END
+| 05-C           SC14      IFEQ 'A0002'
+      *應收帳款－匯齡
+|   C                     MOVEL'11350202'JL1004
+| 05-C                     END
+| 06-C           SC14      IFEQ 'A0001'
+      *應收帳款－康齡
+|   C                     MOVEL'11350203'JL1004
+| 06-C                     END
+      *
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 07-C*M004M     SD07      IFGE 0
+|   C*M004M               Z-ADDSD07      W01
+| 07*C*M004M               ELSE
+|   C*M004M     SD07      MULT -1        W02
+| 07-C*M004M               END
+M004MC           SI25      IFGE 0
+M004MC                     Z-ADDSI25      W01
+M004MC                     ELSE
+M004MC           SI25      MULT -1        W02
+M004MC                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|   C*（１）三................銷貨收入傳票
+      *會計科目－銷項稅額
+|   C                     MOVEL'2193    'JL1004
+|   C*
+|   C                     Z-ADD0         W01
+|   C                     Z-ADD0         W02
+| 25-C           SI24      IFLE 0
+|   C           SI24      MULT -1        W01
+| 25*C                     ELSE
+|   C                     Z-ADDSI24      W02
+| 25-C                     END
+|   C*
+|   C           KEYW10    CHAINWFJL10R              41
+|   C                     EXSR RWF10
+      *IN96
+| 01-C                     END
+M009AC                     END
+M004AC*
+      *----------------------------------------------------------------
+M004AC           KEYSI     CHAINSI0                  45
+M004AC           SI22      IFEQ 'D'
+M009AC           SI19      ANDNE'V'
+M004AC*（１）三................銷貨收入傳票
+M004A *會計科目－銷貨收入－匯齡／匯東／康齡
+M004AC           SC14      IFEQ 'A0001'
+M004A *銷貨收入－匯東
+M004AC                     MOVEL'410101  'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'A0002'
+      *銷貨收入－匯齡
+M004AC                     MOVEL'41010202'JL1004
+M004AC                     END
+M004AC           SC14      IFEQ 'A0001'
+      *銷貨收入－康齡
+M004AC                     MOVEL'410103  'JL1004
+M004AC                     END
+M004AC           SJ04      SUB  SJ13      WSJ04   60
+M004AC           WSJ04     IFEQ 0
+M004AC                     Z-ADDSJ04      WSJ04
+M004AC                     END
+M007AC           WSJ04     IFEQ 0
+M007AC                     Z-ADD1         WSJ04
+M007AC                     END
+M004AC           SJ07      DIV  WSJ04     WSJ07   60
+M004AC           SJ05      SUB  WSJ07     WSJ05   60
+     C*
+M004AC           *IN25     IFEQ '1'
+      *新
+M004AC           WSJ05     MULT SD04      WAMT
+M004AC                     ELSE
+      *舊
+M004AC           WSJ05     MULT WQTY      WAMT
+M004AC                     END
+      *
+M004AC                     Z-ADD0         W01
+M004AC                     Z-ADD0         W02
+M004AC           WAMT      IFLE 0
+M004AC           WAMT      MULT -1        W01
+M004AC                     ELSE
+M004AC                     Z-ADDWAMT      W02
+M004AC                     END
+     C*
+M004AC           KEYW10    CHAINWFJL10R              41
+M004AC                     EXSR RWF10
+M004AC                     ELSE                            SI22='D'
+M004A *----------------------------------------------------------------
+|    C*（１）二................銷貨收入傳票
+      *會計科目－事前折扣－匯齡／匯東／康齡
+      *
+| 08-C           SC14      IFEQ 'A0001'
+      *事前折扣－匯東
+|   C                     MOVEL'410801  'JL1004
+| 08-C                     END
+| 09-C           SC14      IFEQ 'A0002'
+      *事前折扣－匯齡
+|   C                     MOVEL'41080202'JL1004
+| 09-C                     END
+| 10-C           SC14      IFEQ 'A0001'
+      *事前折扣－康齡
+|   C                     MOVEL'410803  'JL1004
+| 10-C                     END
+      *
+| 11-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 11*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 11-C                     END
+|    C                     SUB  SD07      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 12-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 12*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 12-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+      *----------------------------------------------------------------
+|    C*（１）三................銷貨收入傳票
+      *會計科目－銷貨收入－匯齡／匯東／康齡
+| 13-C           SC14      IFEQ 'A0001'
+      *銷貨收入－匯東
+|   C                     MOVEL'410101  'JL1004
+| 13-C                     END
+| 14-C           SC14      IFEQ 'A0002'
+      *銷貨收入－匯齡
+|   C                     MOVEL'41010202'JL1004
+| 14-C                     END
+| 15-C           SC14      IFEQ 'A0001'
+      *銷貨收入－康齡
+|   C                     MOVEL'410103  'JL1004
+| 15-C                     END
+      *
+| 16-C           *IN25     IFEQ '1'
+      *新
+|   C           SJ05      MULT SD04      WAMT
+| 16*C                     ELSE
+      *舊
+|   C           SJ05      MULT WQTY      WAMT
+| 16-C                     END
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 17-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 17*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 17-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+M004AC                     END                             SI22='D'
+      *----------------------------------------------------------------
+|    C*（２）一................銷貨成本傳票
+      *會計科目－銷貨成本－匯齡／匯東／康齡
+|    C                     MOVEL'2'       JL1003
+      *
+| 18-C           SC14      IFEQ 'A0001'
+      *銷貨成本－匯東
+|   C                     MOVEL'510101  'JL1004
+| 18-C                     END
+| 19-C           SC14      IFEQ 'A0002'
+      *銷貨成本－匯齡
+|   C                     MOVEL'51010202'JL1004
+| 19-C                     END
+| 20-C           SC14      IFEQ 'A0001'
+      *銷貨成本－康齡
+|   C                     MOVEL'510103  'JL1004
+| 20-C                     END
+      *
+      *WAMT = (SD10+SD11+SD12) * SD04
+|    C           WCOST     MULT SD04      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 21-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 21*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 21-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+      *----------------------------------------------------------------
+|    C*（２）二................銷貨成本傳票
+      *會計科目－產品促銷－搭贈－人頭馬／其他品牌
+| 22-C           SD03A     IFEQ 'RM'
+      *RM系列
+|   C                     MOVEL'61080101'JL1004
+|   C                     MOVELSD03      JL1006
+| 22*C                     ELSE
+      *其他品牌
+|   C                     MOVEL'61080201'JL1004
+|   C                     MOVELSD03A     JL1006
+| 22-C                     END
+|    C*
+      *WAMT = (SD10+SD11+SD12) * SD05
+|    C           WCOST     MULT SD05      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 23-C           WAMT      IFGE 0
+|   C                     Z-ADDWAMT      W01
+| 23*C                     ELSE
+|   C           WAMT      MULT -1        W02
+| 23-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C                     MOVEL*BLANKS   JL1006
+|    C*
+      *----------------------------------------------------------------
+|    C*（２）三................銷貨成本傳票
+      *會計科目－存貨積欠
+|    C                     MOVEL'1144    'JL1004
+|    C*
+      *WAMT = (SD10+SD11+SD12) * (SD04+SD05)
+|    C           WCOST     MULT WQTY      WAMT
+|    C                     Z-ADD0         W01
+|    C                     Z-ADD0         W02
+| 24-C           WAMT      IFLE 0
+|   C           WAMT      MULT -1        W01
+| 24*C                     ELSE
+|   C                     Z-ADDWAMT      W02
+| 24-C                     END
+|    C*
+|    C           KEYW10    CHAINWFJL10R              41
+|    C                     EXSR RWF10
+|    C*
+16===C                     ENDSR
+     C*==============================================================*
+     C*          R2C00 ... 寫入暫存檔－銷貨收入明細
+     C*==============================================================*
+17===C           R2C00     BEGSR
+      *GET銷項稅額
+|    C                     Z-ADD0         SI23
+|    C                     Z-ADD0         SI24
+|    C                     Z-ADD0         SI25
+|    C           KEYSI     CHAINSI0                  45
+      *----------------------------------------------------------------
+|    C*W04淨售金額
+|    C                     Z-ADDSD07      W04
+|    C*W02折扣金額
+|    C           SJ05      SUB  SD06      W02
+|    C                     MULT SD04      W02
+|    C*判斷新舊列印方式
+| 01-C           *IN25     IFEQ '1'
+      *新折扣方式
+|   C*W01牌價金額（含搭贈）
+|   C           SJ05      MULT SD04      W01
+|   C*W03搭贈金額
+|   C                     Z-ADD0         W03
+| 01*C                     ELSE
+      *舊折扣方式
+|   C*W01牌價金額（含搭贈）
+|   C           SJ05      MULT WQTY      W01
+|   C*W03搭贈金額
+|   C           SJ05      MULT SD05      W03
+| 01-C                     END
+|    C*
+|    C           KEYW11    CHAINWFJL11R              41
+|    C                     MOVELSC30      JL1105
+|    C                     MOVELSC14      JL1106
+      *銷項稅額僅一筆，故已Z-ADD處理
+M009AC           SI19      IFNE 'V'
+|    C                     Z-ADDSI24      JL1111
+M009AC                     ELSE
+M009AC                     Z-ADD0         JL1111
+M009AC                     END
+| 02-C           *IN41     IFEQ '1'
+|   C                     Z-ADDW01       JL1107
+|   C                     Z-ADDW02       JL1108
+|   C                     Z-ADDW03       JL1109
+|   C                     Z-ADDW04       JL1110
+      *專櫃
+| 03-C           SC03      IFEQ 'S2'
+|   C                     Z-ADDSI25      JL1107
+|   C                     Z-ADD0         JL1108
+|   C                     Z-ADD0         JL1109
+|   C                     Z-ADDSI23      JL1110
+| 03-C                     END
+      *
+|   C                     WRITEWFJL11R
+| 02*C                     ELSE
+|   C                     ADD  W01       JL1107
+|   C                     ADD  W02       JL1108
+|   C                     ADD  W03       JL1109
+|   C                     ADD  W04       JL1110
+      *專櫃
+| 04-C           SC03      IFEQ 'S2'
+|   C                     Z-ADDSI25      JL1107
+|   C                     Z-ADD0         JL1108
+|   C                     Z-ADD0         JL1109
+|   C                     Z-ADDSI23      JL1110
+| 04-C                     END
+      *
+|   C                     UPDATWFJL11R
+| 02-C                     END
+|    C*
+|    C*
+17===C                     ENDSR
+     C*==============================================================*
+     C*          R2D00 ... 寫入暫存檔－銷貨成本彙總
+     C*==============================================================*
+18===C           R2D00     BEGSR
+      *產品代號
+|    C                     MOVELSD03      J1204$
+|    C                     MOVELSD03      JL1204
+      *----------------------------------------------------------------
+|    C*W01訂購數量
+|    C                     Z-ADDSD04      W01
+|    C*W02搭贈數量
+|    C                     Z-ADDSD05      W02
+|    C*W03訂購成本ＦＯＢ
+|    C           SD10      MULT SD04      W03
+|    C*W04訂購成本ＦＨＩ
+|    C           SD11      MULT SD04      W04
+|    C*W05訂購成本ＤＵＴＹ
+|    C           SD12      MULT SD04      W05
+| 01-C           *IN25     IFEQ '1'
+|   C           WSC01     ANDNESD16
+|   C                     Z-ADD0         W06
+|   C                     Z-ADD0         W07
+|   C                     Z-ADD0         W08
+| 01*C                     ELSE
+|   C*W06搭贈成本ＦＯＢ
+|   C           SD10      MULT SD05      W06
+|   C*W07搭贈成本ＦＯＢ
+|   C           SD11      MULT SD05      W07
+|   C*W08搭贈成本ＦＯＢ
+|   C           SD12      MULT SD05      W08
+| 01-C                     END
+|    C*
+|    C           KEYW12    CHAINWFJL12R              41
+| 02-C           *IN41     IFEQ '1'
+|   C                     Z-ADDW01       JL1205
+|   C                     Z-ADDW02       JL1206
+|   C                     Z-ADDW03       JL1207
+|   C                     Z-ADDW04       JL1208
+|   C                     Z-ADDW05       JL1209
+|   C                     Z-ADDW06       JL1210
+|   C                     Z-ADDW07       JL1211
+|   C                     Z-ADDW08       JL1212
+|   C                     WRITEWFJL12R
+| 02*C                     ELSE
+|   C                     ADD  W01       JL1205
+|   C                     ADD  W02       JL1206
+|   C                     ADD  W03       JL1207
+|   C                     ADD  W04       JL1208
+|   C                     ADD  W05       JL1209
+|   C                     ADD  W06       JL1210
+|   C                     ADD  W07       JL1211
+|   C                     ADD  W08       JL1212
+|   C                     UPDATWFJL12R
+| 02-C                     END
+|    C*
+|    C*
+18===C                     ENDSR
+     C*==============================================================*
+     C*          RWF10 ... 寫入．更新傳票暫存檔WFJL10PF
+     C*==============================================================*
+19===C           RWF10     BEGSR
+|    C*
+| 01-C           *IN41     IFEQ '1'
+|   C                     Z-ADDW01       JL1012
+|   C                     Z-ADDW02       JL1013
+      *判別借貸方
+|   C           JL1012    SUB  JL1013    WAMT
+| 02-C           WAMT      IFGT 0
+|   C                     MOVEL'1'       J1003$
+| 02-C                     END
+| 03-C           WAMT      IFLT 0
+|   C                     MOVEL'2'       J1003$
+| 03-C                     END
+      *金額不為０才寫入
+| 04-C           WAMT      IFNE 0
+|   C                     WRITEWFJL10R
+| 04-C                     END
+      *
+| 01*C                     ELSE
+|   C                     ADD  W01       JL1012
+|   C                     ADD  W02       JL1013
+      *判別借貸方
+|   C           JL1012    SUB  JL1013    WAMT
+| 05-C           WAMT      IFGT 0
+|   C                     MOVEL'1'       J1003$
+|   C                     Z-ADDWAMT      JL1012
+|   C                     Z-ADD0         JL1013
+| 05-C                     END
+| 06-C           WAMT      IFLT 0
+|   C                     MOVEL'2'       J1003$
+|   C                     Z-ADD0         JL1012
+|   C           WAMT      MULT -1        JL1013
+| 06-C                     END
+      *金額為０不產生傳票
+| 07-C           WAMT      IFNE 0
+|   C                     UPDATWFJL10R
+| 07*C                     ELSE
+|   C                     DELETWFJL10R
+| 07-C                     END
+| 01-C                     END
+|    C*
+19===C                     ENDSR
+     C*==============================================================*
+     C*          R4000 .產生銷售傳票
+     C*==============================================================*
+20===C           R4000     BEGSR
+|    C*
+B2000C                     MOVEL*BLANKS   WL1001
+|    C                     MOVEL*BLANKS   WL1002
+|    C                     MOVEL*BLANKS   W1002$
+|    C                     MOVEL*BLANKS   WL1003
+      *
+B2000C           *LOVAL    SETLLWFJL10L
+|    C                     READ WFJL10L                  46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     EXSR R4100
+      *
+|   C                     READ WFJL10L                  46
+| 01-C                     END
+|    C*
+20===C           E4000     ENDSR
+     C*==============================================================*
+     C*          R4100 .  產生銷售傳票
+     C*==============================================================*
+21===C           R4100     BEGSR
+|    C*
+|    C* <<清除傳票檔部份欄位 >>
+|    C                     EXSR R40XX
+      *----------------------------------------------------------------
+      *傳票日期
+|    C                     Z-ADD*ZEROS    AH10
+M002AC                     Z-ADDJL1001    AH10
+|    C*M002D               CALL 'P31'
+B2MODC*                    PARM JL1001    P310I1  80
+|    C*                    PARM '1'       P310I2  1
+|    C*                    PARM '1'       P310I3  1
+|    C*                    PARM '2'       P310I4  1
+|    C*                    PARM '1'       P310I5  1
+|    C*M002D     AH10      PARM           P311O1  80
+      *1994年6月前公司別不變，以後ＲＥ－＞ＲＭ，ＷＬ－＞ＷＮ
+| 01-C           AH10      IFGE 19940601
+| 02-C           JL1002    IFEQ 'RE'
+|   C                     MOVEL'RM'      JL1002
+| 02-C                     END
+| 03-C           JL1002    IFEQ 'WL'
+|   C                     MOVEL'WH'      JL1002
+| 03-C                     END
+| 01-C                     END
+|    C                     MOVELJL1002    AH01
+      *1994年6月前公司別不變，以後ＲＥ－＞ＲＭ，ＷＬ－＞ＷＮ
+      *
+|    C*傳票號碼
+B2000C           JL1001    IFNE WL1001
+|   C           JL1002    ORNE WL1002
+|   C           J1002$    ORNE W1002$
+|   C           JL1003    ORNE WL1003
+|   C                     MOVEL*BLANKS   AH02
+|   C                     CALL 'GLS002'
+|   C                     PARM AH01      P002I1  2
+|   C                     PARM AH10      P002I2  80
+|   C                     PARM 'F'       P002I3  1
+|   C           AH02      PARM           P002O1  9
+B2000C                     MOVELJL1001    WL1001
+|   C                     MOVELJL1002    WL1002
+|   C                     MOVELJ1002$    W1002$
+|   C                     MOVELJL1003    WL1003
+|   C                     Z-ADD0         WAH03
+| 04-C                     END
+      *
+|    C                     MOVELJL1004    AH04
+|    C           KEYAF     CHAINAF0                  40
+| 05-C           *IN40     IFEQ '0'
+      *
+| 06-C           AF11      IFNE *BLANK
+|   C                     MOVELJL1005    AH05
+| 06-C                     END
+      *
+| 07-C           AF12      IFNE *BLANK
+|   C                     MOVELJL1006    AH06
+| 07-C                     END
+      *
+| 08-C           AF13      IFNE *BLANK
+|   C                     MOVELJL1007    AH07
+| 08-C                     END
+      *
+| 09-C           AF14      IFNE *BLANK
+|   C                     MOVELJL1008    AH08
+| 09-C                     END
+      *
+| 10-C           AF15      IFNE *BLANK
+|   C                     MOVELJL1009    AH09
+| 10-C                     END
+      *
+|   C                     Z-ADDJL1012    AH12
+|   C                     Z-ADDJL1013    AH13
+      *
+| 11-C           AF16      IFNE *BLANK
+|   C                     MOVELJL1010    AH14
+| 11-C                     END
+      *
+| 12-C           AF17      IFNE *BLANK
+|   C                     MOVELJL1011    AH15
+| 12-C                     END
+      *
+|   C                     MOVEL'S0'      AH17
+|   C                     MOVEL*BLANKS   AH18
+|   C                     MOVEL'V'       AH19
+|   C                     MOVEL*BLANKS   AH20
+|   C                     Z-ADD*ZEROS    AH21
+|   C                     MOVEL*BLANKS   AH22
+|   C                     Z-ADD*ZEROS    AH23
+|   C                     MOVEL*BLANKS   AH24
+|   C                     Z-ADDADYYMD    AH25
+|   C                     MOVEL$USER     AH26
+B2000C                     TIME           AH97
+|   C                     Z-ADDADYYMD    AH98
+|   C                     MOVEL$USER     AH99
+|   C* <<取得會計科目資料 >>
+|   C                     EXSR R40YY
+|   C* <<寫入傳票檔 >>
+|   C                     EXSR R40ZZ
+| 05-C                     END
+|    C*
+21===C           E4A00     ENDSR
+     C*==============================================================*
+     C*          R40XX ...清除傳票檔部份欄位
+     C*==============================================================*
+22===C           R40XX     BEGSR
+|    C*
+|    C                     MOVEL*BLANKS   AH04
+|    C                     MOVEL*BLANKS   AH05
+|    C                     MOVEL*BLANKS   AH05A
+|    C                     MOVEL*BLANKS   AH06
+|    C                     MOVEL*BLANKS   AH06A
+|    C                     MOVEL*BLANKS   AH07
+|    C                     MOVEL*BLANKS   AH07A
+|    C                     MOVEL*BLANKS   AH08
+|    C                     MOVEL*BLANKS   AH08A
+|    C                     Z-ADD*ZEROS    AH09
+|    C                     MOVEL*BLANKS   AH09A
+|    C                     Z-ADD*ZEROS    AH12
+|    C                     Z-ADD*ZEROS    AH13
+|    C                     MOVEL*BLANKS   AH14
+|    C                     MOVEL*BLANKS   AH14A
+|    C                     MOVEL*BLANKS   AH15
+|    C                     MOVEL*BLANKS   AH15A
+|    C                     MOVEL*BLANKS   AH16
+|    C                     MOVEL'S0'      AH17
+|    C                     MOVEL*BLANKS   AH18
+|    C                     MOVEL'V'       AH19
+|    C                     MOVEL*BLANKS   AH20
+|    C                     Z-ADD*ZEROS    AH21
+|    C                     MOVEL*BLANKS   AH22
+|    C                     Z-ADD*ZEROS    AH23
+|    C                     MOVEL*BLANKS   AH24
+|    C                     Z-ADDADYYMD    AH25
+|    C                     MOVEL$USER     AH26
+B2000C                     TIME           AH97
+|    C                     Z-ADDADYYMD    AH98
+|    C                     MOVEL$USER     AH99
+|    C*
+22===C                     ENDSR
+     C*==============================================================*
+     C*          R40YY ...取得會計科目資料
+     C*==============================================================*
+23===C           R40YY     BEGSR
+|    C*
+|    C                     MOVEA*BLANKS   CHK1
+|    C                     MOVEA*BLANKS   CHK2
+|    C                     MOVEA*BLANKS   CHK3
+|    C*<<取得會計科目各欄位名稱>>
+|    C           KEYAF     CHAINAF0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVELAF11      AH05A
+|   C                     MOVELAF12      AH06A
+|   C                     MOVELAF13      AH07A
+|   C                     MOVELAF14      AH08A
+|   C                     MOVELAF15      AH09A
+|   C                     MOVELAF16      AH14A
+|   C                     MOVELAF17      AH15A
+|   C*
+|   C                     MOVELAF11      CHK1,1
+|   C                     MOVELAF12      CHK1,2
+|   C                     MOVELAF13      CHK1,3
+|   C                     MOVELAF14      CHK1,4
+|   C                     MOVELAF15      CHK1,5
+|   C                     MOVELAF16      CHK1,6
+|   C                     MOVELAF17      CHK1,7
+| 01-C                     END
+|    C* << 輸入欄位說明CHK3 >>
+|    C*
+|    C                     MOVELAH05      CHK2,1
+|    C                     MOVELAH06      CHK2,2
+|    C                     MOVELAH07      CHK2,3
+|    C                     MOVELAH08      CHK2,4
+| 02-C                     DO   4         I       10
+| 03-C           CHK2,I    IFNE *BLANKS
+|   C           KEYAA     CHAINAA0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C           AA04      ANDNE*BLANKS
+|   C*
+|   C                     MOVELCHK2,I    WPARM1
+|   C                     MOVELAA05      WPARM2
+|   C                     MOVEL'0'       WCHK
+|   C                     CALL AA04
+|   C                     PARM           CHKPGM
+|   C                     PARM           TORN    1
+|   C           CHK3,I    PARM           DESC   20
+| 04*C                     ELSE
+|   C                     MOVELCHK2,I    CHK3,I
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END
+|    C*
+| 05-C           AH09      IFNE 0
+|   C                     CALL 'P56'                      *P56(GET'/')
+|   C                     PARM AH09      P5601I  80
+|   C                     PARM           P5601O 10
+|   C                     MOVELP5601O    CHK3,5
+| 05-C                     END
+|    C*
+| 06-C           AH14      IFNE 0
+|   C                     CALL 'P55'                      *P55(GET,.)
+|   C                     PARM AH14      P5501I 185
+|   C                     PARM 2         P5502I  10
+|   C                     PARM           P5501O 24
+|   C                     MOVELP5501O    CHK3,6
+| 06-C                     END
+|    C*
+| 07-C           AH15      IFNE *BLANK
+|   C                     Z-ADD7         I
+|   C           KEYAA     CHAINAA0                  40
+| 08-C           *IN40     IFEQ '0'
+|   C           AA04      ANDNE*BLANKS
+|   C*
+|   C                     MOVELAH15      WPARM1
+|   C                     MOVELAA05      WPARM2
+|   C                     MOVEL'0'       WCHK
+|   C                     CALL AA04
+|   C                     PARM           CHKPGM
+|   C                     PARM           TORN    1
+|   C           CHK3,7    PARM           DESC   20
+| 08*C*                    ELSE
+|   C                     MOVELAH15      CHK3,7
+| 08-C                     END
+| 07-C                     END
+|    C*<<摘要 >>
+| 09-C                     DO   7         K       10
+| 10-C           CHK3,K    IFNE *BLANKS
+|   C                     CALL 'GLS001'
+|   C                     PARM AH16      S001I1 80
+|   C                     PARM CHK3,K    S001I2 80
+|   C                     PARM 49        S001I3  30
+|   C           AH16      PARM           S001O1 80
+| 10-C                     END
+| 09-C                     END
+|    C*
+23===C                     ENDSR
+     C*==============================================================*
+     C*          R40ZZ ... WRITE GLAHPF
+     C*==============================================================*
+24===C           R40ZZ     BEGSR
+|    C*
+|    C                     ADD  1         WAH03
+|    C                     Z-ADDWAH03     AH03
+|    C                     WRITEAH0
+|    C*
+24===C                     ENDSR
+

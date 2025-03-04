@@ -1,0 +1,170 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : POR054                                        *
+      * AUTHER       : TINA                                          *
+      * CREATE DATE  : 82/05/11                                      *
+      * UPDATE DATE  : 06/21/93 AN MING HSIA                         *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :採購子系統                                   *
+      * REMARK       :供應商採購完稅彙總表                         *
+      *                 :標準容積至PA#HPF檔帶出螢幕不再輸入      *
+      ****************************************************************
+     FREWF72  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMBPF  IF  E           K        DISK
+     FPA#HPF  IF  E           K        DISK
+     FPOR054P O   E             39     PRINTER
+     IWF720
+     I                                              WF7201L2
+     I                                              WF7206L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 605 DMA12S
+     I                                      606 610 DMA12E
+     I                                      611 6160DPG04S
+     I                                      621 6260DPG04E
+     I                                      627 635 DPG03S
+     I                                      636 644 DPG03E
+     I                                      648 6530DATE1
+     I                                      654 6590DATE2
+     I            DS
+     I                                        1   9 WF7202
+     I                                        3   4 W7202L
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#H     KLIST
+     C                     KFLD           #H01
+     C                     KFLD           #H02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN100
+     C                     SETON                     10
+     C*明細列印
+     C                     EXSR RTN200
+     C*
+     CLRN10                WRITEPH1
+     CL1 10                EXSR RTNL1
+     CL2 10                EXSR RTNL2
+     CLR                   EXSR RTNLR                      *NO DATA
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C*表頭列印
+|    C                     EXSR RTN900
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....GET DETAIL
+     C*==============================================================*
+02===C           RTN200    BEGSR
+|    C**
+|    C*產品名稱
+|    C           WF7202    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+     C                     MOVE *BLANK    MA17
+     C                     MOVE *BLANK    MA14
+     C                     Z-ADD0         MA15
+     C                     Z-ADD1         MA16
+| 01-C                     END
+|    C*GET標準容積
+     C                     MOVEL'STANDARD'#H01
+     C                     MOVELW7202L    #H02
+|    C           KEY#H     CHAIN#H0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         DCASE   52
+     C                     ELSE
+|   C                     Z-ADD#H03      DCASE   52
+| 01-C                     END
+     C*計算完稅箱數（完全進位）
+     C           MA16      IFNE 0
+     C           WF7203    DIV  MA16      WORK1   92
+     C           WORK1     ADD  0.99      QTY
+     C                     END
+     C*計算公升數
+     C           WF7203    MULT MA15      WF7204
+     C*計算標準箱數
+     C           WF7204    DIV  DCASE     CASE      H
+     C                     ADD  WF7203    T1TOT1
+     C                     ADD  QTY       T1TOT2
+     C                     ADD  WF7204    T1TOT3
+     C                     ADD  WF7205    T1TOT5
+     C                     ADD  WF7203    T2TOT1
+     C                     ADD  QTY       T2TOT2
+     C                     ADD  WF7204    T2TOT3
+     C                     ADD  WF7205    T2TOT5
+|    C*翻頁控制
+| 02-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN900
+| 02-C                     END
+|    C*明細列印
+|    C                     WRITEPD1
+     C                     ADD  CASE      T1TOT4
+     C                     Z-ADD0         CASE
+02===C                     ENDSR
+      *==============================================================*
+      *          RTNL1  ...TOTAL
+      *==============================================================*
+03===C           RTNL1     BEGSR
+     C*計算標準箱數
+     C   39                EXSR RTN900
+     C                     WRITEPT1
+     C                     ADD  T1TOT4    T2TOT4
+     C                     Z-ADD0         T1TOT1
+     C                     Z-ADD0         T1TOT2
+     C                     Z-ADD0         T1TOT3
+     C                     Z-ADD0         T1TOT4
+     C                     Z-ADD0         T1TOT5
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL2  ...TOTAL
+      *==============================================================*
+03===C           RTNL2     BEGSR
+     C*計算標準箱數
+     C                     WRITEPT2
+     C                     Z-ADD0         T2TOT1
+     C                     Z-ADD0         T2TOT2
+     C                     Z-ADD0         T2TOT3
+     C                     Z-ADD0         T2TOT4
+     C                     Z-ADD0         T2TOT5
+     C                     SETON                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+| 01-C           *IN10     IFEQ '1'
+|   C                     WRITEPE1
+| 01-C                     END
+     C           WF7201    CHAINMB0                  40
+     C           *IN40     IFEQ '1'
+     C                     MOVEL*BLANKS   MB03
+     C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+03===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+     C                     WRITEPE9
+| 01-C                     END
+|    C*
+|    C                     WRITEPE2
+|    C*
+03===C                     ENDSR
+

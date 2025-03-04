@@ -1,0 +1,155 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H* PROGRAM NAME : INR1101                                       *
+     H* AUTHER       : DEREK                                         *
+     H* CREATE DATE  : 102/09/12                                     *
+     H* UPDATE DATE  :                                               *
+     H* SYSTEM       :                                               *
+     H* SUBSYSTEM    :庫存系統                                     *
+     H* REMARK       :存貨調整明細表                               *
+     H*===============================================================
+     H* MODI CODE |   DATE   | DESCRIPTION
+     H*---------------------------------------------------------------
+     H****************************************************************
+     FINTIPF  IP  E           K        DISK
+     FINTJPF  IF  E           K        DISK
+     FINTAPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FUTL2PF  IF  E           K        DISK
+     FINR110F O   E           K        DISK
+     E*--------------------------------------------------------------*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      600 600 DOWNL
+     I                                      601 602 DTI01
+     I                                      603 604 DTI02S
+     I                                      605 606 DTI02E
+     I                                      607 6120DTI03S
+     I                                      613 6180DTI03E
+     I                                      619 623 DTI04S
+     I                                      624 628 DTI04E
+     I                                      629 630 DTI06S
+     I                                      631 632 DTI06E
+     I                                      633 641 DTJ02S
+     I                                      642 650 DTJ02E
+     I                                      651 6580DDATES
+     I                                      659 6660DDATEE
+     I*調整日期
+     I            DS
+     I                                        1   80TI03
+     I                                        1   60TI03YM
+     I                                        1   40TI03YY
+     I                                        5   60TI03MM
+     I                                        7   80TI03DD
+     I*年月
+     I            DS
+     I                                        1   60KTA02
+     I                                        1   40KTA02Y
+     I                                        5   60KTA02M
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYNC     KLIST
+     C                     KFLD           TI01             公司別
+     C                     KFLD           TJ02             產品代號
+     C           KEYNE     KLIST
+     C                     KFLD           TI01             公司別
+     C                     KFLD           TI02             通路代號
+     C                     KFLD           TI04             分店代號
+     C           KEYL2     KLIST
+     C                     KFLD           L201             代碼欄位
+     C                     KFLD           L202             代碼內容
+     C           KEYTA     KLIST
+     C                     KFLD           TI01             公司別
+     C                     KFLD           KTA02            年月
+     C                     KFLD           TJ02             產品代號
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C           TI05      SETLLTJ0
+     C           TI05      READETJ0                      46
+     C           *IN46     DOWEQ'0'
+     C           TJ02      IFGE DTJ02S                     產品代號
+     C           TJ02      ANDLEDTJ02E
+     C                     EXSR R2000
+     C                     SETON                     10
+     C                     END
+     C           TI05      READETJ0                      46
+     C                     END
+     C*
+     CLRN10                EXSR R9900
+     C*==============================================================*
+     C*          R2000 ... WRITE DETAIL
+     C*==============================================================*
+     C           R2000     BEGSR
+     C*
+     C*調整日期
+     C                     Z-ADDTI03      WF01             調整日期
+     C*
+     C                     MOVELTJ02      WF02      P      產品代號
+     C           KEYNC     CHAINNC0                  40
+     C           *IN40     IFEQ '0'
+     C                     MOVELNC05      WF03      P      產品簡稱
+     C                     ELSE
+     C                     MOVEL*BLANK    WF03             產品簡稱
+     C                     END
+     C*
+     C                     MOVELTI04      WF04      P      分店代號
+     C           KEYNE     CHAINNE0                  40
+     C           *IN40     IFEQ '0'
+     C                     MOVELNE05      WF05      P      分店簡稱
+     C                     ELSE
+     C                     MOVEL*BLANK    WF05             分店簡稱
+     C                     END
+     C*
+     C                     MOVELTI06      WF06      P      原因代碼
+     C                     MOVEL'REASON1' L201      P      代碼欄位
+     C                     MOVELTI06      L202      P      代碼內容
+     C           KEYL2     CHAINL20                  40
+     C           *IN40     IFEQ '0'
+     C                     MOVELL203      WF07      P      原因說明
+     C                     ELSE
+     C                     MOVEL*BLANK    WF07             原因說明
+     C                     END
+     C*
+     C                     Z-ADDTJ03      WF08             調整數量
+     C*取得單位成本
+     C                     Z-ADDTI03YM    KTA02
+     C           TI03DD    IFGE 26
+     C                     ADD  1         KTA02M
+     C           KTA02M    IFGT 12
+     C                     Z-ADD1         KTA02M
+     C                     ADD  1         KTA02Y
+     C                     END
+     C                     END
+     C           KEYTA     CHAINTA0                  40
+     C           *IN40     IFEQ '0'
+     C                     Z-ADDTA07      WF09             單位成本
+     C                     ELSE
+     C                     Z-ADD0         WF09             單位成本
+     C                     END
+     C*
+     C           WF08      MULT WF09      WF10      H      調整金額
+     C*
+     C                     MOVELTI05      WF11      P      單據號碼
+     C*
+     C                     WRITEWF0
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R9900 ... LR --- NO DATA
+     C*==============================================================*
+     C           R9900     BEGSR
+     C*
+     C                     MOVEL'NO DATA' WF03      P
+     C                     WRITEWF0
+     C*
+     C                     ENDSR
+

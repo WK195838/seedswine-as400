@@ -1,0 +1,204 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*                                                              *
+     A* PROGRAM NAME : INT0071                                       *
+     A* AUTHER       : A1546  VINCENT                                *
+     A* CREATE DATE  : 97/10/28                                      *
+     A* UPDATE DATE  :                                               *
+     A* SYSTEM       :西祺進銷存                                   *
+     A* SUBSYSTEM    :庫存管理系統                                 *
+     A* REMARK       :庫存月結批次處理SCREEN CHECK                 *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FC#EHPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMANDPF  IF  E           K        DISK
+     FINT006D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     I*
+     ISCDA01      DS
+     I                                        1 100 DA0
+     I                                        2   2 DA01
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 601 MODE
+     I                                      602 603 DEH01
+     I                                      604 6110DATFM
+     I                                      612 6190DATTO
+     I                                      201 2080DATES
+     I            DS
+     I                                        1   60AYM
+     I                                        3   40AYY2
+     I                                        5   60AMM
+     I            DS
+     I                                        1   40BMY
+     I                                        1   20BMM
+     I                                        3   40BYY
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN14     PARM *IN14     IN14    1
+     C           *IN96     PARM *IN96     IN96    1
+     C           *IN97     PARM *IN97     IN97    1
+     C           *IN98     PARM *IN98     IN98    1
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *NAMVAR   DEFN           SCDA01
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYND     KLIST
+     C                     KFLD           EH01
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+     C*                    EXSR RTN100                     *CHECK SCR01?
+     C*
+  01-C           *IN03     DOUEQ'1'
+    C           *IN14     OREQ '1'
+    C           *IN99     ANDEQ'0'
+    C*
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+    C*
+  02-C           *IN03     IFEQ '0'
+    C                     EXSR RTN100                     .CHECK      ?
+  02-C                     ENDIF
+    C*
+  01-C                     ENDDO
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DEH01
+|    C                     Z-ADD0         DEH02
+|    C                     Z-ADD0         DATFM
+|    C                     Z-ADD0         DATTO
+     C                     MOVEL1         $EVR
+|     *
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C* CHK ACTIVE
+     C                     IN   SCDA01
+| 01-C           DA01      IFEQ '1'
+|   C                     SETON                     99
+|   C                     MOVEL'ERR0127' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 01-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C* CHK FILES LOCK.
+| 02-C           *IN96     IFEQ '1'
+|   C                     SETON                     99
+|   C                     SETOF                     96
+|   C                     MOVEL'ERR0126' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 02-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C*空白=全部公司(暫取消)
+|    C*          DEH01     IFEQ *BLANK
+|    C*                    MOVE '2'       MODE
+|    C*                    MOVEL*BLANK    D#B03
+|    C*                    Z-ADD0         DEH02
+|    C*                    GOTO END100
+|    C*                    ENDIF
+|    C* CHK公司代號
+| 03-C           DEH01     IFEQ *BLANK
+|   C                     SETON                     99
+|   C                     MOVEL'UPT0010' ERRID
+|   C                     MOVEL'PTMF'    ERRF
+|   C                     MOVEL*BLANK    D#B03
+|   C                     Z-ADD0         DEH02
+|   C                     GOTO END100
+| 03-C                     ENDIF
+|    C*
+|    C* CHK公司主檔
+|    C           DEH01     CHAIN#B0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     SETON                     99
+|   C                     MOVEL'ERR0025' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     MOVEL*BLANK    D#B03
+|   C                     Z-ADD0         DEH02
+| 04*C                     ELSE
+|   C                     MOVEL#B03      D#B03
+| 04-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C* CHK公司參數檔
+|    C           DEH01     CHAINEH0                  40
+| 05-C           *IN40     IFEQ '1'
+|   C                     SETON                     99
+|   C                     MOVEL'ERR0049' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     Z-ADD0         DEH02
+| 05-C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C                     Z-ADDEH02      AYM
+|    C                     Z-ADDAYY2      BYY
+|    C                     Z-ADDAMM       BMM
+|    C                     Z-ADDBMY       DEH02
+     C                     Z-ADDEH07      DATFM
+     C                     Z-ADDEH08      DATTO
+|    C*
+|    C*系統日期須大於庫存月結帳務區間訖日
+|    C           DATES     IFLE EH08
+|    C                     SETON                     99
+|    C                     MOVEL'ERR0096' ERRID
+|    C                     MOVEL'SCMF'    ERRF
+|    C                     ENDIF
+|    C   99                GOTO END100
+|    C*
+|    C*各通路銷售資料須先完成確認.
+|    C                     EXSR RTN10A
+|    C   99                GOTO END100
+|    C*
+|    C                     MOVE '1'       MODE             指定公司
+|    C*
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTN10A....CHECK 各通路銷售資料須先完成確認
+      *===============================================================*
+03===C           RTN10A    BEGSR
+|    C*
+|    C           KEYND     SETLLND0
+|    C           KEYND     READEND0                      45
+| 01-C           *IN45     DOWEQ'0'
+|   C*
+| 02-C           ND22      IFNE 'R'                        銷售確認
+|   C                     SETON                     7099
+|   C                     MOVE ND02      DND02
+|   C                     LEAVE
+| 02-C                     ENDIF
+|   C*
+|   C           KEYND     READEND0                      45
+| 01-C                     ENDDO
+|    C*
+03===C           END10A    ENDSR
+

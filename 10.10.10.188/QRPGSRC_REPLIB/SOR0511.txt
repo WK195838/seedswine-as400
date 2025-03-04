@@ -1,0 +1,279 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR0501                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/02/21                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :訂單系統                                     *
+      * REMARK       :通路產品銷售彙總表                           *
+      ****************************************************************
+     FREWF08  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FPA#DPF  IF  E           K        DISK
+     FSOR051P O   E             39     PRINTER
+     ISC0
+     I                                              SD03  L1
+     I                                              SD031 L2
+     I                                              SC33  L3
+     I                                              SC01  L4
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 602 DSC01S
+     I                                      603 603 DSC33S
+     I                                      604 604 DSC33E
+     I                                      605 606 DSC31S
+     I                                      607 608 DSC31E
+     I                                      680 681 DSC34S
+     I                                      682 683 DSC34E
+     I                                      684 687 DSC28S
+     I                                      688 691 DSC28E
+     I*(MM/DD/YY)
+     I                                      621 6260DSC39S
+     I                                      627 6320DSC39E
+     I                                      713 721 DSC45S
+     I                                      722 730 DSC45E
+     I*(YY/MM/DD)
+     I                                      640 6450YSC39S
+     I                                      646 6510YSC39E
+     I                                      701 7060DSC08S
+     I                                      707 7120DSC08E
+     I                                      750 750 IN20
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39N38             EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C   39 38             EXSR RTN910                     *OVRSLW-NOT THE SAME
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN555
+     CL2 10                EXSR RTN666
+     CL3 10                EXSR RTN888
+     CL4 10                EXSR RTN899
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+     C           IN20      IFEQ '0'
+     C                     SETOF                     20
+     C                     ELSE
+     C                     SETON                     20
+     C                     END
+|    C*公司簡稱
+|    C           SC01      CHAIN#B0                  45
+| 01-C           *IN45     IFEQ '1'
+|   C                     MOVE *BLANK    #B03
+| 01-C                     END
+|    C*通路
+|    C                     MOVEL'DISTRUBT'#A01
+|    C                     MOVELSC33      #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    #A03
+| 02-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C                     SETON                         30
+|    C*CLEAR INITIAL*
+|    C                     Z-ADD0         PSD041
+|    C                     Z-ADD0         PSD05
+|    C                     Z-ADD0         PSD042
+|    C                     Z-ADD0         PTOT
+|    C                     Z-ADD0         PSD07
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     EXSR RTN300                     *CHAIN DATA
+|    C                     EXSR RTN400                     *DO TOT
+|    C                     EXSR RTN500                     *SUBTOT-->ENDTOT
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*地區＆地區說明
+|    C           SC31      CHAIN#D0                  42
+| 01-C           *IN42     IFEQ '1'
+|   C                     MOVE *BLANK    #D02
+| 01-C                     END
+|    C*產品簡稱
+|    C           SD03      CHAINMA0                  43
+| 02-C           *IN43     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+| 02-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....DO TOT TO (PSD041 PSD05 PSD042 PTOT PSD07)
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*贈品
+|    C                     ADD  SD05      PSD05
+|    C*折扣金額
+|    C           SD13      ADD  SD14      TMON   112
+|    C                     ADD  TMON      PTOT
+|    C*淨銷售金額
+|    C                     ADD  SD07      PSD07
+|    C*
+|    C*
+| 01-C           SC03      IFEQ 'S4'
+|   C*試飲
+|   C                     ADD  SD04      PSD042
+| 01*C                     ELSE
+|   C*銷售數量
+|   C                     ADD  SD04      PSD041
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN500....ADD SUBTOT  TO  ENDTOT
+      *==============================================================*
+05===C           RTN500    BEGSR
+|    C                     ADD  TMON      PRTOT1
+|    C                     ADD  SD07      PRTOT2
+|    C           SC03      IFEQ 'S4'
+|    C                     ADD  SD04      PRTOT5
+|    C                     ELSE
+|    C                     ADD  SD04      PRTOT3
+|    C                     END
+|    C                     ADD  SD05      PRTOT4
+|    C                     ADD  TMON      SLTOT1
+|    C                     ADD  SD07      SLTOT2
+|    C           SC03      IFEQ 'S4'
+|    C                     ADD  SD04      SLTOT5
+|    C                     ELSE
+|    C                     ADD  SD04      SLTOT3
+|    C                     END
+|    C                     ADD  SD05      SLTOT4
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE DETAIL
+      *==============================================================*
+06===C           RTN600    BEGSR
+|    C                     WRITEPD1
+|    C                     SETOF                         30
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW --同一通路
+      *==============================================================*
+07===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN910....OVERFLOW --不同通路
+      *==============================================================*
+08===C           RTN910    BEGSR
+|    C*
+|    C                     WRITEPE3
+|    C*公司簡稱
+|    C           SC01      CHAIN#B0                  45
+| 01-C           *IN45     IFEQ '1'
+|   C                     MOVE *BLANK    #B03
+| 01-C                     END
+|    C*通路
+|    C                     MOVEL'DISTRUBT'#A01
+|    C                     MOVELSC33      #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    #A03
+| 02-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C*
+|    C                     SETOF                     3938
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN555....CLEAR TOT--L1
+      *==============================================================*
+09===C           RTN555    BEGSR
+|    C                     EXSR RTN600                     *WRITE DETAIL
+|    C                     Z-ADD0         PSD041
+|    C                     Z-ADD0         PSD05
+|    C                     Z-ADD0         PSD042
+|    C                     Z-ADD0         PTOT
+|    C                     Z-ADD0         PSD07
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN666....WRITE PRT0T1 & PRTOT2  (SUBTOT)--L2
+      *==============================================================*
+10===C           RTN666    BEGSR
+|    C                     WRITEPD2
+|    C  NL3                WRITEPE4
+|    C                     Z-ADD0         PRTOT1
+|    C                     Z-ADD0         PRTOT2
+|    C                     Z-ADD0         PRTOT3
+|    C                     Z-ADD0         PRTOT4
+|    C                     Z-ADD0         PRTOT5
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN888....WRITE SLTOT1 & SLTOT2  (ENDTOT)--L3
+      *==============================================================*
+12===C           RTN888    BEGSR
+|    C                     WRITEPD4
+|    C                     SETON                     3839
+|    C                     ADD  SLTOT1    COMPT1
+|    C                     ADD  SLTOT2    COMPT2
+|    C                     ADD  SLTOT3    COMPT3
+|    C                     ADD  SLTOT4    COMPT4
+|    C                     ADD  SLTOT5    COMPT5
+|    C                     Z-ADD0         PRTOT1
+|    C                     Z-ADD0         PRTOT2
+|    C                     Z-ADD0         PRTOT3
+|    C                     Z-ADD0         PRTOT4
+|    C                     Z-ADD0         PRTOT5
+|    C                     Z-ADD0         SLTOT1
+|    C                     Z-ADD0         SLTOT2
+|    C                     Z-ADD0         SLTOT3
+|    C                     Z-ADD0         SLTOT4
+|    C                     Z-ADD0         SLTOT5
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN899....WRITE SLTOT1 & SLTOT2  (ENDTOT)--L3
+      *==============================================================*
+12===C           RTN899    BEGSR
+|    C                     WRITEPD5
+|    C                     SETON                     3839
+|    C                     Z-ADD0         COMPT1
+|    C                     Z-ADD0         COMPT2
+|    C                     Z-ADD0         COMPT3
+|    C                     Z-ADD0         COMPT4
+|    C                     Z-ADD0         COMPT5
+12===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+13===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|    C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+13===C                     ENDSR
+

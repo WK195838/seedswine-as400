@@ -1,0 +1,183 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SAR0531                                       *
+      * AUTHER       :                                               *
+      * CREATE DATE  : 81/05/26                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款作業                                 *
+      * REMARK       :專櫃產品毛利率表                             *
+      ****************************************************************
+     FREWFB9  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMBPF  IF  E           K        DISK
+     FSAR053P O   E             39     PRINTER
+     IWFB90
+     I                                              WFB901L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 605 DPH06S
+     I                                      601 601 DPH06A
+     I                                      606 610 DPH06E
+     I                                      606 606 DPH06B
+     I                                      611 619 DPI04S
+     I                                      611 611 DPI04A
+     I                                      621 629 DPI04E
+     I                                      621 621 DPI04B
+     I                                      631 635 DPH05S
+     I                                      631 631 DPH05A
+     I                                      636 640 DPH05E
+     I                                      636 636 DPH05B
+     I*MM/YY
+     I                                      641 6440DPH04S
+     I                                      641 6420MMS
+     I                                      643 644 YYS
+     I                                      645 6480DPH04E
+     I                                      645 6460MME
+     I                                      643 644 YYE
+     I*(YY/MM)
+     I                                      651 6540YPH04S
+     I                                      655 6580YPH04E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C*          #AKEY     KLIST
+     C*                    KFLD           #A01
+     C*                    KFLD           #A02
+      *==============================================================*
+      *                    DEFINE FIELD
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *SET INIT
+     C*
+     C                     EXSR RTN100                     *PROC DATA
+     C*
+     CL1 10                EXSR RTNL1
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN010....CHAIN #A0
+     C*==============================================================*
+     C           RTN010    BEGSR
+     C*
+     C                     Z-ADD0         DATE    60
+     C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+M001DC*                    PARM UDATE     S001I2  80
+M001AC                     PARM UDATE     S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C           DATE      PARM           S001O1  60
+     C*
+     C                     Z-ADD0         FIELD1
+     C                     Z-ADD0         FIELD2
+     C                     Z-ADD0         FIELD3
+     C                     Z-ADD0         FIELD4
+     C                     Z-ADD0         T1TOT1
+     C                     Z-ADD0         T1TOT2
+     C                     Z-ADD0         T1TOT3
+     C                     Z-ADD0         T1TOT4
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....PROC DATA
+     C*==============================================================*
+10===C           RTN100    BEGSR
+     C*
+     C           WFB901    CHAINMB0                  45
+     C           *IN45     IFEQ '1'
+     C                     MOVEL*BLANKS   MB03
+     C                     END
+     C*
+     C           WFB902    CHAINMA0                  45
+     C           *IN45     IFEQ '1'
+     C                     MOVEL*BLANKS   MA03
+     C                     END
+     C*毛利
+     C           WFB904    SUB  WFB903    FIELD1
+     C*毛利率
+     C           WFB904    IFNE 0
+     C           FIELD1    DIV  WFB904    WORK01  52H
+     C           WORK01    MULT 100       FIELD2
+     C                     ELSE
+     C                     Z-ADD0         FIELD2
+     C                     END
+     C*
+     C*毛利
+     C           WFB906    SUB  WFB905    FIELD3
+     C*毛利率
+     C           WFB906    IFNE 0
+     C           FIELD3    DIV  WFB906    WORK01    H
+     C           WORK01    MULT 100       FIELD4
+     C                     ELSE
+     C                     Z-ADD0         FIELD4
+     C                     END
+     C                     EXSR RTN900                     *PROC SKIP
+     C                     WRITEPD1
+     C                     SETON                     30
+     C                     ADD  WFB905    T1TOT1
+     C                     ADD  WFB906    T1TOT2
+     C                     ADD  FIELD3    T1TOT3
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTNL1 ....PROC SKIP
+     C*==============================================================*
+10===C           RTNL1     BEGSR
+     C*
+     C           T1TOT2    IFNE 0
+     C           T1TOT3    DIV  T1TOT2    WORK01    H
+     C           WORK01    MULT 100       T1TOT4
+     C                     ELSE
+     C                     Z-ADD0         T1TOT4
+     C                     END
+     C                     WRITEPT1
+     C                     Z-ADD0         T1TOT1
+     C                     Z-ADD0         T1TOT2
+     C                     Z-ADD0         T1TOT3
+     C                     Z-ADD0         T1TOT4
+     C                     SETOF                     30
+     C                     ENDSR
+     C*==============================================================*
+     C*          RTN900....PROC SKIP
+     C*==============================================================*
+10===C           RTN900    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     SETON                     10
+|   C                     SETOF                     39
+| 01-C                     END
+|    C*
+| 02-C           *IN39     IFEQ '1'
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+     C                     SETOF                     30
+| 02-C                     END
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTNLR
+      *==============================================================*
+06===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+     C                     WRITEPH1
+|   C                     WRITEPE3
+| 01-C                     END
+|    C*
+|    C                     WRITEPE2
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+

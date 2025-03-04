@@ -1,0 +1,101 @@
+     /***************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:3459696   */
+     /*                                                             */
+     /* PROGRAM NAME : IMR082C1                                     */
+     /* AUTHER       : SAM                                          */
+     /* CREATE DATE  : 07/26/96                                     */
+     /* UPDATE DATE  :                                              */
+     /* SYSTEM       :人頭馬匯東                                  */
+     /***************************************************************/
+             PGM
+      /* =========================================================== */
+      /*             SYSTEM USE  - FIELD DECLEAR                     */
+      /* =========================================================== */
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+      /* =========================================================== */
+      /*             PASS DATA USE  - FIELD DECLEAR                  */
+      /* =========================================================== */
+             DCL        VAR(&DIN04S) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DIN04E) TYPE(*CHAR) LEN(9)
+      /* =========================================================== */
+      /*             PASS DATA TO QUERY USE - FIELD DECLEAR          */
+      /* =========================================================== */
+  /*M001M    DCL        VAR(&PART1) TYPE(*CHAR) LEN(6) */
+  /*M001M    DCL        VAR(&PART2) TYPE(*CHAR) LEN(6) */
+  /*M001M*/  DCL        VAR(&PART1) TYPE(*CHAR) LEN(8)
+  /*M001M*/  DCL        VAR(&PART2) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&PART3) TYPE(*CHAR) LEN(11)
+             DCL        VAR(&PART4) TYPE(*CHAR) LEN(11)
+
+      /* =========================================================== */
+      /*             PREPARE EMPTY WORK FILE IN QTEMP                */
+      /* =========================================================== */
+             CPYF       FROMFILE(REW105) TOFILE(QTEMP/REW105) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REW105))
+             CPYF       FROMFILE(REW106) TOFILE(QTEMP/REW106) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REW106))
+
+             OVRDBF     FILE(REW105) TOFILE(QTEMP/REW105) SHARE(*YES)
+             OVRDBF     FILE(REW106) TOFILE(QTEMP/REW106) SHARE(*YES)
+             OVRDBF     FILE(MTMAPF) SHARE(*YES)
+
+      /* =========================================================== */
+      /*             GET DATA FROM *LDA                              */
+      /* =========================================================== */
+
+  /*M001M    CHGVAR     VAR(&DIN04S) VALUE(%SST(*LDA 638 9)) */
+  /*M001M    CHGVAR     VAR(&DIN04E) VALUE(%SST(*LDA 647 9)) */
+  /*M001M*/  CHGVAR     VAR(&DIN04S) VALUE(%SST(*LDA 650 9))
+  /*M001M*/  CHGVAR     VAR(&DIN04E) VALUE(%SST(*LDA 659 9))
+  /*M001M    CHGVAR     VAR(&PART1) VALUE(%SST(*LDA 609 6)) */
+  /*M001M    CHGVAR     VAR(&PART2) VALUE(%SST(*LDA 631 6)) */
+  /*M001M*/  CHGVAR     VAR(&PART1) VALUE(%SST(*LDA 609 8))
+  /*M001M*/  CHGVAR     VAR(&PART2) VALUE(%SST(*LDA 641 8))
+
+             CHGVAR     VAR(&PART3) VALUE('''' *CAT &DIN04S *CAT '''')
+             CHGVAR     VAR(&PART4) VALUE('''' *CAT &DIN04E *CAT '''')
+
+      /* =========================================================== */
+      /*           QUERY MANAGERMENT UPDATE REW106                   */
+      /* =========================================================== */
+             OPNQRYF    FILE((MTMAPF)) QRYSLT('MA01 *EQ %RANGE("' +
+                          *CAT &DIN04S *CAT '" "' *CAT &DIN04E *CAT +
+                          '") ') KEYFLD(*FILE)
+
+             STRQMQRY   QMQRY(REPLIB/IMR082Q1) OUTPUT(*OUTFILE) +
+                          OUTFILE(QTEMP/REW106) SETVAR((PART1 +
+                          &PART1) (PART2 &PART2) (PART3 &PART3) +
+                          (PART4 &PART4))
+
+             OVRPRTF    FILE(IMR082P) PAGESIZE(*N 198) CPI(15) +
+                          USRDTA('R-FORECAST')
+
+             CALL       IMR0821
+             CALL       IMR0822
+
+             CLOF       OPNID(MTMAPF)
+             DLTOVR     FILE(*ALL)
+      /* =========================================================== */
+      /*             CHANGE REPORT TO PRINT??                        */
+      /* =========================================================== */
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6601I) VALUE('IMR082P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             ENDPGM
+

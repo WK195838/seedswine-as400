@@ -1,0 +1,279 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : POR055                                        *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 82/05/11                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :採購子系統                                   *
+      * REMARK       :供應商到貨完稅狀況表                         *
+      ****************************************************************
+     FIMINPF  IF  E           K        DISK
+     FPOPDPF  IF  E           K        DISK
+     FPOPEPF  IF  E           K        DISK
+     FPOPFPF  IF  E           K        DISK
+     FPOPGPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#HPF  IF  E           K        DISK
+     FREWF73  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I*
+     I                                      601 605 DPD07S
+     I                                      606 610 DPD07E
+     I*(MM/YY)
+     I                                      611 6140DPD04S
+     I                                      611 6120DPD4SM
+     I*(YY/MM)
+     I                                      619 6220YPD04S
+     I                                      619 6200YPD4SM
+     I*
+     I                                      627 635 DPE04S
+     I                                      636 644 DPE04E
+     I            DS
+     I                                        1   9 PE04
+     I                                        3   4 PE04L
+     I            DS
+     I                                        1   9 PG03
+     I                                        3   4 PG03L
+     I            DS
+     I                                        1   9 IN04
+     I                                        3   4 IN04L
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF7301
+     C                     KFLD           WF7302
+     C           KEY#H     KLIST
+     C                     KFLD           #H01
+     C                     KFLD           #H02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C*採購驗收檔讀取
+     C                     READ PD0                      45
+  01-C           *IN45     DOWEQ'0'
+    C                     MOVE PD07      WF7301
+    C                     EXSR RTN100                     讀明細檔
+    C                     READ PD0                      45
+  01-C                     END
+     C*
+     C*採購完稅檔讀取
+     C                     READ PF0                      45
+  02-C           *IN45     DOWEQ'0'
+    C                     EXSR RTN200                     讀明細檔
+    C                     READ PF0                      45
+  02-C                     END
+     C*
+     C*存貨月結檔讀取
+     C                     READ IN0                      45
+  03-C           *IN45     DOWEQ'0'
+    C                     EXSR RTN300
+    C                     READ IN0                      45
+  03-C                     END
+     C*
+     C           *LOVAL    SETLLWF730
+     C                     READ WF730                    45
+  04-C           *IN45     DOWEQ'0'
+    C                     EXSR RTN400
+    C                     READ WF730                    45
+  04-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....GET DETAIL
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         WF7303
+|    C                     Z-ADD0         WF7304
+|    C                     Z-ADD0         WF7305
+|    C                     Z-ADD0         WF7306
+|    C                     Z-ADD0         WF7307
+|    C                     Z-ADD0         WF7308
+|    C                     Z-ADD0         WF7309
+|    C                     Z-ADD0         WF7310
+|    C                     Z-ADD0         WF7311
+|    C                     Z-ADD0         WF7312
+|    C                     Z-ADD0         WF7313
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET DETAIL
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*採購驗收明細檔讀取
+|    C           PD02      SETLLPE0
+|    C           PD02      READEPE0                      41
+| 01-C           *IN41     DOWEQ'0'
+| 02-C           PE04      IFGE DPE04S
+|   C           PE04      ANDLEDPE04E
+|   C*
+|   C           PE04      CHAINMA0                  42
+| 03-C           *IN42     IFEQ '0'
+|   C                     Z-ADDMA15      WF7314
+|   C                     Z-ADDMA16      WF7315
+| 03*C                     ELSE
+|   C                     Z-ADD0         WF7314
+|   C                     Z-ADD0         WF7315
+| 03-C                     END
+|   C*GET標準容積
+|   C                     MOVEL'STANDARD'#H01
+|   C                     MOVELPE04L     #H02
+|   C           KEY#H     CHAIN#H0                  40
+| 04-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         WF7318
+| 04*C                     ELSE
+|   C                     Z-ADD#H03      WF7318
+| 04-C                     END
+|   C*
+|   C                     MOVE PE04      WF7302
+|   C                     MOVELPE04      WF7316
+|   C                     EXSR RTN010
+|   C*
+|   C           KEYWF     CHAINWF730                40
+| 05-C           *IN40     IFEQ '0'
+|   C           PE06      MULT WF7315    WPE06   72
+|   C                     ADD  WPE06     WF7304
+|   C                     ADD  PE06      WF7305
+|   C           WF7304    MULT WF7314    WF7306
+|   C           WF7306    DIV  WF7318    WF7306    H
+|   C                     UPDATWF730
+| 05*C                     ELSE
+|   C           PE06      MULT WF7315    WPE06   72
+|   C                     Z-ADDWPE06     WF7304
+|   C                     Z-ADDPE06      WF7305
+|   C           WF7304    MULT WF7314    WF7306
+|   C           WF7306    DIV  WF7318    WF7306    H
+|   C                     WRITEWF730
+| 05-C                     END
+| 02-C                     END
+|   C*
+|   C           PD02      READEPE0                      41
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE WORK FILE
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C*採購完稅明細檔讀取
+|    C           PF02      SETLLPG0
+|    C           PF02      READEPG0                      41
+| 01-C           *IN41     DOWEQ'0'
+| 02-C           PG03      IFGE DPE04S
+|   C           PG03      ANDLEDPE04E
+|   C*
+|   C                     MOVE PG03      WF7302
+|   C                     MOVELPG03      WF7316
+|   C                     EXSR RTN010
+|   C*GET標準容積
+|   C                     MOVEL'STANDARD'#H01
+|   C                     MOVELPG03L     #H02
+|   C           KEY#H     CHAIN#H0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         WF7318
+| 03*C                     ELSE
+|   C                     Z-ADD#H03      WF7318
+| 03-C                     END
+|   C*
+|   C           PG03      CHAINMA0                  42
+|   C  N42                MOVE MA12      WF7301
+|   C  N42                Z-ADDMA15      WF7314
+|   C  N42                Z-ADDMA16      WF7315
+|   C*
+| 04-C           WF7301    IFGE DPD07S
+|   C           WF7301    ANDLEDPD07E
+|   C*
+|   C           KEYWF     CHAINWF730                40
+| 05-C           *IN40     IFEQ '0'
+|   C                     ADD  PG05      WF7307
+|   C           WF7307    MULT WF7314    WF7308    H
+|   C           WF7308    DIV  WF7318    WF7309    H
+|   C                     ADD  PG06      WF7310
+|   C                     UPDATWF730
+| 05*C                     ELSE
+|   C                     Z-ADDPG05      WF7307
+|   C           WF7307    MULT WF7314    WF7308    H
+|   C           WF7308    DIV  WF7318    WF7309    H
+|   C                     Z-ADDPG06      WF7310
+|   C                     WRITEWF730
+| 05-C                     END
+| 04-C                     END
+| 02-C                     END
+|   C*
+|   C           PF02      READEPG0                      41
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....UPDATE WORK FILE
+      *==============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C*存貨月結檔讀取
+| 01-C           IN04      IFGE DPE04S
+|   C           IN04      ANDLEDPE04E
+|   C*
+|   C                     MOVE IN04      WF7302
+|   C                     MOVELIN04      WF7316
+|   C                     EXSR RTN010
+|   C*GET標準容積
+|   C                     MOVEL'STANDARD'#H01
+|   C                     MOVELIN04L     #H02
+|   C           KEY#H     CHAIN#H0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     Z-ADD0         WF7318
+| 02*C                     ELSE
+|   C                     Z-ADD#H03      WF7318
+| 02-C                     END
+|   C*
+|   C           IN04      CHAINMA0                  42
+|   C  N42                MOVE MA12      WF7301
+|   C  N42                Z-ADDMA15      WF7314
+|   C  N42                Z-ADDMA16      WF7315
+|   C*
+| 03-C           WF7301    IFGE DPD07S
+|   C           WF7301    ANDLEDPD07E
+|   C*
+|   C           IN06      ADD  IN19      T7303   60
+| 04-C           T7303     IFNE 0
+|   C           KEYWF     CHAINWF730                40
+| 05-C           *IN40     IFEQ '0'
+|   C                     ADD  T7303     WF7303
+|   C                     UPDATWF730
+| 05*C                     ELSE
+|   C           IN06      ADD  IN19      WF7303
+|   C                     WRITEWF730
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|   C*
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN400....UPDATE WORK FILE
+      *==============================================================*
+05===C           RTN400    BEGSR
+|    C*
+|    C           WF7303    ADD  WF7304    WF7311
+|    C           WF7311    SUB  WF7307    WF7311
+|    C*未完稅實際箱數全進位
+|    C           WF7311    DIV  WF7315    W7312   82
+|    C           W7312     ADD  0.99      WF7312
+|    C           WF7311    MULT WF7314    WF7313
+|    C           WF7313    DIV  WF7318    WF7313    H
+|    C                     UPDATWF730
+|    C*
+05===C                     ENDSR
+

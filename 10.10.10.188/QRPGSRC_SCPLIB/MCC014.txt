@@ -1,0 +1,136 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : MCC011                                        *
+      * AUTHER       : A1010  JOHN CHIOU                             *
+      * CREATE DATE  : 2010/11/01                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存數量重算                                 *
+      ****************************************************************
+     FINTAPF  IF  E           K        DISK
+     FINTXLF05IF  E           K        DISK
+     FC#EHPF  IF  E           K        DISK
+     E*===============================================================
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYEH     KLIST
+     C                     KFLD           INCOMP
+     C*
+     C           KEYTX     KLIST
+     C                     KFLD           EH01             公司別
+     C                     KFLD           EH02             年月
+     C                     KFLD           TA03             產品代號
+     C*
+     C           KEYTA     KLIST
+     C                     KFLD           EH01             公司別
+     C                     KFLD           EH02             年月
+     C*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN000                     GET DATE FROM C#EHPF
+     C                     EXSR RTN100                     計算庫存差額
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN000....GET DATE FROM C#EHPF
+      *===============================================================*
+01===C           RTN000    BEGSR
+|    C*
+|    C                     SETON                     10
+|    C*
+|    C           KEYEH     CHAINEH0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     SETON                     LR
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....計算庫存差額
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           KEYTA     SETLLTA0
+|    C           KEYTA     READETA0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C                     Z-ADD0         MAXAMT 112
+|   C                     Z-ADDTA05      WAMT   112
+|   C           KEYTX     SETLLTX0
+|   C           KEYTX     READETX0                      41
+| 02-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN200                     累計成本金額
+| 03-C           TX21      IFGT MAXAMT                     取得成本金額最大KEY
+     C           TX03      IFEQ 'S1'
+     C           TX03      OREQ 'A1'
+     C           TX03      OREQ 'A2'
+     C           TX03      OREQ 'A4'
+|   C                     Z-ADDTX21      MAXAMT
+|   C                     MOVELTX01      KTX01   2
+|   C                     Z-ADDTX02      KTX02   60
+|   C                     MOVELTX27      KTX27   2
+|   C                     MOVELTX12      KTX12   5
+|   C                     MOVELTX11      KTX11   9
+|   C                     MOVELTX05      KTX05  13
+| 03-C                     ENDIF
+| 03-C                     ENDIF
+|   C           KEYTX     READETX0                      41
+| 02-C                     ENDDO
+|   C*
+| 04-C           TA08      IFNE WAMT
+|   C           TA08      SUB  WAMT      WDIFF  112       差額
+|   C                     CALL 'MCC0141'
+|   C                     PARM           KTX01
+|   C                     PARM           KTX02
+|   C                     PARM           KTX27
+|   C                     PARM           KTX12
+|   C                     PARM           KTX11
+|   C                     PARM           KTX05
+|   C                     PARM           WDIFF
+| 04-C                     ENDIF
+|   C*
+|   C           KEYTA     READETA0                      40
+|   C*
+| 01-C                     ENDDO
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN200....累計庫存金額
+      *===============================================================*
+03===C           RTN200    BEGSR
+| 01-C           TX03      IFEQ 'A1'                       一般庫存調整
+|   C           TX03      OREQ 'A2'                       盤盈虧
+|   C           TX03      OREQ 'S3'                       盤盈銷售
+|   C                     ADD  TX21      WAMT
+| 01-C                     ENDIF
+|    C*
+| 02-C           TX03      IFEQ 'A4'                       陳列調整
+|   C                     ADD  TX21      WAMT
+| 02-C                     ENDIF
+|    C*
+|   C           TX03      IFEQ 'S1'                       銷售銷退
+|   C                     SUB  TX21      WAMT
+| 03-C                     ENDIF
+|    C*
+| 04-C           TX03      IFEQ 'C1'                       一般採購驗收
+|   C           TX03      OREQ 'C2'                       客訂採購驗收
+|   C           TX03      OREQ 'E1'                       陳列轉進貨
+|   C           TX03      OREQ 'S2'                       陳列借貨
+|   C           TX03      OREQ 'A3'                       成本調整
+|   C                     ADD  TX19      WAMT
+| 04-C                     ENDIF
+| 03-C           TX03      IFEQ 'B1'                       進貨退出
+|   C                     SUB  TX19      WAMT
+| 04-C                     ENDIF
+|    C*
+|    C*  B2 陳列退出 & C3 陳列進貨驗收  與帳列庫存無關
+|    C*
+03===C                     ENDSR
+

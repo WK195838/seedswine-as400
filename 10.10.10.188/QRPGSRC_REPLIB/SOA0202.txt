@@ -1,0 +1,224 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOA0201                                       *
+      * AUTHER       : A1034 STEPHANIE                               *
+      * CREATE DATE  : 81/06/03                                      *
+      * UPDATE DATE  : 81/06/23 BY JUDY                              *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+      * REMARK       :訂單批次處理                                 *
+      ****************************************************************
+     FSOSELF  UP  E           K        DISK
+     FSOSFPF  UF  E           K        DISK
+     FMTMAPF  UF  E           K        DISK
+      *庫存
+     FIMIAPF  UF  E           K        DISK                      A
+     FPA#2PF  IF  E           K        DISK
+     I**********
+     I           UDS
+     I                                      101 110 $USER
+B2MODI                                      119 1300$EGMDY
+B2MODI                                      607 608 DSC01
+B2MODI                                      609 6140WSC07S
+B2MODI                                      609 610 YYS
+B2MODI                                      611 614 MMDDS
+B2MODI                                      615 6200WSC07E
+B2MODI                                      615 616 YYE
+B2MODI                                      617 620 MMDDE
+B2MODI                                      627 631 DSC04S
+B2MODI                                      637 641 DSC04E
+B2MODI                                      647 658 DSC02S
+B2MODI                                      667 678 DSC02E
+B2MODI                                      686 686 ERRCDE
+B2MODI                                      687 6920DSC07S
+B2MODI                                      697 7020DSC07E
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN IA01      WIA01
+     C           *LIKE     DEFN IA02      WIA02
+     C           *LIKE     DEFN IA03      WIA03
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN96     PARM *IN96     IN96    1
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#2     KLIST
+     C                     KFLD           #201
+     C                     KFLD           #202
+     C           KEYIA     KLIST
+     C                     KFLD           WIA01
+     C                     KFLD           WIA02
+     C                     KFLD           WIA03
+     C           KEYMA     KLIST
+     C                     KFLD           SF03
+      *==============================================================*
+      *                   *LIKE DEFN
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN010
+     C                     EXSR RTN100
+     C                     EXSR RTN200
+     C*
+     C                     UPDATSE0
+     CLR                   RETRN
+     C*==============================================================*
+     C*          RTN010....GET HEADING  FILE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C* 日期轉換
+B2MODC                     Z-ADD0         DATE    80
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2MODC                     PARM $EGMDY    S001I2  80
+B2MODC           DATE      PARM           S001O1  80
+     C                     SETON                     10
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....HEADING  FILE
+     C*==============================================================*
+01===C           RTN100    BEGSR
+|    C* 日期轉換
+|    C                     MOVEL'V'       SE09
+     C                     ADD  1         SE20
+B2000C                     Z-ADDSE39      SE21
+     C                     MOVELSE07      SE22
+     C                     Z-ADD1         SE23
+B2000C                     Z-ADDSE39      SE24
+|    C                     MOVEL'V'       SE25
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....GET DETAIL  FILE   1
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*
+|    C*送貨明細檔
+|    C           SE02      SETLLSF0
+|    C           SE02      READESF0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C                     EXSR RTN210
+     C                     UPDATSF0
+|   C           SE02      READESF0                      41
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN210.... IMIAPF , MTMAPF
+     C*==============================================================*
+24===C           RTN210    BEGSR
+|    C*****************
+|    C* UPDATE SOSFPF *
+|    C*****************
+     C                     Z-ADDSF04      SF19
+     C                     Z-ADDSF05      SF20
+     C           SF19      ADD  SF20      DATA2   60
+|    C*****************
+|    C* UPDATE IMIAPF *
+|    C*****************
+|    C*
+|    C* GET(#219)送貨倉加減
+|    C                     MOVELSE03      #201
+|    C                     MOVELSE03      #202
+|    C           KEY#2     CHAIN#20                  40
+| 15-C           *IN40     IFEQ '0'
+|   C           #219      ANDEQ'-'
+|   C                     MOVELSF16      WIA01
+|   C                     MOVE SE07      WIA02
+|   C                     MOVE SF03      WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2000C                     Z-ADDDATE      IAXX
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 16-C           *IN40     IFEQ '0'
+|   C                     SUB  DATA2     IA06
+|   C                     SUB  DATA2     IA07
+|   C                     SUB  DATA2     IA09
+|   C                     UPDATIA0
+| 16*C                     ELSE
+|   C                     MOVE WIA01     IA01
+|   C                     MOVE WIA02     IA02
+|   C                     MOVE WIA03     IA03
+|   C           IA03      CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+|   C                     MOVE MA09      IA04
+|   C                     MOVE MA08      IA05
+|   C                     Z-SUBDATA2     IA06
+|   C                     Z-SUBDATA2     IA07
+|   C                     Z-ADD0         IA08
+|   C                     Z-SUBDATA2     IA09
+|   C                     Z-ADD0         IA10
+|   C                     WRITEIA0
+| 16-C                     END
+| 15-C                     END
+|    C* GET(#218)進貨倉加減
+|    C                     MOVELSE03      #201
+|    C                     MOVELSE03      #202
+|    C           KEY#2     CHAIN#20                  40
+| 17-C           *IN40     IFEQ '0'
+|   C           #218      ANDEQ'+'
+|   C                     MOVELSF16      WIA01
+|   C                     MOVE SE26      WIA02
+|   C                     MOVE SF03      WIA03
+|   C           KEYIA     CHAINIA0                  40
+B2000C                     Z-ADDDATE      IAXX
+B2000C                     TIME           IAYY
+|   C                     MOVE $USER     IAZZ
+| 18-C           *IN40     IFEQ '0'
+|   C                     ADD  DATA2     IA06
+|   C                     ADD  DATA2     IA07
+|   C                     ADD  DATA2     IA10
+|   C                     UPDATIA0
+| 18*C                     ELSE
+|   C                     MOVE WIA01     IA01
+|   C                     MOVE WIA02     IA02
+|   C                     MOVE WIA03     IA03
+|   C           IA03      CHAINMA0                  40
+|   C           *LOVAL    SETLLMA0
+|   C                     MOVE MA09      IA04
+|   C                     MOVE MA08      IA05
+|   C                     Z-ADDDATA2     IA06
+|   C                     Z-ADDDATA2     IA07
+|   C                     Z-ADD0         IA08
+|   C                     Z-ADD0         IA09
+|   C                     Z-ADDDATA2     IA10
+|   C                     WRITEIA0
+| 18-C                     END
+| 17-C                     END
+|    C*****************
+|    C* UPDATE MTMAPF *
+|    C*****************
+| 21-C           #219      IFEQ '-'
+|   C           #218      ANDNE'+'
+|   C           KEYMA     CHAINMA0                  40
+|   C                     Z-ADD0         WQTY
+B2000C                     Z-ADDDATE      MAXX
+B2000C                     TIME           MAYY
+|   C                     MOVE $USER     MAZZ
+| 22-C           *IN40     IFEQ '0'
+|   C*
+|   C                     SUB  DATA2     MA30
+|   C                     SUB  DATA2     WQTY    70
+|   C*
+      *TOTAL異動金額
+|   C           WQTY      MULT MA31      FOB    174
+|   C                     ADD  FOB       MA26      H
+|   C           WQTY      MULT MA32      FHI    174
+|   C                     ADD  FHI       MA27      H
+|   C           WQTY      MULT MA33      DUTY   174
+|   C                     ADD  DUTY      MA28      H
+|   C                     UPDATMA0
+| 22-C                     END
+|   C*
+| 21-C                     END
+|    C*
+24===C                     ENDSR
+

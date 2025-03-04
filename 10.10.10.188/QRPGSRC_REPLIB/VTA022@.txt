@@ -1,0 +1,660 @@
+     H****************************************************************
+      *                                                              *
+      * PROGRAM NAME : VTA022                                        *
+      * AUTHER       : MICHELLE                                      *
+      * CREATE DATE  : 04/25/02                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :寰盛洋酒                                     *
+      * SUBSYSTEM    :媒體申報                                     *
+      * REMARK       :銷項憑證轉檔－銷退折讓                       *
+     A*===============================================================
+     A* MODI CODE |  DATE  | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      |05.14.02| 31格式銷退時，稅額要獨立表達
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOVPPF  UF  E           K        DISK                      A
+     FSOVQPF  UF  E           K        DISK                      A
+     FSOSGPF  IF  E           K        DISK
+     F            SG0                               KRENAMESG0L
+     FARAGPF  IF  E           K        DISK
+     FARAFPF  IF  E           K        DISK
+     F            AF0                               KRENAMEAF0L
+     FARAFLF1 IF  E           K        DISK
+     FSOSXPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#8PF  UF  E           K        DISK                      A
+     FPA#BPF  IF  E           K        DISK
+     FSOSGLF01IF  E           K        DISK
+     FSOSILF10IF  E           K        DISK
+     FVTA022D CF  E                    WORKSTN      KINFDS DSPFDS
+     F                                        RRN   KSFILE SFLSR
+     I*DATA AREA
+     I*CURSOR POSTITON
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     I*
+     I*LOCAL DATA AREA
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      173 176 $COR
+     I                                      201 2080$A8YMD
+     I                                      203 2040$A8Y
+     I                                      205 2060$A8M
+     I                                      209 2160$C8YMD
+     I                                      219 219 $ENV
+      *公司別
+     I                                      601 601 DVP91
+      *YYMM
+     I                                      614 6170DVP04S
+     I                                      614 6150MMS
+     I                                      616 6170YYS
+     I                                      620 6230YYMMS
+      *
+     I                                      634 6370DVP04E
+     I                                      634 6350MME
+     I                                      636 6370YYE
+     I                                      640 6430YYMME
+     I                                      800 8070YMD8S
+     I                                      810 8170YMD8E
+     I                                      810 8150YMD6E
+     I            DS
+     I                                        1   2 SG01
+     I                                        1   1 SG01L
+      *DATE
+     I            DS
+     I                                        1   80DATES
+     I                                        1   60DATSYM
+     I                                        7   80DDS
+      *
+     I            DS
+     I                                        1   80DATEE
+     I                                        1   60DATEYM
+     I                                        7   80DDE
+      *
+     I            DS
+     I                                        1   2 AF01
+     I                                        1   1 AF01L
+      *
+     I            DS
+     I                                        1  12 DSG02
+     I                                        3   3 DSG031
+     I                                        3   4 DSG03
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C           *LIKE     DEFN RRN       WRRN1
+     C           *LIKE     DEFN RRN       WRRN2
+     C*
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYVP     KLIST
+     C                     KFLD           VP91
+     C                     KFLD           VP92
+     C                     KFLD           VP04
+     C                     KFLD           VP02
+     C                     KFLD           VP03
+     C           KEYVQ     KLIST
+     C                     KFLD           VQ91
+     C                     KFLD           VQ92
+     C                     KFLD           VQ04
+     C                     KFLD           VQ01
+     C                     KFLD           VQ16
+     C           KEYME     KLIST
+     C                     KFLD           SG04
+     C                     KFLD           SG05
+     C           KEYAF     KLIST
+     C                     KFLD           AF03
+     C                     KFLD           AF04
+     C*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR R0100                      *INITIAL
+     C*
+     C           *IN03     DOWEQ'0'
+     C           SCID      CASEQ'SC02'    R2000
+     C                     END
+     C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R0100 ....INITIAL VALUE
+     C*==============================================================*
+     C           R0100     BEGSR
+     C*
+     C                     MOVEL'SC02'    SCID    4
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2000 .... 'SC02' SCREEN MAIN ROUTINE
+     C*==============================================================*
+     C           R2000     BEGSR
+     C*
+     C                     EXSR R2A00                      *INIT SCR2
+     C*
+     C           *IN03     DOWEQ'0'
+     C           SCID      ANDEQ'SC02'
+     C*
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN03     IFEQ '0'
+     C           *IN12     ANDEQ'0'
+     C*
+     C           *IN14     IFEQ '1'
+     C*
+     C                     EXSR R2B00                      *SELECT & SAVE
+     C                     SETON                     03                VE
+     C*
+     C                     END
+     C* *IN03 OR *IN12 ON
+     C                     ELSE
+     C* RELEAS FILE --------------------------------------------------*
+     C           *LOVAL    SETLLSG0
+     C           *LOVAL    SETLLAF0
+     C                     SETON                     03
+     C                     END                             *IN12 ENDIF
+     C*
+     C                     END                             *ENDDO
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2A00 ....INIT 'SC02'
+     C*==============================================================*
+     C           R2A00     BEGSR
+     C*
+     C*公司檔
+     C           DVP91     IFEQ 'W'
+     C                     MOVEL'匯齡'  CONAME
+     C                     ELSE
+     C           DVP91     IFEQ 'R'
+     C                     MOVEL'寰盛'  CONAME
+     C                     ELSE
+     C           DVP91     IFEQ 'K'
+     C                     MOVEL'康齡'  CONAME
+     C                     END
+     C                     END
+     C                     END
+     C*
+     C*--------------------------------------------------------------*
+     C*
+     C*
+     C*合計
+     C                     Z-ADD0         DSUM
+     C                     Z-ADD0         DSUM2
+     C*---------------------------------------------------------------*
+     C                     EXSR R2A10                      *SFL INIT
+     C                     EXSR R2A20                      *MOVE SFL
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2A10 ....SFL INIT
+     C*==============================================================*
+     C           R2A10     BEGSR
+     C*
+     C                     Z-ADD1         DRRN
+     C                     Z-ADD0         RRN
+     C                     Z-ADD0         WRRN1
+     C                     SETON                     52    *SFLCLR
+     C                     WRITESFLCR
+     C                     SETOF                     525053
+     C                     SETON                     51    *SFLDSPCTL
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2A20 ....MOVE DATA TO SFLSR
+     C*==============================================================*
+     C           R2A20     BEGSR
+     C*
+     C                     MOVEL*BLANK    DOPT
+     C           *LOVAL    SETLLSG0L
+     C                     EXSR R2A21
+     C*
+     C           *LOVAL    SETLLAF0L
+     C                     EXSR R2A22
+     C*
+     C                     SETON                     53
+     C*
+     C           RRN       IFGT 0
+     C                     SETON                     50
+     C                     ELSE
+     C                     MOVEL'UPT2050' ERRID
+     C                     MOVEL'PTMF'    ERRF
+     C                     SETON                     99
+     C                     END
+     C                     Z-ADDRRN       WRRN1
+     C**
+     C                     ENDSR
+     C*
+     C*==============================================================*
+     C*          R2A21 ....SETLL & READE SOSGLF05
+     C*==============================================================*
+     C           R2A21     BEGSR
+     C*
+     C                     READ SG0L                     44
+     C           *IN44     DOWEQ'0'
+     C           SG02      CHAIN#80                  45
+     C           *IN45     IFEQ '1'
+     C*
+M002MC           SG01L     IFEQ DVP91
+     C           SG26      ANDGEYMD8S
+     C           SG26      ANDLEYMD8E
+     C           SG17      ANDEQ'  '
+     C*
+M002AC           SG01      IFEQ 'W3'
+M002AC           SG26      ANDLT20020501
+M002AC                     ELSE
+     C*
+     C                     MOVEL*BLANKS   DSG02
+     C                     MOVELSG02      DSG02
+     C                     MOVEL*BLANKS   DSG04
+     C                     MOVEL*BLANKS   DSG05
+     C                     MOVELSG04      DSG04
+     C                     MOVELSG05      DSG05
+|    C********
+|    C*客戶簡稱
+|    C********
+|    C           KEYME     CHAINME0                  43
+|    C   43                MOVE *BLANK    SG04N
+|    C  N43                MOVELME04      SG04N
+|    C*
+     C*退貨日期
+     C                     CALL 'P31'
+     C                     PARM SG26      P3101I  80
+     C                     PARM '2'       P3102I  1
+     C                     PARM '1'       P3103I  1
+     C                     PARM '3'       P3104I  1
+     C                     PARM '1'       P3105I  1
+     C           SG26N     PARM           P3101O  80
+     C                     ADD  SG10      DSUM
+     C                     Z-ADDSG10      DSG10
+     C*
+     C           SG02      CHAINSX0                  49
+     C           *IN49     IFEQ '0'
+     C           SX02      IFEQ SG02
+     C                     ADD  SX10      DSUM2
+     C                     Z-ADDSX10      DSX10
+     C                     END
+     C                     ELSE
+     C                     Z-ADD0         DSX10
+     C                     END
+      *
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C*
+M002AC                     END
+     C                     END
+     C                     END
+     C                     READ SG0L                     44
+     C                     END
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2A22 ....SETLL & READE ARAFPF
+     C*==============================================================*
+     C           R2A22     BEGSR
+     C*
+     C                     READ AF0L                     44
+     C           *IN44     DOWEQ'0'
+     C           AF02      CHAIN#80                  45
+     C           *IN45     IFEQ '1'
+     C*
+M002DC*          AF01      IFNE 'W3'
+M002MC*          AF01L     ANDEQDVP91
+M002MC           AF01L     IFEQ DVP91
+     C           AF05      ANDGEYMD8S
+     C           AF05      ANDLEYMD8E
+     C*
+     C                     MOVEL*BLANKS   DSG02
+     C                     MOVELAF02      DSG02
+     C                     MOVEL*BLANKS   DSG04
+     C                     MOVEL*BLANKS   DSG05
+     C                     MOVELAF03      DSG04
+     C                     MOVELAF04      DSG05
+     C*
+|   C*客戶簡稱
+|   C           KEYAF     CHAINME0                  46
+| 02-C           *IN46     IFEQ '0'
+|   C                     MOVE *BLANKS   SG04N
+|   C                     MOVELME04      SG04N
+| 02-C                     END
+     C*折讓日期
+|    C                     Z-ADDAF05      DAF05   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+|    C                     PARM DAF05     S001I2  60
+|    C           SG26N     PARM           S001O1  60
+     C                     ADD  AF07      DSUM
+     C                     ADD  AF09      DSUM2
+     C                     Z-ADDAF07      DSG10
+     C                     Z-ADDAF09      DSX10
+     C*
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C*
+     C                     END
+     C                     END
+     C                     READ AF0L                     44
+     C                     END
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2B00 .... SELECT
+     C*==============================================================*
+     C           R2B00     BEGSR
+     C*
+     C                     Z-ADD1         WRRN2
+     C           WRRN2     DOUGTWRRN1
+     C*
+     C           WRRN2     CHAINSFLSR                40
+     C           *IN40     IFEQ '0'
+     C           DOPT      ANDEQ*BLANK
+     C*
+     C*          DSG03     IFEQ 'R1'
+     C           DSG031    IFEQ 'R'
+     C                     EXSR R2C00                      SOSGPF
+     C                     ELSE
+     C           DSG03     IFEQ 'C2'
+     C                     EXSR R2D00                      ARAFPF
+     C                     END
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     ADD  1         WRRN2
+     C                     END
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2C00 .... SAVE FILE
+     C*==============================================================*
+     C           R2C00     BEGSR
+      *
+     C                     MOVELSG02      #801
+     C                     Z-ADDSG26      #802
+     C                     MOVE $A8YMD    #8XX
+     C                     TIME           #8YY
+     C                     MOVEL$USER     #8ZZ
+     C           SG02      CHAIN#80                  50
+     C           *IN50     IFEQ '1'
+     C                     WRITE#80
+     C                     END
+     C*
+     C           SG09      SETLLAG0
+     C           SG09      READEAG0                      45
+  3--C           *IN45     DOWEQ'0'
+|||  C           AG04      CHAINSI0                  51
+|||4-C           *IN51     IFEQ '0'
+|||| C*
+|||| C           DVP91     IFEQ 'W'
+|||| C                     MOVE 'WH'      VP91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'K'
+|||| C                     MOVE 'KN'      VP91
+     C                     ELSE
+     C           DVP91     IFEQ 'R'
+     C                     MOVE 'RM'      VP91
+     C                     END
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE AG01      VP92
+|||| C                     MOVE 'R0'      VP01
+|||| C                     MOVELSG02      VP02
+|||| C                     MOVELAG04      VP03
+|||| C                     MOVELAG11      VP04
+||||5C           SI22      IFEQ 'D'
+|||| C                     MOVEL'1'       VP08
+     C                     ELSE
+     C           SI22      IFEQ 'B'
+     C                     MOVEL'3'       VP08
+     C                     ELSE
+     C           SI22      IFEQ 'Z'
+     C                     MOVEL'2'       VP08
+     C                     END
+     C                     END
+     C                     END
+|||| C                     MOVE $A8YMD    VP97
+|||| C                     TIME           VP98
+|||| C                     MOVEL$USER     VP99
+|||| C           SI17      IFEQ 2
+|||| C           AG07      ADD  AG21      W07    120
+|||| C                     Z-ADD0         W09    100
+|||| C                     ELSE
+|||| C                     Z-ADDAG07      W07
+|||| C                     Z-ADDAG21      W09
+|||| C                     END
+     C           W07       MULT -1        W07
+     C           W09       MULT -1        W09
+|||| C           KEYVP     CHAINVP0                  60
+|||| C           *IN60     IFEQ '0'
+|||| C                     ADD  W07       VP07
+|||| C                     ADD  W09       VP09
+|||| C                     UPDATVP0
+|||| C                     ELSE
+|||| C                     Z-ADDW07       VP07
+|||| C                     Z-ADDW09       VP09
+|||| C                     WRITEVP0
+|||| C                     END
+||||  *SOVQPF
+|||| C                     MOVEL'33'      VQ01
+M001DC*          SI17      IFEQ 2
+M001DC*          AG07      ADD  AG21      W07
+M001DC*                    Z-ADD0         W09
+M001DC*                    ELSE
+|||| C                     Z-ADDAG07      W07
+|||| C                     Z-ADDAG21      W09
+M001DC*                    END
+|||| C*                    MOVELAG11      VQ04
+|||| C                     MOVELYMD6E     VQ04
+|||| C           DVP91     IFEQ 'W'
+|||| C                     MOVE 'WH'      VQ91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'K'
+|||| C                     MOVE 'KN'      VQ91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'R'
+|||| C                     MOVE 'RM'      VQ91
+|||| C                     END
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE AG01      VQ92
+      *
+     C           SI08      CHAINMD0                  47
+     C           *IN47     IFEQ '0'
+     C                     MOVE *BLANKS   VQ05
+     C                     MOVELMD17      VQ05
+     C                     ELSE
+     C                     MOVE *BLANKS   VQ05
+     C                     END
+      *
+|||| C           SI22      IFEQ 'D'
+|||| C                     MOVEL'1'       VQ08
+|||| C                     ELSE
+|||| C           SI22      IFEQ 'B'
+|||| C                     MOVEL'3'       VQ08
+|||| C                     ELSE
+|||| C                     MOVEL'2'       VQ08
+|||| C                     END
+|||| C                     END
+      *
+|||| C                     MOVEL*BLANKS   VQ10
+|||| C                     MOVEL*BLANKS   VQ14
+|||| C                     MOVEL*BLANKS   VQ16
+|||| C                     MOVELAG04      VQ16
+|||| C                     MOVELSI21      VQ17
+|||| C           SI01      CHAIN#B0                  50
+|||| C           *IN50     IFEQ '0'
+|||| C                     MOVEL#B17      WCO     2
+|||| C           WCO       CHAIN#B0                  51
+|||| C           *IN51     IFEQ '0'
+|||| C                     MOVEL#B12      VQ15
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE $A8YMD    VQ97
+|||| C                     TIME           VQ98
+|||| C                     MOVEL$USER     VQ99
+||||  *
+|||| C           KEYVQ     CHAINVQ0                  61
+|||| C           *IN61     IFEQ '0'
+|||| C                     ADD  W07       VQ07
+|||| C                     ADD  W09       VQ09
+|||| C                     UPDATVQ0
+|||| C                     ELSE
+|||| C                     Z-ADDW07       VQ07
+|||| C                     Z-ADDW09       VQ09
+|||| C                     WRITEVQ0
+|||| C                     END
+||||  *
+|||4-C                     END
+|||  C           SG09      READEAG0                      45
+||3--C                     END
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2D00 .... SAVE FILE - ARAFPF
+     C*==============================================================*
+     C           R2D00     BEGSR
+      *
+     C                     MOVELAF02      #801
+     C                     Z-ADDAF05      #802
+     C                     MOVE $A8YMD    #8XX
+     C                     TIME           #8YY
+     C                     MOVEL$USER     #8ZZ
+     C           AF02      CHAIN#80                  50
+     C           *IN50     IFEQ '1'
+     C                     WRITE#80
+     C                     END
+     C*
+|||  C           AF06      CHAINSI0                  51
+|||4-C           *IN51     IFEQ '0'
+|||| C*
+|||| C           DVP91     IFEQ 'W'
+|||| C                     MOVE 'WH'      VP91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'K'
+|||| C                     MOVE 'KN'      VP91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'R'
+|||| C                     MOVE 'RM'      VP91
+|||| C                     END
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE AF01      VP92
+|||| C                     MOVE 'F0'      VP01
+|||| C                     MOVELAF02      VP02
+|||| C                     MOVELAF06      VP03
+|||| C                     MOVELAF05      VP04
+     C           SI22      IFEQ 'D'
+|||| C                     MOVEL'1'       VP08
+     C                     ELSE
+     C           SI22      IFEQ 'B'
+     C                     MOVEL'3'       VP08
+     C                     ELSE
+     C           SI22      IFEQ 'Z'
+     C                     MOVEL'2'       VP08
+     C                     END
+     C                     END
+     C                     END
+      *
+|||| C                     MOVE $A8YMD    VP97
+|||| C                     TIME           VP98
+|||| C                     MOVEL$USER     VP99
+|||| C           SI17      IFEQ 2
+|||| C           AF07      ADD  AF09      W07    120
+|||| C                     Z-ADD0         W09    100
+|||| C                     ELSE
+|||| C                     Z-ADDAF07      W07
+|||| C                     Z-ADDAF09      W09
+|||| C                     END
+     C           W07       MULT -1        W07
+     C           W09       MULT -1        W09
+|||| C           KEYVP     CHAINVP0                  60
+|||| C           *IN60     IFEQ '0'
+|||| C                     ADD  W07       VP07
+|||| C                     ADD  W09       VP09
+|||| C                     UPDATVP0
+|||| C                     ELSE
+|||| C                     Z-ADDW07       VP07
+|||| C                     Z-ADDW09       VP09
+|||| C                     WRITEVP0
+|||| C                     END
+||||  *SOVQPF
+|||| C                     MOVEL'33'      VQ01
+     C           SI08      CHAINMD0                  47
+     C           *IN47     IFEQ '0'
+     C                     MOVELMD17      VQ05
+     C                     ELSE
+     C                     MOVEL*BLANKS   VQ05
+     C                     END
+|||| C                     Z-ADDAF07      W07
+|||| C                     Z-ADDAF09      W09
+     C           SI17      IFEQ 2
+|||| C*          AF07      ADD  AF09      W07
+|||| C*                    Z-ADD0         W09
+     C                     MOVEL*BLANKS   VQ05
+|||| C                     END
+|||| C*                    MOVELAF05      VQ04
+|||| C                     MOVELYMD6E     VQ04
+|||| C           DVP91     IFEQ 'W'
+|||| C                     MOVE 'WH'      VQ91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'K'
+|||| C                     MOVE 'KN'      VQ91
+|||| C                     ELSE
+|||| C           DVP91     IFEQ 'R'
+|||| C                     MOVE 'RM'      VQ91
+|||| C                     END
+|||| C                     END
+|||| C                     END
+|||| C                     MOVE AF01      VQ92
+|||| C           SI01      CHAIN#B0                  47
+|||| C           *IN47     IFEQ '0'
+|||| C                     MOVEL#B17      WCO     2
+|||| C           WCO       CHAIN#B0                  48
+|||| C           *IN48     IFEQ '0'
+|||| C                     MOVEL#B12      VQ15
+|||| C                     ELSE
+|||| C                     MOVE *BLANKS   VQ15
+|||| C                     END
+|||| C                     ELSE
+|||| C                     MOVE *BLANKS   VQ15
+|||| C                     END
+|||| C           SI22      IFEQ 'D'
+|||| C                     MOVEL'1'       VQ08
+|||| C                     ELSE
+|||| C           SI22      IFEQ 'B'
+|||| C                     MOVEL'3'       VQ08
+|||| C                     ELSE
+|||| C                     MOVEL'2'       VQ08
+|||| C                     END
+|||| C                     END
+|||| C                     MOVEL*BLANKS   VQ10
+|||| C                     MOVEL*BLANKS   VQ14
+|||| C                     MOVEL*BLANKS   VQ16
+|||| C                     MOVELAF06      VQ16
+|||| C                     Z-ADDSI21      VQ17
+|||| C                     MOVE $A8YMD    VQ97
+|||| C                     TIME           VQ98
+|||| C                     MOVEL$USER     VQ99
+|||| C           KEYVQ     CHAINVQ0                  61
+|||| C           *IN61     IFEQ '0'
+|||| C                     ADD  W07       VQ07
+|||| C                     ADD  W09       VQ09
+|||| C                     UPDATVQ0
+|||| C                     ELSE
+|||| C                     Z-ADDW07       VQ07
+|||| C                     Z-ADDW09       VQ09
+|||| C                     WRITEVQ0
+|||| C                     END
+||||  *
+||||4C                     END
+     C*
+     C                     ENDSR
+     C*==============================================================*
+B2NEWC/COPY HBP2CVTR
+     C*==============================================================*
+

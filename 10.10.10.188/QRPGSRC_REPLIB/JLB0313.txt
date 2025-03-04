@@ -1,0 +1,212 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250
+     H*
+     H*    PROGRAM ID   : JLB031
+     H*    PROGRAM NAME : 沖帳作帳傳票批次
+     H*    AUTHOR       : D910121 CHARLES
+     H*    CREATE DATE  : 1993.06.22
+     H*    UPDATE DATE  :
+     H*    SYSTEM       : 進銷存收TO總帳
+     F****************************************************************
+     FWFJL26PFIP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FJLB0313PO   E             39     PRINTER
+     E                    ARR1    1   1 10
+     E                    ARR2    1   1 10
+     IWFJL26R
+     I                                              JL2601L6
+     I                                              JL2602L5
+     I                                              JL2604L4
+     I                                              JL2605L3
+     I                                              J2602$L2
+     I                                              JL2603L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *確認日期
+M001MI                                      601 6080F01
+M001MI                                      609 6160F02
+M001MI                                      617 6220D05
+M001MI                                      623 6280D06
+      *公司別
+M001MI                                      629 629 D01
+M001MI                                      630 630 D02
+      *辦事處
+M001MI                                      631 631 D03
+M001MI                                      632 632 D04
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01-C                     END
+     C*
+     C                     EXSR RTN050                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN100
+     CL2 10                EXSR RTN200
+     CL3 10                EXSR RTN300
+     CL4                   SETOF                     34
+     CL5 10                EXSR RTN400
+     CL6 10                EXSR RTN500
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN050....READE DETAIL
+      *==============================================================*
+02===C           RTN050    BEGSR
+      *日期轉換
+M001AC                     Z-ADDJL2601    W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM W6        S001I2  60
+|    C           PL2601    PARM           S001O1  60
+|    C*種類
+|    C                     MOVEL*BLANKS   D#A03
+| 01-C           JL2604    IFEQ '99'
+|   C                     MOVELARR1,1    D#A03
+| 01*C                     ELSE
+|   C                     MOVEL'COLLECT' #A01
+|   C                     MOVELJL2604    #A02
+|   C           KEY#A     CHAIN#A0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVEL#A03      D#A03
+| 02-C                     END
+| 01-C                     END
+|    C*客戶
+|    C                     MOVEL*BLANKS   ME04
+|    C                     MOVELJL2606    ME01
+|    C                     MOVEL*BLANKS   ME02
+|    C           KEYME     CHAINME0                  40
+|    C*預收
+| 03-C           JL2608    IFEQ '1'
+|   C                     MOVEL'預收'  P01
+| 03*C                     ELSE
+|   C                     MOVEL*BLANKS   P01
+| 03-C                     END
+|    C*作帳
+|    C                     MOVEL*BLANKS   P02
+| 04-C           JL2609    IFEQ 'AA'
+|   C                     MOVEL'收款'  P02
+| 04*C                     ELSE
+| 05-C           JL2609    IFEQ 'BB'
+|   C                     MOVEL'分配'  P02
+| 05*C                     ELSE
+| 06-C           JL2609    IFEQ 'DD'
+|   C                     MOVELARR2,1    P02
+| 06*C                     ELSE
+|   C                     MOVELJL2609    P02
+| 06-C                     END
+| 05-C                     END
+| 04-C                     END
+      *
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     SETOF                     20
+|    C                     ADD  JL2607    T12607
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN100....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN100    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C                     SETON                     20
+|    C                     ADD  T12607    T22607
+|    C                     Z-ADD0         T12607
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT2   SUBTOTAL
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT2
+|    C                     ADD  T22607    T32607
+|    C                     Z-ADD0         T22607
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE PT3   SUBTOTAL
+      *==============================================================*
+05===C           RTN300    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT3
+|    C                     ADD  T32607    T42607
+|    C                     Z-ADD0         T32607
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE PT4   SUBTOTAL
+      *==============================================================*
+06===C           RTN400    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT4
+|    C                     ADD  T42607    T52607
+|    C                     Z-ADD0         T42607
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN500....WRITE PT5   SUBTOTAL
+      *==============================================================*
+07===C           RTN500    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT5
+|    C                     Z-ADD0         T52607
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+08===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+      *
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN999....END
+      *==============================================================*
+09===C           RTN999    BEGSR
+      *
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+      *
+09===C                     ENDSR
+**
+價差折讓
+**
+未切傳票
+

@@ -1,0 +1,307 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOR0471                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/02/14                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :訂單系統                                     *
+      * REMARK       :送貨未確認明細表                             *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M002      | 99.01.29 | CALL P20之前先把日期轉成中國年
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FREW500  IP  E           K        DISK
+     FREW501  IF  E           K        DISK
+     FREW502  IF  E           K        DISK
+     FIMR083P O   E             39     PRINTER
+     IWF500
+     I                                              WF5000L2
+     I                                              WF5001L1
+     I                                              WF5004L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 605 DSE07S
+     I                                      606 610 DSE07E
+     I*          　　　　
+     I                                      611 6160DSE06S
+     I                                      617 6220DSE06E
+     I*(YY/MM/DD)
+B2MODI*                                     630 6370YSE06S
+B2MODI*                                     638 6430YSE06E
+M001AI                                      630 6350YSE06S
+M001AI                                      636 6410YSE06E
+     I*
+     I* BRAND
+B2MODI*                                     653 654 DSE08S
+B2MODI*                                     655 656 DSE08E
+M001AI                                      651 652 DSE08S
+M001AI                                      653 654 DSE08E
+     I* GIFT
+B2MODI*                                     657 665 DSE09S
+B2MODI*                                     666 674 DSE09E
+B2MODI*                                     675 675 DSE10S
+M001AI                                      655 663 DSE09S
+M001AI                                      664 672 DSE09E
+M001AI                                      673 6730DSE10S
+M001AI*(YYYY/MM/DD)
+M001AI                                      850 8570YMD8S
+M001AI                                      858 8650YMD8E
+     I            DS
+     I                                        1   9 IR03
+     I                                        1   2 IR031
+     I                                        3   4 IR032
+     I*
+     I            DS
+     I                                        1   9 IA03
+     I                                        1   2 IA031
+     I                                        3   4 IA032
+     I*
+B2MODC           *LIKE     DEFN YSE06S    DAY
+B2000C           *LIKE     DEFN YSE06S    DSE6SB
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C           *IN10     IFEQ '0'
+     C                     SETON                     104012
+M001DC*          YSE06S    SUB  110000    WSE06S
+M001AC           YMD8S     SUB  110000    WSE06S
+B2INF *CVR0001 sev.00 Field WSE06S is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+     C                     CALL 'P62'
+|   C                     PARM           WSE06S  60
+|   C                     PARM -1        P6202I  40
+B2MODC*          DSE6SB    PARM           P6211O  80
+B2MODC           DSE6SB    PARM           P6211O  60
+     C*
+B2CHKC                     ADD  110000    DSE6SB
+     C*
+M002AC           YMD8E     SUB  19110000  WSE06E  60       轉成中國年
+|   C                     CALL 'P20'
+M001DC*                    PARM YSE06S    P2001I  80
+M001AC*M002M               PARM YSE06S    P2001I  60
+|   C*M002M               PARM YSE06E    P2002I  60
+M002MC                     PARM WSE06S    P2001I  60
+M002MC                     PARM WSE06E    P2002I  60
+|   C           DAY       PARM           P2011O  90
+     C                     ADD  1         DAY
+     C*
+     C                     EXSR INIL1
+     C                     EXSR INIL2
+     C                     END
+     C*
+     C                     EXSR PROCES
+     CL1 10                EXSR CALL1
+     CL2 10                EXSR CALL2
+     CLR                   EXSR RTNLR
+     CLR                   RETRN
+      *==============================================================*
+      *          PROCES. ..DETAIL PROCESS
+      *==============================================================*
+     C           PROCES    BEGSR
+     C   40N12             WRITEPE1
+     C   40                EXSR RTN900
+     C   40                EXSR CALL0
+     C   40                SETOF                     40
+     C*
+ A   C                     ADD  WF5006    CMBL1
+M002AC           WF5001    SUB  19110000  XF5001  60       轉成中國年
+M002AC           YMD8E     SUB  19110000  WSE06E  60       轉成中國年
+|   C                     CALL 'P20'
+M001DC*                    PARM WF5001    P2001I  80
+M001AC                     PARM XF5001    P2001I  60
+|    C*M002M               PARM YSE06E    P2002I  60
+M002MC                     PARM WSE06E    P2002I  60
+     C           DAYNO     PARM           P2011O  90
+B2TRCC                     Z-ADDWF5001    W5001X
+     C           WF5000    CHAINWF501                55
+     C           WF5004    IFEQ '1'
+     C                     ADD  1         DAYNO
+     C                     END
+     C           DAYNO     MULT WF5006    WAMT01  82H
+     C           WF5012    MULT WAMT01    WAMT01
+     C           WF5004    IFEQ '1'
+     C           WF5007    MULT WF5013    WAMT02  82H
+     C                     ELSE
+     C           WF5007    MULT WF5014    WAMT02  82H
+     C                     END
+     C           WF5008    MULT WF5015    WAMT03  82H
+     C           WF5009    MULT WF5016    WAMT04  82H
+     C                     ADD  WF5007    CMBL2
+     C                     ADD  WF5008    CMBL3
+     C                     ADD  WF5009    CMBL4
+     C                     ADD  WAMT01    AMT11
+     C                     ADD  WAMT02    AMT21
+     C                     ADD  WAMT03    AMT31
+     C                     ADD  WAMT04    AMT41
+     C                     Z-ADD0         WAMT01
+     C                     Z-ADD0         WAMT02
+     C                     Z-ADD0         WAMT03
+     C                     Z-ADD0         WAMT04
+     C                     ENDSR
+      *==============================================================*
+      *          CALL0 . ..CAL LAST MONTH CBM & AMOUNT
+      *==============================================================*
+     C           CALL0     BEGSR
+     C           WF5000    SETLLREW502
+     C           WF5000    READEREW502                   46
+     C           *IN46     DOWEQ'0'
+     C                     ADD  WF5024    CMBL1
+     C           WF5000    READEREW502                   46
+     C                     END
+     C           WF5000    CHAINWF501                55
+     C                     Z-ADDWF5012    UNIT1
+     C           WF5012    MULT CMBL1     AMT11
+     C                     MULT DAY       AMT11
+B2TRCC                     Z-ADDDSE6SB    W5001X
+     C                     Z-ADDDAY       DAYNO
+     C   39                WRITEPE1
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     WRITEPD1
+     C                     Z-ADDAMT11     AMT12
+     C                     EXSR INIL1
+     C                     SETOF                     12
+     C                     ENDSR
+      *==============================================================*
+      *          CALL1 . ..CAL DAY CBM & AMOUNT L2
+      *==============================================================*
+     C           CALL1     BEGSR
+     C                     EXSR PROL1
+     C   39                WRITEPE1
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     WRITEPD1
+     C                     EXSR INIL1
+     C                     ENDSR
+      *==============================================================*
+      *          PROL1 . ..INITIAL FIELD IN PD1
+      *==============================================================*
+     C           PROL1     BEGSR
+M002AC           WF5001    SUB  19110000  XF5001  60       轉成中國年
+M002AC           YMD8E     SUB  19110000  WSE06E  60       轉成中國年
+|   C                     CALL 'P20'
+M001DC*                    PARM WF5001    P2001I  80
+M002MC                     PARM XF5001    P2001I  60
+|    C*M002M               PARM YSE06E    P2002I  60
+M002MC                     PARM WSE06E    P2002I  60
+     C           DAYNO     PARM           P2011O  90
+B2TRCC                     Z-ADDWF5001    W5001X
+     C           WF5000    CHAINWF501                55
+     C           WF5004    IFEQ '1'
+     C                     ADD  1         DAYNO
+     C*          WF5013    MULT CMBL2     AMT21
+     C                     ELSE
+     C*          WF5014    MULT CMBL2     AMT21
+     C                     END
+     C*          DAYNO     MULT CMBL1     AMT11
+     C*          WF5012    MULT AMT11     AMT11
+     C*          WF5015    MULT CMBL3     AMT31
+     C*          WF5016    MULT CMBL4     AMT41
+     C           WF5004    IFEQ '2'
+     C                     MULT -1        AMT11
+     C                     END
+     C           CMBL1     IFNE 0
+     C                     Z-ADDWF5012    UNIT1
+     C                     END
+     C           CMBL2     IFNE 0
+     C           WF5004    IFEQ '1'
+     C                     Z-ADDWF5013    UNIT2
+     C                     END
+     C                     END
+     C           CMBL2     IFNE 0
+     C           WF5004    IFEQ '2'
+     C                     Z-ADDWF5014    UNIT2
+     C                     END
+     C                     END
+     C           CMBL3     IFNE 0
+     C                     Z-ADDWF5015    UNIT3
+     C                     END
+     C           CMBL4     IFNE 0
+     C                     Z-ADDWF5016    UNIT4
+     C                     END
+     C                     ADD  AMT11     AMT12   82
+     C                     ADD  AMT21     AMT22   82
+     C                     ADD  AMT31     AMT32   82
+     C                     ADD  AMT41     AMT42   82
+     C                     ENDSR
+      *==============================================================*
+      *          INIL1 . ..INITIAL FIELD IN PD1
+      *==============================================================*
+     C           INIL1     BEGSR
+     C*                    SETOF                     30
+     C                     Z-ADD*ZEROS    CMBL1
+     C                     Z-ADD*ZEROS    CMBL2
+     C                     Z-ADD*ZEROS    CMBL3
+     C                     Z-ADD*ZEROS    CMBL4
+     C                     Z-ADD*ZEROS    AMT11
+     C                     Z-ADD*ZEROS    AMT21
+     C                     Z-ADD*ZEROS    AMT31
+     C                     Z-ADD*ZEROS    AMT41
+     C                     Z-ADD*ZEROS    UNIT1
+     C                     Z-ADD*ZEROS    UNIT2
+     C                     Z-ADD*ZEROS    UNIT3
+     C                     Z-ADD*ZEROS    UNIT4
+     C                     Z-ADD*ZEROS    DAYNO
+     C                     ENDSR
+     C*
+      *==============================================================*
+      *          INIL2 . ..INITIAL FIELD IN PD1
+      *==============================================================*
+     C           INIL2     BEGSR
+     C                     Z-ADD*ZEROS    AMT12
+     C                     Z-ADD*ZEROS    AMT22
+     C                     Z-ADD*ZEROS    AMT32
+     C                     Z-ADD*ZEROS    AMT42
+     C                     Z-ADD*ZEROS    AMT52
+     C                     ENDSR
+     C*
+      *==============================================================*
+      *          CALL2 . ..CAL LAST MONTH CBM & AMOUNT
+      *==============================================================*
+     C           CALL2     BEGSR
+     C*          'L3'      DSPLY
+     C*                    DSPLY          WF5003
+     C   39                WRITEPE1
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     ADD  AMT12     AMT52   82
+     C                     ADD  AMT22     AMT52
+     C                     ADD  AMT32     AMT52
+     C                     ADD  AMT42     AMT52
+     C                     WRITEPT1
+     C                     Z-ADD*ZERO     AMT12
+     C                     Z-ADD*ZERO     AMT22
+     C                     Z-ADD*ZERO     AMT32
+     C                     Z-ADD*ZERO     AMT42
+     C                     Z-ADD*ZERO     AMT52
+     C                     SETON                     40
+     C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+07===C           RTN900    BEGSR
+|    C*
+|    C*                    WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+08===C           RTNLR     BEGSR
+| 01-C           *IN10     IFEQ '0'
+     C                     WRITEPH1
+|    C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+08===C                     ENDSR
+

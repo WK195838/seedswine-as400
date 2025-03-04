@@ -1,0 +1,224 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0421                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/02/25                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :分車準備明細表                               *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.16 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSEPF  IP  E           K        DISK
+     FSOSFPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#DPF  IF  E           K        DISK
+     FPA#EPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FIMR042P O   E             39     PRINTER
+      *業務自送
+     E                    MRK     1   1 10
+     ISE0
+     I                                              SE34  L4
+     I                                              SE35  L3
+     I                                              SE10  L2
+     I                                              SE11  L2
+     I                                              SE02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      603 603 DSEL
+     I                                      609 613 DSE07
+     I*(MM/DD/YY)
+     I                                      621 6260DSE06
+     I*(YY/MM/DD)
+M001MI                                      640 6470YSE06
+     I*
+     I            DS
+     I                                        1  52 SE12
+     I                                        1   2 SE12L
+     I            DS
+     I                                        1  52 SE13
+     I                                        1   2 SE13L
+     I            DS
+     I                                        1  52 SE14
+     I                                        1   2 SE14L
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSE     KLIST
+     C                     KFLD           SE10
+     C                     KFLD           SE11
+     C*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C*
+     C           KEY#E     KLIST
+     C                     KFLD           #E01
+     C                     KFLD           #E02
+     C           KEYME     KLIST
+     C                     KFLD           SE10
+     C                     KFLD           SE11
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *HEADING
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     CL1 10                SETON                     30
+     CL2 10                SETON                     3031
+     CL3 10                SETON                     303132
+     CL4 10                EXSR RTN888
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*物流點
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELDSE07     #A02
+|    C           KEY#A     CHAIN#A0                  41
+| 02-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    #A03
+| 02-C                     END
+|    C*
+| 02-C           DSEL      IFEQ '1'
+|   C                     SETON                     21
+| 02*C                     ELSE
+|   C           DSEL      IFEQ '2'
+     C                     SETON                     22
+| 02*C                     ELSE
+     C                     SETON                     23
+| 02-C                     END
+| 02-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETON                       3310
+|    C                     SETON                     303132
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+     C           SE12L     IFEQ '**'
+     C           SE13L     OREQ '**'
+     C           SE14L     OREQ '**'
+     C                     MOVELMRK,1     MARK
+     C                     ELSE
+     C                     MOVEL*BLANKS   MARK
+     C                     END
+|    C*
+     C                     ADD  1         CSE02
+|    C           SE02      SETLLSF0
+|    C           SE02      READESF0                      42
+| 01-C           *IN42     DOWEQ'0'
+|   C                     EXSR RTN300                     *CHAIN DATA
+|   C                     EXSR RTN400                     *WRITE DETAIL
+|   C           SE02      READESF0                      42
+| 01-C                     END
+|    C*
+|    C                     SETOF                         42
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+|    C*地區
+|    C           SE34      CHAIN#D0                  43
+| 01-C           *IN43     IFEQ '1'
+|   C                     MOVE *BLANK    #D02
+| 01-C                     END
+|    C*區域
+|    C                     MOVELSE34      #E01
+|    C                     MOVELSE35      #E02
+|    C           KEY#E     CHAIN#E0                  44
+| 02-C           *IN44     IFEQ '1'
+|   C                     MOVE *BLANK    #E03
+| 02-C                     END
+|    C*客戶簡稱
+|    C           KEYSE     CHAINME0                  45
+| 03-C           *IN45     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 03-C                     END
+|    C*送貨地址
+|    C           KEYME     CHAINME0                  45
+| 03-C           *IN45     IFEQ '1'
+|   C                     MOVE *BLANK    ME056
+     C                     ELSE
+     C           ME05      IFNE *BLANKS
+     C                     MOVELME05      ME056
+     C                     ELSE
+     C                     MOVELME06      ME056
+     C                     END
+| 03-C                     END
+|    C*產品代號
+|    C*          SE02      CHAINSF0                  46
+| 04-C*          *IN46     IFEQ '1'
+|   C*                    MOVE *BLANK    SF03
+| 04-C*                    END
+|    C*產品簡稱＆單位
+|    C           SF03      CHAINMA0                  47
+| 05-C           *IN47     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+|   C                     MOVE *BLANK    MA13
+| 05-C                     END
+|    C*數量
+|    C           SF04      ADD  SF05      PTOT
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE DETAIL
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C                     WRITEPD1
+     C                     ADD  PTOT      PTOT1
+|    C                     SETOF                     303132
+|    C                     SETOF                     33
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     303132
+|    C                     SETON                     33
+|    C                     SETOF                     39
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN888....(L4)
+      *==============================================================*
+06===C           RTN888    BEGSR
+|    C*
+|    C                     SETON                     303132
+|    C                     SETON                     33
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+07===C           RTN999    BEGSR
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+| 01-C                     END
+     C                     WRITEPT1
+|    C                     WRITEPE2
+07===C                     ENDSR
+**
+業務自送
+

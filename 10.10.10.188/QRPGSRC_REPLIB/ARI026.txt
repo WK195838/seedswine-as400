@@ -1,0 +1,497 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARI026                                     *
+     A*    AUTHOR       : A1084  CHARLES                             *
+     A*    DATE WRITTEN : 81/03/23                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收帳款作業                              *
+     A*    REMARK       :收款沖帳查詢                              *
+     A****************************************************************
+     FARACLF03IF  E           K        DISK
+B2CHKFARI026D CF  E                    WORKSTN
+B2INF *CVR3010 sev.30 DISPLAY file ARI026D must be converted, because file
+B2INF *   AC11 (and more) are shared by name with other database fields
+B2INF *   which require to be expanded. Please convert ARI026D, enlarging
+B2INF *   all involved fields prior to compilation, or manually insert in
+B2INF *   this source the proper RENAME and MOVE statements to avoid name
+B2INF *   sharing
+     F                                        RRN   KSFILE SFLSR
+     E*: A/U/D/I AUT
+     E                    WA01        5  1
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+ @   I                                      140 140 $RMK02
+     I            DS
+     I                                        1   1 DOPT1
+     I                                        1   10WNUM
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C                     Z-ADD0         HRRN    40
+     C* FOR F4 PARM
+     C                     MOVE *BLANKS   APPSCR  6
+      *  FOR SUBFILE (SYS+PGM CONTROL)
+     C           *LIKE     DEFN DBGN1     OBGN1            *START KEY1
+     C*          *LIKE     DEFN DBGN2     OBGN2            *START KEY2
+M001AC           *LIKE     DEFN DBGN3     OBGN3            *START KEY
+B2MODC*          *LIKE     DEFN DBGN3     OBGN3 + 2        *START KEY
+     C           *LIKE     DEFN DBGN4     OBGN4            *START KEY1
+     C*
+     C           *LIKE     DEFN DBGN1     BBGN1            *SUBFIL BUTTOM
+     C*          *LIKE     DEFN DBGN2     BBGN2            *SUBFIL BUTTOM
+B2MODC           *LIKE     DEFN DBGN3     BBGN3            *SUBFIL BUTTOM
+     C           *LIKE     DEFN DBGN4     BBGN4            *SUBFIL BUTTOM
+     C           *LIKE     DEFN AC06      BBGN5            *SUBFIL BUTTOM
+     C*
+B2MODC           *LIKE     DEFN AC04      WKAC4 - 2                    OM
+     C           *LIKE     DEFN AC01      HAC01                        OM
+     C           *LIKE     DEFN AC02      HAC02                        OM
+     C           *LIKE     DEFN AC03      HAC03                        OM
+B2MODC           *LIKE     DEFN AC04      HAC04 - 2                    OM
+     C           *LIKE     DEFN AC05      HAC05                        OM
+     C           *LIKE     DEFN AC06      HAC06                        OM
+B2MODC           *LIKE     DEFN AC04      WAC04 - 2                    OM
+     C           *LIKE     DEFN AC08      HAC08                        OM
+     C           *LIKE     DEFN AC10      HAC10                        OM
+     C           *LIKE     DEFN AC10      WAC10                        OM
+     C*
+B2MODC           *LIKE     DEFN AC04      SAC04 - 2                    OM
+B2000C           *LIKE     DEFN AC04      SBGN3                        OM
+B2000C           *LIKE     DEFN AC04      TBGN3                        OM
+     C*
+     C                     MOVE *BLANK    WBOTOM  1
+     C           *LIKE     DEFN RRN       WRRN
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYAC1    KLIST
+     C                     KFLD           DBGN1
+     C*                    KFLD           DBGN2
+     C                     KFLD           SBGN3
+     C                     KFLD           DBGN4
+     C           KEYAC2    KLIST
+     C                     KFLD           BBGN1
+     C*                    KFLD           BBGN2
+     C                     KFLD           TBGN3
+     C                     KFLD           BBGN4
+     C                     KFLD           BBGN5
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+      *
+     C                     MOVE *ALL'0'   *IN,60
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+    C           *IN25     CASEQ'1'       RTN192
+    C                     CAS            RTN170
+  02-C                     END
+    C  N03                EXSR RTN195
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE $ADD      WA01,1
+|    C                     MOVE $UPD      WA01,2
+|    C                     MOVE $DLT      WA01,4
+|    C                     MOVE $INQ      WA01,5
+|    C                     MOVE 'SCR001'  APPSCR
+M001DC*                    Z-ADD123199    DBGN3
+M001AC                     Z-ADD123129    DBGN3
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*                    Z-ADD123199    OBGN3
+M001DC*                    Z-ADD29991231  OBGN3
+M001AC                     Z-ADD123129    OBGN3
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|    C*
+B2MODC*                    Z-ADD0         DATE    80
+M001AC                     Z-ADD0         DATE    60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C*                    PARM $EGMDY    S001I2  80
+M001AC                     PARM $EGMDY    S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC*          DATE      PARM           S001O1  80
+M001AC           DATE      PARM           S001O1  60
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN110....F6(ADD)
+      *==============================================================*
+02===C           RTN110    BEGSR
+|    C*
+|    C                     MOVE '1'       DOPT1
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     9699
+| 01-C                     ELSE
+|    C                     EXSR RTN200
+| 02-C           DRRN      IFGT 0
+|   C           DRRN      SUB  1         HRRN
+| 02-C                     END
+|    C                     EXSR RTN191
+|    C                     EXSR RTN192
+| 01-C                     END
+|    C                     SETOF                     12
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+03===C           RTN170    BEGSR
+|    C*
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          DBGN1     IFNE OBGN1
+B2OLDC*          DBGN2     ORNE OBGN2
+B2OLDC*          DBGN3     ORNE OBGN3
+B2OLDC*          DBGN4     ORNE OBGN4
+B2NEWC*                    MOVE DBGN3     HB2@F6  6
+B2NEWC*                    EXSR HB@68L                     + CENTURY 6->8 LEFT
+B2NEWC*                    MOVE HB2@T8    H@8N01  80
+B2NEWC           DBGN1     IFNE OBGN1
+B2NEWC*          DBGN2     ORNE OBGN2
+M001DC*          H@8N01    ORNE OBGN3
+M001AC           DBGN3     ORNE OBGN3
+B2NEWC           DBGN4     ORNE OBGN4
+B2INF *CVR0001 sev.00 Field DBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field OBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field DBGN4 is not a date or year
+B2INF *CVR0001 sev.00 Field OBGN4 is not a date or year
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+     C*
+B2CHKC           DBGN3     IFEQ 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2CHKC*                    Z-ADD123199    DBGN3
+M001AC                     Z-ADD123129    DBGN3
+     C                     END
+     C*
+|   C                     Z-ADD0         HRRN
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+|   C                     MOVE DBGN1     OBGN1
+|   C*                    MOVE DBGN2     OBGN2
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+M001AC                     Z-ADDDBGN3     OBGN3
+B2NEWC*                    MOVE DBGN3     HB2@F6  6
+B2NEWC*                    EXSR HB@68L                     + CENTURY 6->8 LEFT
+B2NEWC*                    MOVE HB2@T8    OBGN3
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C                     MOVE DBGN4     OBGN4
+| 01*C                     ELSE
+|   C                     EXSR RTN171
+| 02-C           *IN99     IFEQ '0'
+|   C           RRN       SUB  1         HRRN
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 02-C                     END
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN171....READC SFL
+      *==============================================================*
+04===C           RTN171    BEGSR
+|    C*
+|    C                     SETON                     54
+|    C*
+|    C                     READCSFLSR                  5757*NF
+| 01-C           *IN57     DOWEQ'0'                        *57 LOOP
+|   C           *IN03     ANDEQ'0'
+|   C*
+|   C                     SETOF                     60    *DOP *IND
+| 02-C           *IN99     IFEQ '0'
+|   C*
+| 03-C           DOPT1     IFNE *BLANKS
+|   C           *IN12     ANDEQ'0'
+     C                     EXSR RTN180
+|   C*
+| 04-C           *IN99     IFEQ '0'
+|   C                     Z-ADDRRN       DRRN
+|   C                     EXSR RTN200
+| 04-C                     END
+| 03-C                     END
+| 02-C                     END                             *IN99
+|   C*
+|   C  N99                MOVE *BLANKS   DOPT1
+|   C                     UPDATSFLSR
+|   C                     READCSFLSR                    57*NF
+|   C*
+| 01-C                     END                             *57 END
+| 05-C           *IN99     IFEQ '0'
+|   C                     SETOF                     5412
+|   C                     SETON                     97
+| 05-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN180....CHECK 'SC01' SCREEN
+      *==============================================================*
+05===CSR         RTN180    BEGSR
+|    C*
+|    C* CHK AUT *
+| 01-C           WA01,WNUM IFNE 'Y'                         WNUM = DOPT
+|   C                     SETON                     609699
+|   C                     Z-ADDRRN       DRRN
+| 01-C                     END
+|    C   99                GOTO END180
+|    C*
+|    C           END180    TAG
+|    C   99                Z-ADDRRN       DRRN
+|    C*
+05===C                     ENDSR
+      *=========================================================*
+      *          RTN191....INITIAL                              *
+      *=========================================================*
+06===C           RTN191    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DOPT1
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         WRRN
+|    C                     Z-ADD10        WPRCD
+|    C*                    Z-ADD0         DSPRCD
+|    C           HRRN      DIV  WPRCD     DSPRCD
+|    C                     MULT WPRCD     DSPRCD
+|    C                     MOVE 'N'       WBOTOM
+|    C                     SETON                     52
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C***  日期轉換
+M001AC                     MOVE 0         WBGN3   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C*                    PARM DBGN3     S001I2  80
+M001AC                     PARM DBGN3     S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+B2MODC*          SBGN3     PARM           S001O1  80
+M001AC           WBGN3     PARM           S001O1  60
+M001AC                     MOVE WBGN3     HB2@F6  6
+M001AC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+M001AC                     MOVE HB2@T8    SBGN3
+|    C*
+B2000C           KEYAC1    SETLLAC0
+|    C                     MOVE DBGN1     BBGN1
+|    C*                    MOVE DBGN2     BBGN2
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC                     Z-ADDDBGN3     BBGN3
+B2NEWC*                    MOVE DBGN3     HB2@F6  6
+B2NEWC*                    EXSR HB@68L                     + CENTURY 6->8 LEFT
+B2NEWC*                    MOVE HB2@T8    BBGN3
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|    C                     MOVE DBGN4     BBGN4
+|    C                     MOVE *BLANKS   BBGN5
+|    C*
+06===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+07===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          BBGN1     IFNE DBGN1
+B2OLDC*          BBGN2     ORNE DBGN2
+B2OLDC*          BBGN4     ORNE DBGN4
+B2NEWC*                    MOVE DBGN3     HB2@F6  6
+B2NEWC*                    EXSR HB@68L                     + CENTURY 6->8 LEFT
+B2NEWC*                    MOVE HB2@T8    H@8N01  80
+B2NEWC           BBGN1     IFNE DBGN1
+B2NEWC*          BBGN2     ORNE DBGN2
+B2OLDC           BBGN3     ORNE DBGN3
+B2NEWC*          BBGN3     ORNE H@8N01
+B2NEWC           BBGN4     ORNE DBGN4
+B2INF *CVR0001 sev.00 Field BBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field DBGN1 is not a date or year
+B2INF *CVR0001 sev.00 Field BBGN4 is not a date or year
+B2INF *CVR0001 sev.00 Field DBGN4 is not a date or year
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C***  日期轉換
+M001AC                     Z-ADD0         XBGN3   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'MDY'     S001I1  3
+B2MODC*                    PARM BBGN3     S001I2  80
+M001AC                     PARM BBGN3     S001I2  60
+M001DC*          TBGN3     PARM           S001O1  80
+M001AC           XBGN3     PARM           S001O1  60
+B2NEWC                     MOVE XBGN3     HB2@F6  6
+B2NEWC                     EXSR HB@68L                     + CENTURY 6->8 LEFT
+B2NEWC                     MOVE HB2@T8    TBGN3
+B2000C           KEYAC2    SETGTAC0
+| 02-C                     END
+|   C                     EXSR RTN193
+|   C                     MOVE AC02      BBGN1
+|   C*                    MOVE AC03      BBGN2
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC                     Z-ADDDAC04     BBGN3
+B2NEWC*                    MOVE DAC04     HB2@F6  6
+B2NEWC*                    EXSR HB@68L                     + CENTURY 6->8 LEFT
+B2NEWC*                    MOVE HB2@T8    BBGN3
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+|   C                     MOVE AC05      BBGN4
+|   C                     MOVE AC06      BBGN5
+|   C           *LOVAL    SETLLAC0
+| 01-C                     END
+|    C*
+07===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+08===C           RTN193    BEGSR
+|    C*
+|    C                     SETOF                     54
+|    C                     MOVE *BLANK    DOPT1
+|    C                     Z-ADDWRRN      RRN
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C                     READ AC0                      46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C                     ADD  1         RRN
+|   C***  日期轉換
+M001AC                     MOVE AC04      XAC04   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM AC04      S001I2  80
+M001AC                     PARM XAC04     S001I2  60
+M001DC*          DAC04     PARM           S001O1  80
+M001AC           DAC04     PARM           S001O1  60
+B2MODC                     MOVE AC07      WAC07   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM AC07      S001I2  80
+M001AC                     PARM WAC07     S001I2  60
+M001DC*          DAC07     PARM           S001O1  80
+M001AC           DAC07     PARM           S001O1  60
+|   C*
+|   C                     WRITESFLSR
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+|   C                     MOVE 'Y'       WBOTOM
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN       DRRN
+|    C                     Z-ADDRRN       WRRN
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+09===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN       IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     94    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN200....'SC02' SCREEN MAIN ROUTINE
+      *==============================================================*
+10===C           RTN200    BEGSR
+|    C*
+|    C                     MOVE 'SCR002'  APPSCR
+|   C           DOPT1     CASEQ'5'       RTN250           *SUBPGM1
+| 01-C                     END
+|    C           *LOVAL    SETLLAC0
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN250....CALL ARI0261
+      *==============================================================*
+15===C           RTN250    BEGSR
+|    C*
+|    C                     CALL 'ARI0261'
+|    C                     PARM AC01      A005I1  2
+|    C                     PARM AC02      A005I2  5
+|    C                     PARM AC03      A005I3  4
+B2MODC                     PARM AC04      A005I4  80
+|    C                     PARM AC05      A005I5  2
+|    C                     PARM AC06      A005I6 14
+|    C           *IN03     PARM           IN03    1
+|    C  N03                SETON                     12
+|    C*
+15===C                     ENDSR
+     C*==============================================================*
+     C*          RTN990....AUT CHK (CALL SUBPGM)
+     C*==============================================================*
+23===C           RTN990    BEGSR
+|    C*
+|    C                     CALL 'S#S01'
+|    C                     PARM $USER     S0101I 10
+|    C                     PARM           S0102I 10
+|    C                     PARM           S0101O  1
+| 01-C           S0101O    IFEQ 'N'
+|   C                     SETON                     8999
+| 01-C                     END
+|    C*
+23===C                     ENDSR
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2NEWC/COPY HBP2CVTR
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+

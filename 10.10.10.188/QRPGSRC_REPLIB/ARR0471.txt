@@ -1,0 +1,199 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0471                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/04/02                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款作業                                 *
+      * REMARK       :銷退折讓明細表                               *
+     A*===============================================================
+     A* CODE |  AUTHOR  |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M004 | MICHELLE | 00.06.08 |新增稅額欄
+     A*================================================================
+      ****************************************************************
+     FSOSGPF  IP  E           K        DISK
+     FARAGPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+B2CHKFARR047APO   E             39     PRINTER
+     ISG0
+     I                                              SG01  L3
+     I                                              SG26  L2
+     I                                              SG09  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 602 DSG01S
+     I                                      603 604 DSG01E
+     I                                      605 6100DSG26S
+     I                                      611 6160DSG26E
+     I                                      620 620 DMD07S
+     I                                      621 621 DMD07E
+     I                                      622 630 DSG04S
+     I                                      631 639 DSG04E
+     I                                      617 617 DATA
+     I            DS
+     I                                        1   5 SG04
+     I                                        1   1 SG04A
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#B     KLIST
+     C                     KFLD           SG01
+     C           KEYME     KLIST
+     C                     KFLD           SG04
+     C                     KFLD           SG05
+     C           KEYAG     KLIST
+     C                     KFLD           SG09
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN AG04      OAG04                        OM
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *INIT ENVIRM
+     C  N10                EXSR RTN100
+     C*
+     C   39N38             EXSR RTN900
+     C   39 38             EXSR RTN910                     *換下頁
+     C                     EXSR RTN200                     *FILE TO SCR
+     C*
+     CL1 10N38             SETON                     3132
+     CL2 10N38             SETON                     303132
+     CL3 10                SETON                     3938
+     CLR                   EXSR RTN999
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C* 折讓單小計
+|    C                     Z-ADD0         STAG07
+M004AC                     Z-ADD0         STAG21
+M004AC                     Z-ADD0         ST0721
+|    C* 合計
+|    C                     Z-ADD0         TOTAL
+M004AC                     Z-ADD0         TAG21
+M004AC                     Z-ADD0         T0721
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C* GET公司別
+|    C           KEY#B     CHAIN#B0                  40
+|    C   40                MOVE *BLANK    #B03
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C                     SETON                     303132
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....MOVE DATA TO SCREEN
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C                     SETOF                     70
+| 01-C           SG04A     IFGE DMD07S
+|   C           SG04A     ANDLEDMD07E
+|   C* GET轉換日期
+M001AC                     Z-ADDSG26      XSG26   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SG26      S001I2  80
+M001AC                     PARM XSG26     S001I2  60
+M001DC*          SG26      PARM           S001O1  80
+M001AC           DSG26     PARM           S001O1  60
+M001AC                     Z-ADDSG06      XSG06   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SG06      S001I2  80
+M001AC                     PARM XSG06     S001I2  60
+M001DC*          SG06      PARM           S001O1  80
+M001AC           DSG06     PARM           S001O1  60
+|   C* GET 客戶名稱
+|   C           KEYME     CHAINME0                  40
+|   C   40                MOVE *BLANK    ME04
+|   C***
+|   C           KEYAG     SETLLAG0
+|   C           KEYAG     READEAG0                      44
+|   C                     MOVE AG04      OAG04
+| 02-C           *IN44     DOWEQ'0'
+|   C*
+M004AC           AG07      ADD  AG21      W0721
+|   C* 折讓單小計
+|   C                     ADD  AG07      STAG07
+M004AC                     ADD  AG21      STAG21
+M004AC                     ADD  W0721     ST0721
+|   C* 合計
+|   C                     ADD  AG07      TOTAL
+M004AC                     ADD  AG21      TAG21
+M004AC                     ADD  W0721     T0721
+|   C*
+|   C   39                EXSR RTN900
+|   C                     WRITEPD1
+|   C                     SETOF                     303132
+|   C                     SETON                     70
+|   C           KEYAG     READEAG0                      44
+| 03-C           AG04      IFNE OAG04
+|   C                     MOVE AG04      OAG04
+|   C                     SETON                     32
+| 03-C                     END
+| 02-C                     END
+|   C   39 70             EXSR RTN900
+|   C   70                WRITEPD2
+|   C                     Z-ADD0         STAG07
+M004AC                     Z-ADD0         STAG21
+M004AC                     Z-ADD0         ST0721
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     303132
+|    C                     SETOF                     39
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN910....換下頁
+      *==============================================================*
+05===C           RTN910    BEGSR
+|    C*
+|    C                     WRITEPD3
+|    C                     WRITEPE3
+|    C                     EXSR RTN010
+|    C                     EXSR RTN100
+|    C*
+|    C                     SETON                     303132
+|    C                     SETOF                     3938
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+06===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN100
+     C                     WRITEPE4
+| 01*C                     ELSE
+|   C                     WRITEPD3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+06===C                     ENDSR
+

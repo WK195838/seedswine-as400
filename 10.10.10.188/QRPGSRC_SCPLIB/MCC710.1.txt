@@ -1,0 +1,188 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H* PROGRAM NAME : MCC710                                        *
+     H* AUTHER       : DEREK                                         *
+     H* CREATE DATE  : 2016/01/29                                    *
+     H* UPDATE DATE  :                                               *
+     H* SYSTEM       :西祺進銷存                                   *
+     H* SUBSYSTEM    :庫存管理系統                                 *
+     H* REMARK       :庫存數量重算                                 *
+     H****************************************************************
+     FINTBPF  IF  E           K        DISK
+     FINTXLF06IF  E           K        DISK
+     I            DS
+     I                                        1   80DDATE
+     I                                        1   40DYY
+     I                                        5   60DMM
+     I                                        7   80DDD
+     I*
+     I            DS
+     I                                        1   60LYYMM
+     I                                        1   40LYY
+     I                                        5   60LMM
+     I*
+     I            DS
+     I                                        1   80SDATE
+     I                                        1   40SYY
+     I                                        5   60SMM
+     I                                        7   80SDD
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           XTB01   2        公司別
+     C                     PARM           XTB03   2        通路代號
+     C                     PARM           XTB04   5        分店代號
+     C                     PARM           XTB05   9        產品代號
+     C                     PARM           XTX06   80       日期
+     C                     PARM           XTB07   90       庫存數量
+     C                     PARM           XTB17   90       陳列數量
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYTB     KLIST
+     C                     KFLD           XTB01   2        公司別
+     C                     KFLD           XTB02X  60       年月
+     C                     KFLD           XTB03   2        通路代號
+     C                     KFLD           XTB04   5        分店代號
+     C                     KFLD           XTB05   9        產品代號
+     C           KEYTX     KLIST
+     C                     KFLD           XTB01   2        公司別
+     C                     KFLD           XTB03   2        通路代號
+     C                     KFLD           XTB04   5        分店代號
+     C                     KFLD           XTB05   9        產品代號
+     C                     KFLD           STX06   80       日期
+     C           KEYTX1    KLIST
+     C                     KFLD           XTB01   2        公司別
+     C                     KFLD           XTB03   2        通路代號
+     C                     KFLD           XTB04   5        分店代號
+     C                     KFLD           XTB05   9        產品代號
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN000                     GET YYMM
+     C                     EXSR RTN100                     CALCULATE QTY
+     C*
+     C                     SETON                     LR
+     C*===============================================================*
+     C*          RTN000....GET DATE FROM C#EHPF
+     C*===============================================================*
+01===C           RTN000    BEGSR
+|    C*
+|    C                     Z-ADDXTX06     DDATE
+|    C                     Z-ADDDYY       LYY
+|    C                     Z-ADDDMM       LMM
+|    C*
+| 01-C           DDD       IFGT 25
+|   C                     ADD  1         LMM
+| 01-C                     ENDIF
+|    C*
+| 02-C           LMM       IFGT 12
+|   C                     Z-ADD1         LMM
+|   C                     ADD  1         LYY
+| 02-C                     ENDIF
+|    C*
+|    C                     Z-ADDLYYMM     XTB02X
+|    C*
+|    C                     Z-ADDLYY       SYY
+|    C                     Z-ADDLMM       SMM
+|    C                     Z-ADD26        SDD
+|    C                     SUB  1         SMM
+| 03-C           SMM       IFEQ 0
+|   C                     Z-ADD12        SMM
+|   C                     SUB  1         SYY
+| 03-C                     ENDIF
+|    C                     Z-ADDSDATE     STX06
+|    C*
+01===C                     ENDSR
+     C*===============================================================*
+     C*          RTN100 ...計算數量
+     C*===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           KEYTB     CHAINTB0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     Z-ADDTB06      XTB07   90       庫存數量
+|   C                     Z-ADDTB17      XTB17   90       陳列數量
+| 01*C                     ELSE
+|   C                     Z-ADD0         XTB07            庫存數量
+|   C                     Z-ADD0         XTB17            陳列數量
+| 01-C                     ENDIF
+|    C*
+|    C           KEYTX     SETLLTX0
+|    C           KEYTX1    READETX0                      41
+| 02-C           *IN41     DOWEQ'0'
+|   C           TX06      ANDLEXTX06
+|   C                     EXSR RTN200                     計算異動數量
+|   C           KEYTX1    READETX0                      41
+| 02-C                     ENDDO
+|    C*
+02===C                     ENDSR
+     C*===============================================================*
+     C*          RTN200....GET INTXPF
+     C*===============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C* A1 A2  存貨調整
+| 01-C           TX03      IFEQ 'A1'
+|   C           TX03      OREQ 'A2'
+|   C           TX03      OREQ 'A6'
+|   C                     ADD  TX15      XTB07            調整入出庫
+| 01-C                     ENDIF
+|    C* A6 存貨調整
+| 02-C           TX03      IFEQ 'A6'
+|   C                     ADD  TX16      XTB17            調整入出庫
+| 02-C                     ENDIF
+|    C* A4  陳列調整
+| 03-C           TX03      IFEQ 'A4'
+|   C                     ADD  TX15      XTB17            陳列異動
+| 03-C                     ENDIF
+|    C* B1 進貨退出
+| 04-C           TX03      IFEQ 'B1'
+|   C                     SUB  TX15      XTB07            進貨退出
+| 04-C                     ENDIF
+|    C* B2 陳列退出
+| 05-C           TX03      IFEQ 'B2'
+|   C                     SUB  TX15      XTB17            陳列異動
+| 05-C                     ENDIF
+|    C* C1 C2 進貨驗收
+| 06-C           TX03      IFEQ 'C1'
+|   C           TX03      OREQ 'C2'
+|00A+C           TX06A     IFLE XTX06
+|   C                     ADD  TX15      XTB07            進貨
+|00A+C                     ENDIF
+| 06-C                     ENDIF
+|    C* C3    陳列驗收
+| 07-C           TX03      IFEQ 'C3'
+|00A+C           TX06A     IFLE XTX06
+|   C                     ADD  TX15      XTB17            陳列異動
+|00A+C                     ENDIF
+| 07-C                     ENDIF
+|    C*
+|    C* E1    陳列轉進貨
+| 08-C           TX03      IFEQ 'E1'
+|   C                     ADD  TX15      XTB07            進貨
+|   C                     SUB  TX15      XTB17            進貨
+| 08-C                     ENDIF
+|    C*
+|    C* M1    調撥
+| 09-C           TX03      IFEQ 'M1'
+| 10-C           TX04      IFEQ 1                          調入
+|   C                     ADD  TX15      XTB07            調整入庫
+|   C                     ADD  TX16      XTB17            調整入庫
+| 10*C                     ELSE                            調出
+|   C                     SUB  TX15      XTB07            調整出庫
+|   C                     SUB  TX16      XTB17            調整出庫
+| 10-C                     ENDIF
+| 09-C                     ENDIF
+|    C* S1 銷售
+| 11-C           TX03      IFEQ 'S1'
+|   C                     SUB  TX15      XTB07            銷售/退回
+|   C                     SUB  TX16      XTB07            銷售/退回
+|   C                     SUB  TX17      XTB07            銷售/退回
+| 11-C                     ENDIF
+|    C*
+03===C                     ENDSR
+     C*===============================================================*
+

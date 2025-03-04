@@ -1,0 +1,304 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : BCM001                                     *
+     A*    AUTHOR       : A1546                                      *
+     A*    DATE WRITTEN : 98/09/01                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :                                          *
+     A*    SUBSYSTEM    :共用資料維護子系統                        *
+     A*    PROCEDURE    :檢核訂貨單預計到分店日                    *
+     A****************************************************************
+     FUTL4PF  IF  E           K        DISK
+     FC#EHPF  IF  E           K        DISK
+     F*
+     E                    @L4        31  1
+     I*
+     I            DS
+     I                                        1   80DATE1
+     I                                        1   60D1YM
+     I                                        7   80D1DAY
+     I            DS
+     I                                        1   80DATE2
+     I                                        1   60D2YM
+     I                                        7   80D2DAY
+     I            DS
+     I                                        1   80DATE3
+     I                                        1   60D3YM
+     I                                        7   80D3DAY
+     I            DS
+     I                                        1   80TDATE
+     I                                        1   60TDYM
+     I                                        7   80TDDAY
+     I            DS
+     I                                        1   80W1DATE
+     I                                        1   60W1YM
+     I                                        7   80W1DD
+     I           UDS
+     I                                      201 2080$EG8
+     C*==============================================================*
+     C*                    DEFN
+     C*==============================================================*
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C* T004I0='1'前台單,'2'後台單,'3'後台補增驗收單
+     C*        '4'後台客訂直送單
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           T004I0  1        需求來源
+     C           DATE1     PARM           T004I1  80       到分店日
+     C                     PARM           T004I2  2        公司代碼
+     C                     PARM           T004I3  2        通路代碼
+     C                     PARM           T004I4  5        分店代碼
+     C           DATE2     PARM           T004O1  80       到運貨日
+     C           DATE3     PARM           T004O2  80       訂貨單日
+     C                     PARM           T004O3  1        訊息代碼
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C                     MOVEL'Y'       T004O3
+     C*
+     C* 客訂直送單檢核'4'
+  01-C           T004I0    IFEQ '4'
+    C                     EXSR RTN040
+    C                     GOTO ENDMAN                     程式結束
+  01-C                     ENDIF
+     C*
+     C*到分店日期檢核
+     C                     CALL 'P30'
+     C                     PARM DATE1     P3001I  80
+     C                     PARM '2'       P3002I  1
+     C                     PARM '1'       P3003I  1
+     C                     PARM           P3011O  1
+  02-C           P3011O    IFEQ 'N'
+    C                     MOVEL'3'       T004O3
+    C                     GOTO ENDMAN
+  02-C                     ENDIF
+     C*   檢核休假日檔
+     C                     Z-ADDD1YM      WYM     60
+     C                     EXSR RTN010
+     C   99                GOTO ENDMAN
+      *
+  03-C           @L4,D1DAY IFNE ' '
+    C           @L4,D1DAY ANDNE'A'
+    C           @L4,D1DAY ANDNE'B'
+    C                     MOVEL'1'       T004O3
+    C                     GOTO ENDMAN
+  03-C                     ENDIF
+      *
+      *計算及檢查到貨運日
+     C                     Z-ADD0         TDATE   80       倒推用
+     C                     Z-ADD-1        I       20
+     C                     Z-ADD1         J       10
+     C                     Z-ADD1         K       10
+     C                     Z-ADDDATE1     SDATE   80       到分店日
+     C*
+     C* 西祺S1家樂福C1台東店C054到分店日多加1日
+     C*  99/04/28變更貨運公司改成花蓮店多加1日
+     C           T004I2    IFEQ 'S1'
+     C           T004I3    ANDEQ'C1'
+     C           T004I4    ANDEQ'C054'
+     C*          T004I2    OREQ 'S1'
+     C*          T004I3    ANDEQ'C1'
+     C*          T004I4    ANDEQ'C022'
+    C                     Z-ADD2         K
+  04-C                     ENDIF
+     C*
+  05-C           J         DOWLEK
+    C                     EXSR RTN020
+    C   99                GOTO ENDMAN
+  05-C                     ENDDO
+      *
+      *計算及檢查訂貨單日
+     C                     Z-ADDTDATE     T004O1           正確到貨運日
+     C                     Z-ADDTDATE     DATE2
+     C                     Z-ADD0         TDATE   80
+     C                     Z-ADD-1        I       20
+     C                     Z-ADD1         J       10
+     C                     Z-ADDDATE2     SDATE
+      *
+  06-C           J         DOWLE2
+    C                     EXSR RTN030
+    C   99                GOTO ENDMAN
+  06-C                     ENDDO
+      *
+     C                     Z-ADDTDATE     T004O2
+     C                     Z-ADDTDATE     DATE3
+     C*
+  07-C                     SELEC
+    C           T004I0    WHEQ '1'
+    C           T004I0    OREQ '2'
+  08-C           DATE3     IFLT $EG8
+    C                     MOVEL'2'       T004O3
+    C                     GOTO ENDMAN
+  08-C                     ENDIF
+  09-C           T004I0    IFEQ '1'
+    C           DATE3     ANDEQ$EG8
+    C                     TIME           WTIME   60
+  10-C           WTIME     IFGE 120000                     前台單過中午
+    C                     MOVEL'4'       T004O3
+    C                     GOTO ENDMAN
+  10-C                     ENDIF
+  09-C                     ENDIF
+    C           T004I0    WHEQ '3'                        補增驗收單
+    C**                   Z-ADDTDATE     W1DATE
+    C                     Z-ADDDATE2     W1DATE
+    C           T004I2    CHAINEH0                  42
+  11-C           *IN42     IFEQ '1'
+    C           W1DATE    ORLT EH07
+    C                     MOVEL'2'       T004O3
+    C                     Z-ADD0         T004O1
+    C                     Z-ADD0         T004O2
+    C                     GOTO ENDMAN
+  11-C                     ENDIF
+  07-C                     ENDSL
+      *
+     C           ENDMAN    TAG
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010    CHECK休假日檔
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           WYM       CHAINL40                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEAL402      @L4
+| 01*C                     ELSE
+|   C                     SETON                     99
+|   C                     MOVEL'3'       T004O3
+| 01-C                     ENDIF
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN020    CHECK 到貨運日
+     C*==============================================================*
+02===C           RTN020    BEGSR
+|    C*
+|    C                     CALL 'P37'
+|    C                     PARM SDATE     P3701I  80       到分店日
+|    C                     PARM '2'       P3702I  1
+|    C                     PARM '1'       P3703I  1
+|    C                     PARM I         P3704I  40       倒推天數
+|    C           TDATE     PARM           P3711O  80       到貨運日
+|    C*
+|    C* CHECK月份變更
+| 01-C           D1YM      IFNE TDYM
+|   C                     Z-ADDTDYM      WYM
+|   C                     EXSR RTN010                     CHK休假檔
+|   C   99                GOTO END020
+| 01-C                     ENDIF
+|     *
+|    C                     SUB  1         I                加推１天
+|    C           K         SUB  J         L       10
+|     *
+| 02-C           J         IFEQ K
+|    * 到貨運日當天條件
+| 03-C           @L4,TDDAY IFEQ ' '                        有效日
+|   C           @L4,TDDAY OREQ 'B'
+|   C                     ADD  1         J                迴圈數
+| 03-C                     ENDIF
+| 02*C                     ELSE
+|    * 到貨運日的倒推算過程中日期視為到分店日
+| 04-C           @L4,TDDAY IFEQ ' '                        有效日
+|   C           @L4,TDDAY OREQ 'A'
+|   C           @L4,TDDAY OREQ 'B'
+|   C                     ADD  1         J                迴圈數
+| 04-C                     ENDIF
+| 02-C                     ENDIF
+|     *
+02===C           END020    ENDSR
+     C*==============================================================*
+     C*          RTN030    CHECK 訂貨單日
+     C*==============================================================*
+03===C           RTN030    BEGSR
+|    C*
+|    C                     CALL 'P37'
+|    C                     PARM SDATE     P3701I  80       到貨運日
+|    C                     PARM '2'       P3702I  1
+|    C                     PARM '1'       P3703I  1
+|    C                     PARM I         P3704I  40       倒推天數
+|    C           TDATE     PARM           P3711O  80       訂貨單日
+|     *
+|    C* CHECK月份變更
+| 01-C           D2YM      IFNE TDYM
+|   C                     Z-ADDTDYM      WYM
+|   C                     EXSR RTN010                     CHK休假檔
+|   C   99                GOTO END030
+| 01-C                     ENDIF
+|     *
+|    C                     SUB  1         I
+|     *
+| 02-C                     SELEC
+|   C           J         WHEQ 1
+| 03-C           @L4,TDDAY IFEQ ' '                        有效日
+|   C*          @L4,TDDAY OREQ 'A'
+|   C           @L4,TDDAY OREQ 'B'
+|   C                     ADD  1         J                迴圈數
+| 03-C                     ENDIF
+|   C*訂貨日須為上班日
+|   C           J         WHEQ 2
+| 04-C           @L4,TDDAY IFEQ ' '                        有效日
+|   C*          @L4,TDDAY OREQ 'A'
+|   C           @L4,TDDAY OREQ 'B'
+|   C                     ADD  1         J                迴圈數
+| 04-C                     ENDIF
+| 02-C                     ENDSL
+|     *
+03===C           END030    ENDSR
+     C*==============================================================*
+     C*          RTN040    CHECK 客訂直送單的訂貨單日
+     C*==============================================================*
+04===C           RTN040    BEGSR
+|    C*
+|    C*到訂貨日期檢核
+|    C                     CALL 'P30'
+|    C                     PARM DATE3     P3001I  80
+|    C                     PARM '2'       P3002I  1
+|    C                     PARM '1'       P3003I  1
+|    C                     PARM           P3011O  1
+| 01-C           P3011O    IFEQ 'N'
+|   C                     MOVEL'1'       T004O3
+|   C                     GOTO END040
+| 01-C                     ENDIF
+|    C*
+|    C*到分店日期檢核
+|    C                     CALL 'P30'
+|    C                     PARM DATE1     P3001I  80
+|    C                     PARM '2'       P3002I  1
+|    C                     PARM '1'       P3003I  1
+|    C                     PARM           P3011O  1
+| 02-C           P3011O    IFEQ 'N'
+|   C                     MOVEL'2'       T004O3
+|   C                     GOTO END040
+| 02-C                     ENDIF
+|    C*
+|    C* 檢核休假日檔(訂貨日期)
+|    C                     Z-ADDD3YM      WYM
+|    C                     EXSR RTN010
+|    C   99                GOTO END040
+|    C*
+| 03-C           @L4,D3DAY IFNE ' '
+|   C                     MOVEL'4'       T004O3
+|   C                     GOTO ENDMAN
+| 03-C                     ENDIF
+|    C*
+|    C*到分店日須大於訂貨日
+| 04-C           DATE1     IFLE DATE3
+|   C                     MOVEL'5'       T004O3
+|   C                     GOTO ENDMAN
+| 04-C                     ENDIF
+|    C*
+|    C*訂貨日須>=系統日
+| 05-C           DATE3     IFLT $EG8
+|   C                     MOVEL'6'       T004O3
+|   C                     GOTO ENDMAN
+| 05-C                     ENDIF
+|    C*
+04===C           END040    ENDSR
+

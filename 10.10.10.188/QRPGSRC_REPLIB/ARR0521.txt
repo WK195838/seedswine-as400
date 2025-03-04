@@ -1,0 +1,211 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0521                                       *
+      * AUTHER       : A1118 PHILIP TSAI                             *
+      * CREATE DATE  : 81/04/09                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款子系統                               *
+      * REMARK       :應收帳款管理表                               *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M002      | 99.01.29 | CALL P20之前先把日期轉成中國年
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FSOSILF07IP  E           K        DISK
+     FARADLF01IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FARR052P O   E             39     PRINTER
+     ISI0
+     I                                              SI01  L3
+     I                                              SI29  L2
+     I                                              SI12  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 602 DSI01S
+     I                                      603 604 DSI01E
+     I                                      605 6100DSI29
+M001DI*                                     611 6180WSI29
+M001AI                                      611 6160WSI29
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+     C           KEYSI     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C*
+M001DC*          *LIKE     DEFN AD04      WAD04            上次收款日
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*明細列印
+     C                     EXSR RTN100
+     C*
+     CL1 10                SETON                     31
+     CL2 10                EXSR RTN700
+     CL3 10                EXSR RTN800
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN010....INIT
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C**
+|    C*公司名稱
+|    C           SI01      CHAIN#B0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #B03
+| 01-C                     END
+|    C*表頭列印
+|    C                     EXSR RTN900
+|    C*清除總計及合計欄位
+|    C                     Z-ADD0         SSI30T
+|    C                     Z-ADD0         TSI30T
+|    C*
+|    C                     SETON                     103031
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET DETAIL
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+M001AC                     Z-ADDSI29      XSI29   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM SI29      S001I2  80
+M001AC                     PARM XSI29     S001I2  60
+|    C           PSI29     PARM           S001O1  60
+|    C**
+|    C*客戶名稱
+|    C                     MOVE SI12      ME01
+|    C                     MOVE *BLANK    ME02
+|    C           KEYME     CHAINME0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 01-C                     END
+|    C*計算每日合計
+|    C                     ADD  SI30      SSI30T
+|    C*計算總計
+|    C                     ADD  SI30      TSI30T
+|    C*上次收款日
+|    C                     Z-ADD0         PAD04
+|    C                     Z-ADD0         WAD04   80
+|    C           KEYSI     SETLLAD0
+|    C           KEYSI     READEAD0                      41
+| 02-C           *IN41     DOWEQ'0'
+B2000C           AD04      IFGT WAD04
+B2000C                     Z-ADDAD04      WAD04
+| 03-C                     END
+|   C           KEYSI     READEAD0                      41
+| 02-C                     END
+|    C*
+M001MC                     Z-ADDWAD04     XAD04   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM WAD04     S001I2  80
+M001AC                     PARM XAD04     S001I2  60
+|    C           PAD04     PARM           S001O1  60
+|    C*延遲日數
+|    C                     Z-ADD0         WCDAT   90
+| 04-C           PAD04     IFEQ 0
+M002AC           SI29      SUB  19110000  XSI29   60       轉成中國年
+M002AC           WSI29     SUB  110000    WWSI29  60       轉成中國年
+|   C                     CALL 'P20'
+M001DC*                    PARM WSI29     P201I1  80
+M001DC*                    PARM SI29      P201I2  80
+M002AC                     PARM WWSI29    P201I1  60
+M001AC                     PARM XSI29     P201I2  60
+|   C           WCDAT     PARM           P201O1  90
+| 04*C                     ELSE
+M002AC           SI29      SUB  19110000  XSI29   60       轉成中國年
+M002AC           WAD04     SUB  19110000  XAD04   60       轉成中國年
+|   C                     CALL 'P20'
+M001DC*                    PARM WAD04     P201I1  80
+M001AC                     PARM XAD04     P201I1  60
+M001DC*                    PARM SI29      P201I2  80
+M001AC                     PARM XSI29     P201I2  60
+|   C           WCDAT     PARM           P201O1  90
+| 04-C                     END
+|    C                     Z-ADDWCDAT     PCDAT
+|    C*
+|    C*翻頁控制
+| 05-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN900
+| 05-C                     END
+|    C*發票日期轉中國年ＹＹＭＭＤＤ
+B2???C           SI21      SUB  110000    PSI21
+B2INF *CVR0001 sev.00 Field PSI21 is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C*明細列印
+|    C                     WRITEPD1
+|    C                     SETOF                     3031
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN700....LEVEL BREAK 2
+      *==============================================================*
+03===C           RTN700    BEGSR
+|    C*翻頁控制
+| 01-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN900
+| 01-C                     END
+|    C*每日合計
+|    C                     WRITEPD2
+|    C                     SETON                     30
+|    C*每日合計清零
+|    C                     Z-ADD0         SSI30T
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN800....LEVEL BREAK 3
+      *==============================================================*
+04===C           RTN800    BEGSR
+|    C*翻頁控制
+| 01-C           *IN39     IFEQ '1'
+|   C                     EXSR RTN900
+| 01-C                     END
+|    C*合計
+|    C                     WRITEPE3
+|    C  NLR                WRITEPE1
+|    C                     SETON                     3031
+|    C*重設起始值
+|    C  NLR                SETOF                     10
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+|    C*第一次表頭列印，不印續頁行
+| 01-C           *IN10     IFEQ '1'
+|   C                     WRITEPE1
+| 01-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....LR
+      *==============================================================*
+10===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE4
+| 01-C                     END
+|   C                     WRITEPE2
+|    C*
+10===C                     ENDSR
+

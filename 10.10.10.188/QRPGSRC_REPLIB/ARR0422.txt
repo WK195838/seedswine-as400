@@ -1,0 +1,199 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0421                                       *
+      * AUTHER       : 910074 TINA                                   *
+      * CREATE DATE  : 82/06/26                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :帳齡分析表                                   *
+      ****************************************************************
+     FSOSILF07IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FREWF77  UF  E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      631 636 DSI31S
+     I                                      637 642 DSI31E
+     I                                      617 6220YDATES
+     I*(YYYY/MM/DD)
+     I                                      850 8570YMD8S
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN WF7703    WORK1
+     C           *LIKE     DEFN WF7704    WORK2
+     C           *LIKE     DEFN WF7705    WORK3
+     C           *LIKE     DEFN WF7706    WORK4
+     C           *LIKE     DEFN WF7707    WORK5
+     C           *LIKE     DEFN WF7708    WORK6
+     C           *LIKE     DEFN WF7709    WORK7
+     C           *LIKE     DEFN YDATES    WSDATE
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY77     KLIST
+     C                     KFLD           WF7701
+     C                     KFLD           WF7702
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     READ SI0                      45
+  01-C           *IN45     DOWEQ'0'
+    C* ME15為業務員,CHAIN不到時,SI31為業務員
+    C           SI12      CHAINME0                  46
+  02-C           *IN46     IFEQ '0'
+    C                     MOVELME15      WF7701
+  02*C                     ELSE
+    C                     MOVELSI31      WF7701
+  02-C                     END
+    C                     MOVELSI12      WF7702
+      *業務員
+  03-C           WF7701    IFGE DSI31S
+    C           WF7701    ANDLEDSI31E
+    C*
+    C           KEY77     CHAINWF770                47
+      *計算帳齡
+    C                     EXSR RTN100
+      *WRITE REWF77
+    C                     EXSR RTN200
+  03-C                     END
+      *
+    C                     READ SI0                      45
+  01-C                     END
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....計算帳齡
+      *==============================================================*
+01===C           RTN100    BEGSR
+      *
+|    C                     Z-ADD0         DAY     90
+|    C                     Z-ADD0         WORK1
+|    C                     Z-ADD0         WORK2
+|    C                     Z-ADD0         WORK3
+|    C                     Z-ADD0         WORK4
+|    C                     Z-ADD0         WORK5
+|    C                     Z-ADD0         WORK6
+|    C                     Z-ADD0         WORK7
+|    C***
+|    C*(交貨日轉成中國年月日)
+|    C***
+|    C* (UPD BY 81/05/05 --->應收日轉成中國年月日)
+|    C***
+B2???C           SI29      SUB  110000    DSI29   60
+B2INF *CVR0001 sev.00 Field DSI29 is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C***
+|    C*(確認日轉成中國年月日)
+|    C***
+M001DC*          YDATES    SUB  110000    WSDATE
+M001AC           YMD8S     SUB  110000    WSDATE
+|    C***
+|    C*發票日與確認日之相距天數
+|    C***
+|    C*                    CALL 'P20'
+|    C*                    PARM DSI29     P2001I  60       *應收日
+|    C*                    PARM WSDATE    P2002I  60       *確認日
+|    C*          DAY       PARM           P2011O  90
+     C*   CHANGE BY JOHN  2011/08/30 ---------------------------------
+     C                     CALL 'P32'
+     C                     PARM SI29      P3201I  80       *應收日
+     C                     PARM YMD8S     P3202I  80       *確認日
+     C                     PARM '2'       P3203I  1        *日期格式
+     C                     PARM '1'       P3203I  1        *曆別
+     C           DAY       PARM           P3201O  90
+|    C*(O)
+| 04-C           DAY       IFLE 0
+|   C                     ADD  SI30      WORK1
+| 04-C                     END
+|    C*(A)
+| 05-C           DAY       IFGT 0
+|   C           DAY       ANDLE30
+|   C                     ADD  SI30      WORK2
+| 05-C                     END
+|    C*(B)
+| 06-C           DAY       IFGE 31
+|   C           DAY       ANDLE60
+|   C                     ADD  SI30      WORK3
+| 06-C                     END
+|    C*(C)
+| 07-C           DAY       IFGE 61
+|   C           DAY       ANDLE90
+|   C                     ADD  SI30      WORK4
+| 07-C                     END
+|    C*(D)
+| 08-C           DAY       IFGE 91
+|   C           DAY       ANDLE180
+|   C                     ADD  SI30      WORK5
+| 08-C                     END
+|    C*(E)
+| 09-C           DAY       IFGT 180
+|   C                     ADD  SI30      WORK6
+| 09-C                     END
+|    C***
+|    C*(總額)---SUBTOT
+|    C***
+|    C           WORK1     ADD  WORK2     WORK7
+|    C                     ADD  WORK3     WORK7
+|    C                     ADD  WORK4     WORK7
+|    C                     ADD  WORK5     WORK7
+|    C                     ADD  WORK6     WORK7
+      *
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE OR UPDATE REWF77
+      *==============================================================*
+02===C           RTN200    BEGSR
+      *
+| 01-C           *IN47     IFEQ '0'
+|   C                     EXSR RTN300
+| 01*C                     ELSE
+| 02-C           *IN47     IFEQ '1'
+|   C                     EXSR RTN400
+| 02-C                     END
+| 01-C                     END
+      *
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....UPDATE REWF77
+      *==============================================================*
+03===C           RTN300    BEGSR
+      *
+|    C                     ADD  WORK1     WF7703
+|    C                     ADD  WORK2     WF7704
+|    C                     ADD  WORK3     WF7705
+|    C                     ADD  WORK4     WF7706
+|    C                     ADD  WORK5     WF7707
+|    C                     ADD  WORK6     WF7708
+|    C                     ADD  WORK7     WF7709
+|    C*
+|    C                     UPDATWF770
+      *
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE  REWF77
+      *==============================================================*
+04===C           RTN400    BEGSR
+      *
+|    C                     MOVELME15      WF7701
+|    C                     MOVELSI12      WF7702
+|    C                     Z-ADDWORK1     WF7703
+|    C                     Z-ADDWORK2     WF7704
+|    C                     Z-ADDWORK3     WF7705
+|    C                     Z-ADDWORK4     WF7706
+|    C                     Z-ADDWORK5     WF7707
+|    C                     Z-ADDWORK6     WF7708
+|    C                     Z-ADDWORK7     WF7709
+|    C*
+|    C                     WRITEWF770
+      *
+04===C                     ENDSR
+

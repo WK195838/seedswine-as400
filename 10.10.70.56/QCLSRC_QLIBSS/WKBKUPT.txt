@@ -1,0 +1,70 @@
+/*-------------------------------------------------------------------*/
+/*           1. AUTHOR     : JULIA                                   */
+/*           2. CREAT DATE : 80.2.8                                  */
+/*           3. FUNCTION   : FOR WEEKLY BACK UP                      */
+/*  DESCRIPTION:                                                     */
+/*                                                                   */
+/*  PARMATERS:                                                       */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+             PGM
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&TIME) TYPE(*CHAR) LEN(10) VALUE(' ')
+             DCL        VAR(&N) TYPE(*DEC) LEN(2) VALUE(1)
+             DCL        VAR(&ENDINT) TYPE(*CHAR) LEN(1) VALUE('N')
+             DCL        VAR(&WRKSTN) TYPE(*CHAR) LEN(10)
+             DCLF       FILE(WKBKUPT)
+             MONMSG     MSGID(MCH0000 CPF0000 CPF9999)
+                           /*EXECEPTION HANDER */
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*NOTIFY)
+             SNDBRKMSG  MSG('PLEASE SIGNOFF FOR WEEKLY BACKUP +
+                          ...   THANKS ........') TOMSGQ(*ALLWS)
+
+             CALL       PGM(SET) PARM(&IN03 &ENDINT)
+             IF         COND(&IN03 *EQ '0') THEN(DO)
+
+RCVFIL:      RCVF
+             MONMSG     MSGID(CPF0864) EXEC(GOTO CMDLBL(ENDPGM)) +
+                        /*EXIT OF FILE REACHED */
+             IF         COND(&LIB *EQ '          ') THEN(GOTO +
+                          CMDLBL(RCVFIL))
+             CHKOBJ     OBJ(QSYS/&LIB) OBJTYPE(*LIB) /*CHECK IF FILE +
+                          EXISTS */
+             MONMSG     MSGID(CPF9801) EXEC(GOTO CMDLBL(RCVFIL))
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(RCVFIL))
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('此LIB: ' *CAT &LIB *CAT +
+                          '正在做WEEKLY BACKUP') TOPGMQ(*EXT) +
+                          MSGTYPE(*STATUS)
+   /*        IF         COND(&TYPE1 = '1') THEN(DO)        */
+             SAVLIB     LIB(&LIB) DEV(TAP01) SEQNBR(&N) +
+                          EXPDATE(090189) ENDOPT(*LEAVE) +
+                          TGTRLS(*CURRENT)
+   /*                   ENDDO                             */
+   /*        IF         COND(&TYPE1 = '2') THEN(DO)       */
+   /*        SAVOBJ     OBJ(Q*) LIB(&LIB) DEV(TAP01) SEQNBR(&N) +
+                          EXPDATE(090189) ENDOPT(*LEAVE) +
+                          TGTRLS(*CURRENT)                 */
+   /*                   ENDDO                              */
+             CHGVAR     VAR(&N)       VALUE(&N + 1)
+  /*         PRINT      LINE( &LIB)         */
+
+             GOTO       RCVFIL
+    /*       RTVSYSVAL  SYSVAL(QTIME) RTNVAR(&TIME)     */
+    /*       CHGVAR     VAR(&TIME) VALUE(%SST(&TIME 1 2) *CAT ':' +
+                          *CAT %SST(&TIME 3 2) *CAT ':' *CAT +
+                          %SST(&TIME 5 2))                */
+    /*       PRINT      LINE('REPORT END RUN TIME :' *CAT &TIME)  */
+    /*       PRINT      ACTION(*CLO)                   */
+ ENDPGM:     CLOF       OPNID(WKBKUP)
+             RTVJOBA    JOB(&WRKSTN)
+             SNDBRKMSG  MSG('恭喜你 WEEKLY BACKUP +
+                          已做完請你DSPJOBLOG將沒有SAVE完整之LIB+
+                          RARY用手操作重新... SAVE ...並做記錄 +
+                          ......祝你假日愉快......') TOMSGQ(&WRKSTN)
+             DSPJOBLOG
+       /*    CHKTAP     DEV(TAP01) ENDOPT(*UNLOAD)    */
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*BREAK)
+             ENDDO
+             ENDPGM
+

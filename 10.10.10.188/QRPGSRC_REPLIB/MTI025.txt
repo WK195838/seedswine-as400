@@ -1,0 +1,180 @@
+     A****************************************************************
+     A*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+     A*                                                              *
+     A*    PROGRAM ID   : MTI028                                     *
+     A*    AUTHOR       : AN MING HSIA                               *
+     A*    DATE WRITTEN : 08/23/93                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :基本資料系統                              *
+     A*    PROCEDURE    :組別業務員資料查詢                        *
+     A****************************************************************
+     FMTMCLF02IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTI025D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN DBGN1     OBGN1            *START KEY
+     C           *LIKE     DEFN DBGN2     OBGN2            *START KEY
+     C*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYMC2    KLIST
+     C                     KFLD           DBGN1
+     C                     KFLD           DBGN2
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN191                     *INIT SFL
+      *
+     C                     EXSR RTN192                     *READ NEXT PAGE
+     C                     EXSR RTN195                     *EXFMT
+     C*
+  01-C           *IN03     DOWEQ'0'                        *03    OFF
+    C*
+  02-C           *IN25     IFEQ '1'
+    C                     EXSR RTN192
+  02*C                     ELSE
+    C                     EXSR RTN170
+  02-C                     END
+    C  N03                EXSR RTN195
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE 'SCR001'  APPSCR  60
+|    C                     Z-ADD0         HRRN    40
+|    C                     Z-ADD0         DATE    60
+|    C                     MOVE *BLANK    DBGN1
+|    C                     MOVE *BLANK    DBGN2
+|    C                     MOVE *BLANK    OBGN1
+|    C                     MOVE *BLANK    OBGN2
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM $EGMDY    S001I2  60
+|    C           DATE      PARM           S001O1  60
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN170....ENTER
+      *==============================================================*
+02===C           RTN170    BEGSR
+|    C*
+| 01-C           DBGN1     IFNE OBGN1
+| 01-C           DBGN2     ORNE OBGN2
+|   C                     Z-ADD0         HRRN
+|   C                     MOVE DBGN1     OBGN1
+|   C                     MOVE DBGN2     OBGN2
+|   C                     EXSR RTN191
+|   C                     EXSR RTN192
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*=========================================================*
+     C*          RTN191....INITIAL                              *
+     C*=========================================================*
+03===C           RTN191    BEGSR
+|    C*
+|    C                     Z-ADD1         DRRN    40
+|    C                     Z-ADD0         RRN     40
+|    C                     Z-ADD0         WRRN    40
+|    C                     Z-ADD14        WPRCD1  30
+|    C                     Z-ADD0         DSPRC1  40
+|    C           HRRN      DIV  WPRCD1    DSPRC1
+|    C                     MULT WPRCD1    DSPRC1
+|    C                     MOVE 'N'       WBOTOM  1
+|    C                     SETOF                     53
+|    C                     SETON                     5254
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C*
+|    C           KEYMC2    SETLLMC0
+|    C*
+03===C                     ENDSR
+      *=========================================================*
+      *          RTN192 .. ROLLUP MAIN ROUTINE
+      *=========================================================*
+04===C           RTN192    BEGSR
+|    C*
+| 01-C           WBOTOM    IFEQ 'Y'
+|   C                     SETON                     98    *LST PAG
+|   C                     Z-ADDRRN       DRRN
+| 01*C                     ELSE
+|   C                     EXSR RTN193
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *=========================================================*
+      *          RTN193 .. ADD SUBFILE DATA
+      *=========================================================*
+05===C           RTN193    BEGSR
+|    C*
+|    C                     Z-ADDWRRN      RRN
+|    C                     ADD  WPRCD1    DSPRC1
+|    C*
+| 01-C           RRN       DOWLTDSPRC1
+|   C                     READ MC0                      46
+|   C*
+| 02-C           *IN46     IFEQ '0'
+|   C*組別名稱
+     C                     MOVEL'CENTER  '#A01
+     C                     MOVELMC03      #A02
+|   C           KEY#A     CHAIN#A0                  40
+     C           *IN40     IFEQ '0'
+     C                     MOVEL#A03      M#A03
+     C                     ELSE
+|   C                     MOVE *BLANK    M#A03
+     C                     END
+|   C*
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+| 02*C                     ELSE
+|   C                     Z-ADDRRN       DSPRC1
+|   C                     MOVE 'Y'       WBOTOM
+|   C                     SETON                     53
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C                     Z-ADDRRN       DRRN
+|    C                     Z-ADDRRN       WRRN
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN195... EXFMT SFL                                 *
+      *==============================================================*
+06===C           RTN195    BEGSR
+|    C*
+| 01-C           RRN       IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     94    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*                    Z-ADD0         D#ROW
+|    C*                    Z-ADD0         D#COL
+|    C*
+06===C                     ENDSR
+

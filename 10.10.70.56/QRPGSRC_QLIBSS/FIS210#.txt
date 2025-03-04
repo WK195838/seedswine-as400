@@ -1,0 +1,155 @@
+     F****************************************************************
+     F*    PROGRAM NAME : FIS210D                                    *
+     F*    AUTHOR       : A1040  JUSTIN                              *
+     F*    CREATE DATE  : 78/10/11                                   *
+     F*    UPDATE DATE  :                                            *
+     F*    SYSTEM       :財務系統                                  *
+     F*    SUBSYSTEM    :人事薪資系統                              *
+     F*    PROCEDURE    :                                            *
+     F*    PURPOSE      :銷退折讓類別查詢                          *
+     F****************************************************************
+     F*  PROCESS RULE .............................................. *
+     F*  WBOTOM = SUBFILE BOTTOM (Y/N)                               *
+     F*                                                              *
+     F*  ROLLDOWN ------------------------------ SEND MESSAGE        *
+     F*                                                              *
+     F*                                    (Y)                       *
+     F*                                     +---- SEND MESSAGE       *
+     F*                   WBOTOM='Y'        |                        *
+     F*  ROLLUP    -------------------------+                        *
+     F*                                     |                        *
+     F*                                     +---- ADD SUBFILE DATA   *
+     F*                                    (N)                       *
+     F*                                                              *
+     F****************************************************************
+     FNMPF    IF  E           K        DISK
+     FFIS210D#CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR1
+     E*: DNM033 CHAR :
+     E                    W033    2   2 10
+     I*
+     INM03        DS
+     I                                        1  14 DNM031
+     I                                       15  15 DNM032
+     I                                       15  150WCN
+     INM02        DS
+     I                                        1   1 DNM02
+     I           UDS
+     I                                      101 110 WUSER
+     I                                      111 1160DDATE
+     C*
+     C           *ENTRY    PLIST
+     C                     PARM           S21I1   1
+     C           *IN03     PARM *IN03     S21O1   1
+     C*
+     C           KEYNM     KLIST                           *NMPF
+     C                     KFLD           WNM01   2
+     C                     KFLD           WNM02  15
+     C*=============================================================*
+     C*                    MAIN ROUTINE
+     C*=============================================================*
+     C           *IN12     DOWEQ'0'
+     C           *IN03     IFEQ '0'
+     C*
+     C           *IN25     IFEQ '0'
+     C           *IN26     ANDEQ'0'
+     C                     EXSR RTN100                     *INITIAL
+     C                     EXSR RTN810                     *ADD SFLDTA
+     C                     END
+     C*
+     C           *IN25     IFEQ '1'
+     C                     EXSR RTN200                     *ROLLUP
+     C                     END
+     C*
+     C           *IN26     IFEQ '1'                        *ROLLDOWN
+     C                     SETON                     98    *1ST PAG
+     C                     Z-ADD1         DRRN
+     C                     END
+     C*
+     C                     EXSR RTN300                     *EXFMT
+     C*
+     C*: RETURN :
+     C                     ELSE
+     C                     SETON                     12    *EOJ
+     C                     END
+     C*
+     C                     END
+     C                     SETON                     LR
+     C*=============================================================*
+     C*          RTN100....INITIAL
+     C*=============================================================*
+     C           RTN100    BEGSR
+     C*: INITIAL VALUE
+     C                     Z-ADD0         DRRN
+     C                     Z-ADD0         RRN     20
+     C                     Z-ADD0         DSPRCD  20       *DSP RCD
+     C                     Z-ADD20        WPRCD   20       *PAG RCD
+     C                     MOVE 'N'       WBOTOM  1        *BOTTOM
+     C                     SETOF                     4053  *EOF
+     C*: CLEAR SUBFILE DATA :
+     C                     SETON                     52    *SFLCLR
+     C                     WRITESFLCR1
+     C                     SETOF                     52
+     C*: POINT RECORD POSITION :
+     C                     MOVE '21'      WNM01
+     C           S21I1     IFEQ *BLANK
+     C                     MOVE *LOVAL    WNM02
+     C                     ELSE
+     C                     MOVELS21I1     WNM02
+     C                     END
+     C           KEYNM     SETLLNMPF
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN200....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+     C           RTN200    BEGSR
+     C           WBOTOM    IFEQ 'Y'
+     C                     SETON                         97*LST PAG
+     C                     Z-ADDRRN       DRRN
+     C                     ELSE
+     C                     EXSR RTN810                     *ADD SFL DTA
+     C                     END
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN300....EXFMT DSPF
+     C*=============================================================*
+     C           RTN300    BEGSR
+     C*: CHECK SFL DATA EXIST :
+     C           RRN       IFGT 0
+     C                     SETON                     50    *SFLDSP
+     C                     ELSE
+     C                     SETON                     96    *NO DTA
+     C                     END
+     C*: SHOW SCREEN :
+     C                     SETON                     51    *SFLCTL
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR1
+     C                     SETOF                     5051
+     C                     MOVEA*ALL'0'   *IN,60
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA
+     C*=============================================================*
+     C           RTN810    BEGSR
+     C                     ADD  WPRCD     DSPRCD
+     C           RRN       DOWLTDSPRCD
+     C           WNM01     READENM0                      40*NF/EOF
+     C*
+     C           *IN40     IFEQ '0'
+     C           *IN53     ANDEQ'0'
+     C                     ADD  1         RRN
+     C                     MOVE W033,WCN  DNM033
+     C                     WRITESFLSR1                   53*SFLEND
+     C                     ELSE
+     C                     Z-ADDRRN       DSPRCD
+     C                     MOVE 'Y'       WBOTOM
+     C                     SETON                         53
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     Z-ADDRRN       DRRN
+     C                     ENDSR
+**
+銷貨退回銷貨折讓
+

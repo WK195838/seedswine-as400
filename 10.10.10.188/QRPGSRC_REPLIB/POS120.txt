@@ -1,0 +1,188 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM NAME : POS120                                     *
+     H*    AUTHOR       : A1034  STEPHANIE                           *
+     H*    CREATE DATE  : 79/07/07                                   *
+     H*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :銷售系統                                  *
+     A*    SUBSYSTEM    :車輛採購                                  *
+     H*    REMARK       :車型基本資料全頁查詢                      *
+     F****************************************************************
+     FPOZCPF  IF  E           K        DISK
+     FBAQBPF  IF  E           K        DISK
+     FPOS120D CF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     C*==============================================================*
+     C*                    *DEFN
+     C*==============================================================*
+     C           *LIKE     DEFN RRN       WRRN
+     C*==============================================================*
+     C*                    *ENTRY PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           DZC01     PARM           S120O1 15          車型編號
+     C                     PARM           S120O2  2           FUN KEY
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     SUBPGM AUT
+     C*
+     C           *IN03     DOWEQ'0'
+     C           *IN12     ANDEQ'0'
+     C*
+     C           *IN25     CASEQ'1'       RTN100           下一頁
+     C           *IN02     CASEQ'1'       RTN200           挑選序號
+     C           DOP1      CASNE0         RTN300           明細查詢
+     C                     CAS            RTN400            START KEY
+     C                     END
+     C*
+     C* IN02 ON --> IN12 ON (因挑選序號後即回前畫面)
+     C  N12                EXSR RTN500                     EXFMTSFL
+     C                     END
+     C*
+     C   03                MOVE '03'      S120O2
+     C                     SETON                     LR
+     C*=============================================================*
+     C*          RTN010....CHK SUBPGM AUT
+     C*=============================================================*
+     C           RTN010    BEGSR
+     C*
+     C*使用者若有使用＜車型資料查詢＞權利時--> SETON IN32
+     C*          --> 可輸入明細查詢
+     C*
+     C                     CALL 'S#S01'
+     C                     PARM $USER     S0101I 10
+     C                     PARM 'POI120'  S0102I 10
+     C                     PARM           S0101O  1
+     C           S0101O    IFEQ 'Y'
+     C                     SETON                     32
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN100....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+     C           RTN100    BEGSR
+     C           WBOTOM    IFEQ 'Y'
+     C                     SETON                         97*LST PAG
+     C                     Z-ADDRRN       DRRN
+     C                     ELSE
+     C                     EXSR RTN810                     *ADD SFL DTA
+     C                     END
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN200....挑選序號(PF2)
+     C*=============================================================*
+     C           RTN200    BEGSR
+     C*
+     C           DOP2      CHAINSFLSR                4040
+     C           *IN40     IFEQ '1'
+     C                     SETON                     619599
+     C                     ELSE
+     C                     MOVE ZC01      S120O1            車型編號
+     C                     MOVE '02'      S120O2             FUN KEY
+     C                     SETON                     12
+     C                     END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN300....明細查詢
+     C*=============================================================*
+     C           RTN300    BEGSR
+     C*
+     C           DOP1      CHAINSFLSR                4040
+-----C           *IN40     IFEQ '1'
+|    C                     SETON                     609599
+|----C                     ELSE
+|    C                     CALL 'POI120'
+|    C                     PARM ZC01      I120I1 15        車型編號
+|    C                     PARM           I120O1  2         FUN KEY
+|    C           I120O1    IFEQ '03'
+|    C                     SETON                     0312
+|    C                     END
+|    C                     Z-ADD0         DOP1
+-----C                     END                              *IN40END
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN400....SFL MAIN RUTINE (START KEY)
+     C*=============================================================*
+     C           RTN400    BEGSR
+     C                     EXSR RTN405                     *INIT SFL
+     C                     EXSR RTN810                     *ADD SFL DTA
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN405....SFL INITIAL
+     C*=============================================================*
+     C           RTN405    BEGSR
+     C*
+     C                     Z-ADD0         DRRN
+     C                     Z-ADD0         RRN
+     C                     Z-ADD0         WRRN
+     C                     Z-ADD0         DSPRCD  40
+@    C                     Z-ADD14        WPRCD   40       *PAG RCD
+     C                     MOVE 'N'       WBOTOM  1        *BOTTOM
+     C                     Z-ADD0         WRRN
+     C                     SETOF                     53    *EOF
+     C*
+     C                     SETON                     52    *SFLCLR
+     C                     WRITESFLCR
+     C                     SETOF                     52
+     C                     SETON                     51    *SFLDSPCTL
+     C*
+     C           DZC01     SETLLZC0
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN500....EXFMT DSPF
+     C*=============================================================*
+     C           RTN500    BEGSR
+     C*
+     C           RRN       IFGT 0
+     C                     SETON                     50    *SFLDSP
+     C                     ELSE
+     C                     SETON                     96    *NO DTA
+     C                     END
+     C*
+     C                     WRITEDSPC1
+     C                     EXFMTSFLCR
+     C                     SETOF                     50
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA
+     C*=============================================================*
+     C           RTN810    BEGSR
+     C*
+     C                     Z-ADDWRRN      RRN
+     C                     ADD  WPRCD     DSPRCD
+     C           RRN       DOWLTDSPRCD
+     C                     READ ZC0                      46*NF/EOF
+     C*
+     C           *IN46     IFEQ '0'
+     C                     MOVELZC02      DZC02
+     C*
+     C* GET 廠商簡稱
+@8/13C           ZC04      CHAINQB0                  40
+     C   40                MOVE *BLANKS   QB02
+     C*
+     C                     ADD  1         RRN
+     C                     WRITESFLSR
+     C                     ELSE
+     C                     Z-ADDRRN       DSPRCD
+     C                     MOVE 'Y'       WBOTOM
+     C                     SETON                         53
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     Z-ADDRRN       DRRN
+     C                     Z-ADDRRN       WRRN
+     C                     ENDSR
+

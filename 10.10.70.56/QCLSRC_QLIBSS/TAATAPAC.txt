@@ -1,0 +1,80 @@
+/* TAATAPAC - CPP for DUPSAVTAP - Duplicates a Save/Restore tape */
+             PGM        PARM(&FROMDEV &TODEV &STRSEQ &ENDSEQ &TOSEQ +
+                          &FOPT &TOPT)
+             DCL        VAR(&FROMDEV) TYPE(*CHAR) LEN(10)
+             DCL        &TODEV *CHAR LEN(10)
+             DCL        VAR(&COUNTA) TYPE(*CHAR) LEN(22)
+             DCL        &MSGKEY *CHAR LEN(4)
+             DCL        &FOPT   *CHAR LEN(7)
+             DCL        &TOPT   *CHAR LEN(7)
+             DCL        VAR(&SEQNBR) TYPE(*DEC) LEN(4 0) VALUE(0)
+             DCL        &STRSEQ *DEC LEN(4 0)
+             DCL        &ENDSEQ *DEC LEN(4 0)
+             DCL        &DATE   *CHAR LEN(6)
+             DCL        &TOSEQ  *DEC LEN(4 0)
+             DCL        &ERRORSW *LGL                     /* Std err */
+             DCL        &MSGID *CHAR LEN(7)               /* Std err */
+             DCL        &MSGDTA *CHAR LEN(100)            /* Std err */
+             DCL        &MSGF *CHAR LEN(10)               /* Std err */
+             DCL        &MSGFLIB *CHAR LEN(10)            /* Std err */
+             MONMSG     MSGID(CPF0000) EXEC(GOTO STDERR1) /* Std err */
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&DATE)
+             IF         (&FROMDEV *EQ &TODEV) DO /* Same dev */
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGTYPE(*ESCAPE) +
+                          MSGDTA('The FROMDEV and TODEV cannot be +
+                          the same')
+             ENDDO      /* Same dev */
+             IF         (&STRSEQ *GT &ENDSEQ) DO /* Same dev */
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGTYPE(*ESCAPE) +
+                          MSGDTA('RANGE ERROR')
+             ENDDO
+ CPYNEXT:    OVRTAPF    FILE(QTAPE) DEV(&FROMDEV) VOL(*NONE) +
+                          REELS(*SL) SEQNBR(&STRSEQ) RCDLEN(*CALC) +
+                          BLKLEN(*CALC) RCDBLKFMT(*U) ENDOPT(*LEAVE) +
+                          SECURE(*YES)
+             OVRTAPF    FILE(QSYSTAP) SECURE(*YES)
+             CPYTOTAP   FROMFILE(QTAPE) TOFILE(QSYSTAP) +
+                          TOSEQNBR(&TOSEQ) TODEV(&TODEV) +
+                          TOVOL(*NONE) TOREELS(*SL) +
+                          TORCDLEN(*FROMFILE) TOBLKLEN(*CALC) +
+                          TORCDBLK(*U) TOEXPDATE(&DATE) +
+                          TOENDOPT(*LEAVE)
+             MONMSG     MSGID(MCH1201)
+             MONMSG     MSGID(CPF2952) CMPDTA('QTAPE     ') EXEC(GOTO +
+                          CPYEND)
+             CHGVAR     &STRSEQ (&STRSEQ + 1)
+             CHGVAR     &TOSEQ (&TOSEQ + 1)
+             CHGVAR     &SEQNBR (&SEQNBR + 1)
+             IF         (&STRSEQ *LE &ENDSEQ) DO /* Same dev */
+             GOTO       CPYNEXT
+             ENDDO
+             ELSE       CMD(GOTO CMDLBL(T))
+ CPYEND:     RCVMSG     MSGTYPE(*DIAG) RMV(*NO) KEYVAR(&MSGKEY) +
+                          MSGID(&MSGID)
+             IF         (&MSGID *EQ '       ') GOTO STDERR1
+             IF         (&MSGID *NE 'CPF4114') GOTO CPYEND
+             RMVMSG     MSGKEY(&MSGKEY)
+             RCVMSG     MSGTYPE(*EXCP)
+ T:          CHKTAP     DEV(&FROMDEV) ENDOPT(&FOPT)
+             CHKTAP     DEV(&TODEV) ENDOPT(&TOPT)
+      /*     CHGVAR     &SEQNBR (&SEQNBR - 1)   */
+             EDTVAR     &COUNTA &SEQNBR
+             SNDPGMMSG  MSG(&COUNTA *TCAT ' files copied from ' +
+                          *CAT &FROMDEV *TCAT ' to ' *CAT &TODEV)
+             RETURN     /* Normal end of program */
+ STDERR1:               /* Standard error handling routine */
+             IF         &ERRORSW SNDPGMMSG MSGID(CPF9999) +
+                          MSGF(QCPFMSG) MSGTYPE(*ESCAPE) /* Func chk */
+             CHGVAR     &ERRORSW '1' /* Set to fail ir error occurs */
+ STDERR2:    RCVMSG     MSGTYPE(*DIAG) MSGDTA(&MSGDTA) MSGID(&MSGID) +
+                          MSGF(&MSGF) MSGFLIB(&MSGFLIB)
+             IF         (&MSGID *EQ '       ') GOTO STDERR3
+             SNDPGMMSG  MSGID(&MSGID) MSGF(&MSGFLIB/&MSGF) +
+                          MSGDTA(&MSGDTA) MSGTYPE(*DIAG)
+             GOTO       STDERR2 /* Loop back for addl diagnostics */
+ STDERR3:    RCVMSG     MSGTYPE(*EXCP) MSGDTA(&MSGDTA) MSGID(&MSGID) +
+                          MSGF(&MSGF) MSGFLIB(&MSGFLIB)
+             SNDPGMMSG  MSGID(&MSGID) MSGF(&MSGFLIB/&MSGF) +
+                          MSGDTA(&MSGDTA) MSGTYPE(*ESCAPE)
+             ENDPGM
+

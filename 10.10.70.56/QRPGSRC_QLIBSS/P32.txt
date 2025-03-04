@@ -1,0 +1,262 @@
+      ****************************************************************
+      * PROGRAM ID : P32                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :計算起日～迄日相距日數                         *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3201I    I   *DEC    8 0 起日            *
+      *             02   P3202I    I   *DEC    8 0 迄日            *
+      *             02   P3203I    I   *CHAR   1   日期格式        *
+      *             02   P3204I    I   *CHAR   1   曆別            *
+      *             02   P3211O    O   *DEC    9 0 相距天數...     *
+      *                                            負數表起日大於迄日
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3201     N   *DEC    4 0 西元年          *
+      *             02   P3202     N   *DEC    2 0 月份            *
+      *             03   P3203     N   *DEC    2 0 日期            *
+      *             04   P3204     N   *DEC    5 0 商數            *
+      *             05   P3205     N   *DEC    4 0 餘數            *
+      *             06   P3206     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P3207     N   *CHAR   1   驗証(Y/N)       *
+      *             08   P32DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P32DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P3206=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P3206=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P3206=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P3206=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E* P32DAY:每月日數
+     E* WFV   :日期格式VALUE
+     E                    P32DAY 12  12  2 0
+     E                    WFV     6   6  1
+     I            DS
+     I                                        1   80WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     I                                        7   80WD4
+     I            DS
+     I                                        1   80P3201C
+     I                                        1   40P3201Y
+     I                                        5   60P3201M
+     I                                        7   80P3201D
+     I            DS
+     I                                        1   80P3202C
+     I                                        1   40P3202Y
+     I                                        5   60P3202M
+     I                                        7   80P3202D
+0    I            DS
+     I                                        1   80P32SML
+     I                                        1   40P32SYY
+     I                                        5   60P32SMM
+     I                                        7   80P32SDD
+     I            DS
+     I                                        1   80P32BIG
+     I                                        1   40P32BYY
+     I                                        5   60P32BMM
+     I                                        7   80P32BDD
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3201I  80
+     C                     PARM           P3202I  80
+     C                     PARM           P3203I  1
+     C                     PARM           P3204I  1
+     C                     PARM           P3211O  90
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     MOVE P3203I    @FMT    1
+     C                     MOVE P3204I    @CALD   1
+     C                     EXSR @@CHK                      *CHK中西曆
+      *
+     C           *IN99     IFEQ '1'
+     C                     Z-ADD0         P32FTD  90
+     C                     GOTO QUIT
+     C                     END
+      *
+     C                     Z-ADDP3201I    @DATE   80
+     C                     EXSR @@YMD                      *GET起YMD
+     C                     Z-ADDWYYYY     P3201Y
+     C                     Z-ADDWMM       P3201M
+     C                     Z-ADDWDD       P3201D
+      *
+     C                     Z-ADDP3202I    @DATE   80
+     C                     EXSR @@YMD                      *GET迄YMD
+     C                     Z-ADDWYYYY     P3202Y
+     C                     Z-ADDWMM       P3202M
+     C                     Z-ADDWDD       P3202D
+      *
+     C                     EXSR P32CMP
+     C                     EXSR P32CYY
+     C                     EXSR P32CMD
+     C                     EXSR P32CAL
+      *
+     C           P32CCK    IFEQ 'N'
+     C           0         SUB  P32TD     P32FTD
+     C                     ELSE
+     C                     Z-ADDP32TD     P32FTD
+     C                     END
+      *
+     C           QUIT      TAG
+     C                     Z-ADDP32FTD    P3211O
+     C                     SETON                     LR
+     C/COPY QRPGSRC,@CHECK
+      *--------------------------------------------------------------*
+      *          P32CMP....COMPARE FROM DATE AND TO DATE WHICH LARGE *
+      *                    INPUT      P3201C                         *
+      *                    INPUT      P3202C                         *
+      *                    OUTPUT     P32SML                         *
+      *                    OUTPUT     P32BIG                         *
+      *                    OUTPUT     P32CCK ( Y = P3201I <= P3202I )*
+      *--------------------------------------------------------------*
+     C           P32CMP    BEGSR
+     C           P3201C    IFLE P3202C
+     C                     MOVE 'Y'       P32CCK  1        .CMP CHECK
+     C                     Z-ADDP3201C    P32SML
+     C                     Z-ADDP3202C    P32BIG
+     C                     ELSE
+     C                     MOVE 'N'       P32CCK
+     C                     Z-ADDP3202C    P32SML
+     C                     Z-ADDP3201C    P32BIG
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P32CYY....CACULATE YEARS DAY                        *
+      *                    INPUT      P32SYY 小日期西元年          *
+      *                    INPUT      P32BYY 大日期西元年          *
+      *                    OUTPUT     P32YDA 相距年度天數          *
+      *--------------------------------------------------------------*
+     C           P32CYY    BEGSR
+     C*
+     C                     Z-ADD0         P32YDA  90
+     C                     Z-ADDP32SYY    WYEAR   40
+     C           WYEAR     DOWNEP32BYY
+      *
+     C                     Z-ADDWYEAR     P3201   40
+     C                     EXSR P32LEP
+      *
+     C           P3206     IFEQ 'Y'
+     C                     ADD  366       P32YDA
+     C                     ELSE
+     C                     ADD  365       P32YDA
+     C                     END
+      *
+     C                     ADD  1         WYEAR
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P32LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P3201 西元年                 *
+      *                    OUTPUT     P3206  (Y=潤年:N=平年)     *
+      *--------------------------------------------------------------*
+     C           P32LEP    BEGSR
+     C           P3201     DIV  400       P3204   50
+     C                     MVR            P3205   40
+     C           P3205     IFEQ 0
+     C                     MOVE 'Y'       P3206   1
+     C                     ELSE
+     C*
+     C           P3201     DIV  100       P3204
+     C                     MVR            P3205
+     C           P3205     IFEQ 0
+     C                     MOVE 'N'       P3206
+     C                     ELSE
+     C*
+     C           P3201     DIV  4         P3204
+     C                     MVR            P3205
+     C           P3205     IFEQ 0
+     C                     MOVE 'Y'       P3206
+     C                     ELSE
+     C                     MOVE 'N'       P3206
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P32CMD....CALCULATE YEAR DAYS OF P32SML AND P32BIG  *
+      *                    INPUT    P32SML ......                    *
+      *                                    P32SYY                    *
+      *                                    P32SMM                    *
+      *                                    P32SDD                    *
+      *                             P32BIG ......                    *
+      *                                    P32BYY                    *
+      *                                    P32BMM                    *
+      *                                    P32BDD                    *
+      *                    OUTPUT   P32SDA(YEAR DAYS OF P32SML)      *
+      *                             P32BDA(YEAR DAYS OF P32BIG)      *
+      *--------------------------------------------------------------*
+     C           P32CMD    BEGSR
+      *-------------------------------------*
+      *        CALCULATE   P32SDA           *
+      *-------------------------------------*
+     C                     Z-ADD0         P32SDA  90
+     C                     Z-ADD1         PMM     20
+     C           PMM       DOWLTP32SMM
+     C                     ADD  P32DAY,PMMP32SDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P32SDD    P32SDA
+      *
+     C*MAY 1994.03.07      ADD  P32SYY    P3201
+     C                     Z-ADDP32SYY    P3201
+     C                     EXSR P32LEP
+     C           P3206     IFEQ 'Y'
+     C           P32SMM    ANDGT2
+     C                     ADD  1         P32SDA
+     C                     END
+      *-------------------------------------*
+      *        CALCULATE   P32BDA           *
+      *-------------------------------------*
+     C                     Z-ADD0         P32BDA  90
+     C                     Z-ADD1         PMM
+     C           PMM       DOWLTP32BMM
+     C                     ADD  P32DAY,PMMP32BDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P32BDD    P32BDA
+      *
+     C                     Z-ADDP32BYY    P3201
+     C                     EXSR P32LEP
+     C           P3206     IFEQ 'Y'
+     C           P32BMM    ANDGT2
+     C                     ADD  1         P32BDA
+     C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P32CAL....CACULATE DAYS BETWEEN P32SML & P32BIG     *
+      *                    INPUT      P32SDA  (YEAR DAYS OF P32SML)  *
+      *                    INPUT      P32BDA  (YEAR DAYS OF P32BIG)  *
+      *                    INPUT      P32YDA 相距年度天數          *
+      *                    OUTPUT     P32RST 相距天數              *
+      *--------------------------------------------------------------*
+     C           P32CAL    BEGSR
+     C                     Z-ADD0         P32TD   90
+     C           P32YDA    ADD  P32BDA    P32TD
+     C                     SUB  P32SDA    P32TD
+     C                     ENDSR
+** <<每月日數>>
+312831303130313130313031
+** <<日期格式>>VALUE
+123456
+

@@ -1,0 +1,221 @@
+      ****************************************************************
+      * PROGRAM ID : P20                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :計算起日～迄日相距日數                         *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P2001I    I   *DEC    6 0 起日(中國年)  *
+      *             02   P2002I    I   *DEC    6 0 迄日(中國年)  *
+      *             02   P2011O    O   *DEC    9 0 相距天數...     *
+      *                                            負數表起日大於迄日
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             00   P200DS    N   *CHAR   6    YYMMDD(中國年) *
+      *             01   P2001C    N   *DEC    2 0 中國年          *
+      *                  P2001     N   *DEC    4 0 西元年          *
+      *             02   P2002(P20)N   *DEC    2 0 月份            *
+      *             03   P2003     N   *DEC    2 0 日期            *
+      *             04   P2004     N   *DEC    5 0 商數            *
+      *             05   P2005     N   *DEC    4 0 餘數            *
+      *             06   P2006     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P2007     N   *DEC    3 0 驗証(Y/N)       *
+      *             08   P20DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P20DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P2006=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P2006=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P2006=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P2006=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E                    P20DAY 12  12  2 0
+     IP20SC       DS
+     I                                        1   20P20SYY
+     I                                        3   40P20SMM
+     I                                        5   60P20SDD
+     IP20BC       DS
+     I                                        1   20P20BYY
+     I                                        3   40P20BMM
+     I                                        5   60P20BDD
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P2001I  60
+     C                     PARM           P2002I  60
+     C                     PARM           P2011O  90
+      *
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     EXSR P20CMP
+     C                     EXSR P20CYY
+     C                     EXSR P20CMD
+     C                     EXSR P20CAL
+      *
+     C                     Z-ADD0         P20FTD  90
+     C           P20CCK    IFEQ 'N'
+     C           0         SUB  P20TD     P20FTD
+     C                     ELSE
+     C                     Z-ADDP20TD     P20FTD
+     C                     END
+     C                     Z-ADDP20FTD    P2011O
+      *
+     C                     RETRN
+      *--------------------------------------------------------------*
+      *          P20CMP....COMPARE FROM DATE AND TO DATE WHICH LARGE *
+      *                    INPUT      P2001I                         *
+      *                    INPUT      P2002I                         *
+      *                    OUTPUT     P20SML                         *
+      *                    OUTPUT     P20BIG                         *
+      *                    OUTPUT     P20CCK ( Y = P2001I <= P2002I )*
+      *--------------------------------------------------------------*
+     C           P20CMP    BEGSR
+     C           P2001I    IFLE P2002I
+     C                     MOVE 'Y'       P20CCK  1        .CMP CHECK
+     C                     Z-ADDP2001I    P20SML  60
+     C                     Z-ADDP2002I    P20BIG  60
+     C                     ELSE
+     C                     MOVE 'N'       P20CCK
+     C                     Z-ADDP2002I    P20SML
+     C                     Z-ADDP2001I    P20BIG
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P20CYY....CACULATE YEARS DAY                        *
+      *                    INPUT      P20SCY 小日期西元年          *
+      *                    INPUT      P20BCY 大日期西元年          *
+      *                    OUTPUT     P20YDA 相距年度天數          *
+      *--------------------------------------------------------------*
+     C           P20CYY    BEGSR
+     C                     MOVE P20SML    P20SC   6
+     C                     MOVE P20BIG    P20BC   6
+     C                     Z-ADD0         P20SCY  40
+     C                     Z-ADD0         P20BCY  40
+     C           P20SYY    ADD  1911      P20SCY
+     C           P20BYY    ADD  1911      P20BCY
+     C                     Z-ADD0         P20YDA  90
+     C           P20SCY    DOWNEP20BCY
+      *
+     C                     Z-ADDP20SCY    P2001   40
+     C                     EXSR P20LEP
+      *
+     C           P2006     IFEQ 'Y'
+     C                     ADD  366       P20YDA
+     C                     ELSE
+     C                     ADD  365       P20YDA
+     C                     END
+      *
+     C                     ADD  1         P20SCY
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P20LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P2001 西元年                 *
+      *                    OUTPUT     P2006  (Y=潤年:N=平年)     *
+      *--------------------------------------------------------------*
+     C           P20LEP    BEGSR
+     C           P2001     DIV  400       P2004   50
+     C                     MVR            P2005   40
+     C           P2005     IFEQ 0
+     C                     MOVE 'Y'       P2006   1
+     C                     ELSE
+     C*
+     C           P2001     DIV  100       P2004
+     C                     MVR            P2005
+     C           P2005     IFEQ 0
+     C                     MOVE 'N'       P2006
+     C                     ELSE
+     C*
+     C           P2001     DIV  4         P2004
+     C                     MVR            P2005
+     C           P2005     IFEQ 0
+     C                     MOVE 'Y'       P2006
+     C                     ELSE
+     C                     MOVE 'N'       P2006
+     C                     END
+     C*
+     C                     END
+     C*
+     C                     END
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P20CMD....CALCULATE YEAR DAYS OF P20SML AND P20BIG  *
+      *                    INPUT    P20SML ......                    *
+      *                                    P20SYY                    *
+      *                                    P20SMM                    *
+      *                                    P20SDD                    *
+      *                             P20BIG ......                    *
+      *                                    P20BYY                    *
+      *                                    P20BMM                    *
+      *                                    P20BDD                    *
+      *                    OUTPUT   P20SDA(YEAR DAYS OF P20SML)      *
+      *                             P20BDA(YEAR DAYS OF P20BIG)      *
+      *--------------------------------------------------------------*
+     C           P20CMD    BEGSR
+      *-------------------------------------*
+      *        CALCULATE   P20SDA           *
+      *-------------------------------------*
+     C                     Z-ADD0         P20SDA  90
+     C                     Z-ADD1         PMM     20
+     C           PMM       DOWNEP20SMM
+     C           PMM       ANDLE12
+     C                     ADD  P20DAY,PMMP20SDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P20SDD    P20SDA
+      *
+     C                     Z-ADD1911      P2001
+     C                     ADD  P20SYY    P2001
+     C                     EXSR P20LEP
+     C           P2006     IFEQ 'Y'
+     C           P20SMM    ANDGT2
+     C                     ADD  1         P20SDA
+     C                     END
+      *-------------------------------------*
+      *        CALCULATE   P20BDA           *
+      *-------------------------------------*
+     C                     Z-ADD0         P20BDA  90
+     C                     Z-ADD1         PMM
+     C           PMM       DOWNEP20BMM
+     C                     ADD  P20DAY,PMMP20BDA
+     C                     ADD  1         PMM
+     C                     END
+     C                     ADD  P20BDD    P20BDA
+      *
+     C                     Z-ADD1911      P2001
+     C                     ADD  P20BYY    P2001
+     C                     EXSR P20LEP
+     C           P2006     IFEQ 'Y'
+     C           P20BMM    ANDGT2
+     C                     ADD  1         P20BDA
+     C                     END
+      *
+     C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P20CAL....CACULATE DAYS BETWEEN P20SML & P20BIG     *
+      *                    INPUT      P20SDA  (YEAR DAYS OF P20SML)  *
+      *                    INPUT      P20BDA  (YEAR DAYS OF P20BIG)  *
+      *                    INPUT      P20YDA 相距年度天數          *
+      *                    OUTPUT     P20RST 相距天數              *
+      *--------------------------------------------------------------*
+     C           P20CAL    BEGSR
+     C                     Z-ADD0         P20TD   90
+     C           P20YDA    ADD  P20BDA    P20TD
+     C                     SUB  P20SDA    P20TD
+     C                     ENDSR
+**
+312831303130313130313031
+

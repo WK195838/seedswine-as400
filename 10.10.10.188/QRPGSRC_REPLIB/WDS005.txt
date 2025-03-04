@@ -1,0 +1,201 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM NAME : WDS005                                     *
+     H*    AUTHOR       : A1034  STEPHANIE                           *
+     H*    CREATE DATE  : 81/01/13                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :                                            *
+     H*    SUBSYSTEM    :                                            *
+     H*    REMARK       :員工代碼資料全頁查詢(WINDOW)              *
+     F****************************************************************
+     FMTMCLF01IF  E           K        DISK
+     FWDS005D CF  E                    WORKSTN
+     E* OP CODE
+     E                    W01         8  1
+     E* COMBINED BY 員工姓名X(12) 員工代號X(6)
+     E                    W02         8 20
+     I*
+     IWOP0        DS
+@    I                                        1   8 W01
+     I                                        1   1 D1011
+     I                                        2   2 D1021
+     I                                        3   3 D1031
+     I                                        4   4 D1041
+     I                                        5   5 D1051
+     I                                        6   6 D1061
+     I                                        7   7 D1071
+     I                                        8   8 D1081
+     IWD0         DS
+@    I                                        1 160 W02
+     I                                        1  20 D1012
+     I                                       21  40 D1022
+     I                                       41  60 D1032
+     I                                       61  80 D1042
+     I                                       81 100 D1052
+     I                                      101 120 D1062
+     I                                      121 140 D1072
+     I                                      141 160 D1082
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C***                  PARM           S005I1 10        *BLANKS
+     C                     PARM           S005O1  6        員工代號
+     C*==============================================================*
+     C*                    KEY LIST FOR NMPF
+     C*==============================================================*
+     C           KEYMCT    KLIST                           *KEY TOP
+     C                     KFLD           WMC02T
+     C                     KFLD           WMC01T
+     C*
+     C           KEYMCB    KLIST                           *KEY BOTTOM
+     C                     KFLD           WMC02B
+     C                     KFLD           WMC01B
+     C*
+     C           *LIKE     DEFN MC01      WMC01T
+     C           *LIKE     DEFN MC02      WMC02T
+     C           *LIKE     DEFN MC01      WMC01B
+     C           *LIKE     DEFN MC02      WMC02B
+     C*==============================================================*
+     C*          MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C           KEYMCB    SETLLMC0                        *1 SETLL
+     C                     EXSR RTN100                     *1 READ NEXT
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+    C                     EXFMTDSPC1
+    C*
+  02-C           *IN25     IFEQ '1'                        *ROLLUP
+    C           *IN97     ANDEQ'0'                        *LAST PAGE
+    C           KEYMCB    SETGTMC0                        *AFTER 1 SETLL
+    C                     EXSR RTN100                     *READ NEXT
+  02-C                     END
+    C*
+  03-C           *IN26     IFEQ '1'                        *ROLLDOWN
+    C           *IN98     ANDEQ'0'                        *FIRST PAGE
+    C           KEYMCT    SETLLMC0
+    C                     EXSR RTN200                     *READ PREV
+  03-C                     END
+    C*
+  04-C           *IN25     IFEQ '0'
+    C           *IN26     ANDEQ'0'
+    C                     EXSR RTN300
+  04-C                     END
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C                     MOVE *BLANKS   WMC01T
+|    C                     MOVE *BLANKS   WMC01B
+|    C                     MOVE *LOVAL    WMC02T
+|    C                     MOVEL*LOVAL    WMC02B
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....READ NEXT
+     C*==============================================================*
+02===CSR         RTN100    BEGSR
+|    C*
+|    C                     MOVEA*BLANKS   W01
+|    C                     MOVEA*BLANKS   W02
+|    C                     Z-ADD0         WI      10
+|    C   25                SETOF                     98
+|    C*
+|    C                     READ MC0                      97
+|    C  N97                EXSR RTN810                     *GET KEY TOP
+|    C*
+| 01-C                     DO   8         WI
+|   C*
+| 02-C           *IN97     IFEQ '0'
+|   C                     MOVELMC02      W02,WI
+|   C                     MOVE MC01      W02,WI
+|   C                     EXSR RTN820                     *GET KEY BOT
+| 02*C                     ELSE
+|   C           WI        ADD  60        WO      20
+|   C                     MOVEA*ALL'1'   *IN,WO
+|   C                     SETOF                     9998
+|   C                     Z-ADD8         WI
+| 02-C                     END
+|   C*
+|   C                     READ MC0                      97
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....READ PREVIOUS
+     C*==============================================================*
+03===CSR         RTN200    BEGSR
+|    C*
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     MOVEA*BLANKS   W01
+|    C                     MOVEA*BLANKS   W02
+|    C                     Z-ADD9         WI
+|    C*
+|    C                     READPMC0                      98*READ EQ DIV
+|    C                     EXSR RTN820                     *GET KEY BOTTOM
+|    C*
+| 01-C                     DO   8                          *SFL FULL
+|   C*
+| 02-C           *IN98     IFEQ '1'                        *READP EOF
+|   C                     MOVE WMC01T    WMC01B           *KEY BOTTOM
+|   C                     MOVE WMC02T    WMC02B           *KEY BOTTOM
+|   C           KEYMCB    SETLLMC0
+|   C                     EXSR RTN100                     *READ NEXT
+|   C                     GOTO END200
+| 02-C                     END
+|   C*
+|   C                     SUB  1         WI
+|   C                     MOVELMC02      W02,WI
+|   C                     MOVE MC01      W02,WI
+|   C                     EXSR RTN810                     *GET KEY TOP
+|   C*
+|   C                     READPMC0                      98*READ EQ DIV
+| 01-C                     END
+|    C*
+03===C           END200    ENDSR
+     C*==============================================================*
+     C*          RTN300....
+     C*==============================================================*
+04===CSR         RTN300    BEGSR
+|    C*
+|    C                     Z-ADD1         WJ      10
+|    C           '/'       LOKUPW01,WJ                   30
+| 01-C           *IN30     IFEQ '1'
+|   C                     MOVE W02,WJ    S005O1
+|   C                     SETON                     03
+| 01*C                     ELSE
+| 02-C           DMC02     IFEQ *BLANKS
+|   C                     MOVE *LOVAL    DMC02
+| 02-C                     END
+|   C                     MOVE DMC02     WMC02B
+|   C                     MOVE DMC02     WMC02T
+|   C                     MOVE *BLANKS   WMC01B
+|   C                     MOVE *BLANKS   WMC01T
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C           KEYMCB    SETLLMC0                        *1 SETLL
+|   C                     EXSR RTN100                     *1 READ NEXT
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN810....READ NEXT CLEAR & INIT
+     C*==============================================================*
+05===CSR         RTN810    BEGSR
+|    C                     MOVE MC01      WMC01T           *KEY TOP
+|    C                     MOVE MC02      WMC02T           *KEY TOP
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN820....READ PREV CLEAR & INIT
+     C*==============================================================*
+06===CSR         RTN820    BEGSR
+|    C                     MOVE MC01      WMC01B           *KEY BOTTOM
+|    C                     MOVE MC02      WMC02B           *KEY
+06===C                     ENDSR
+

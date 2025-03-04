@@ -1,0 +1,75 @@
+     /***************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266   */
+     /*                                                             */
+     /*    DSPF NAME    : ARA015C                                   */
+     /*    AUTHOR       : AN MING HSIA                              */
+     /*    CREATE DATE  : 82/03/03                                  */
+     /*    PROGRAM NAME : ARA015C                                   */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款作業                             */
+     /*    REMARK       :銷退折讓批次作業                         */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&IN98) TYPE(*LGL) LEN(1)
+             DCL        VAR(&WSC08) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN14)   TYPE(*LGL)  LEN(1)
+
+             DCL        VAR(&DSG01S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSG01E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSG04)  TYPE(*CHAR) LEN(5)
+             DCL        VAR(&YSG06S) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&YSG06E) TYPE(*CHAR) LEN(8)
+
+ START:      CALL       PGM(ARA015) PARM(&IN03 &IN14 &IN98)
+             IF         COND(&IN03) THEN(DO)
+             CHGVAR     VAR(%SST(*LDA 601 100)) VALUE(' ')
+             RETURN
+             ENDDO
+
+             IF         COND(&IN14) THEN(DO)
+
+             OVRPRTF    FILE(ARA015P) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('銷退批次')
+             OVRPRTF    FILE(ARA015AP) USRDTA('銷退批次')
+
+             CHGVAR     VAR(&DSG01S) VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DSG01E) VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&DSG04)  VALUE(%SST(*LDA 605 5))
+             CHGVAR     VAR(&YSG06S) VALUE(%SST(*LDA 622 8))
+             CHGVAR     VAR(&YSG06E) VALUE(%SST(*LDA 630 8))
+
+             OVRDBF     FILE(REWF63) TOFILE(SOSJPF) SHARE(*YES)
+             OVRDBF     FILE(SOSGPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSJPF) (SOSIPF)) FORMAT(REWF63) +
+                          QRYSLT('SJ01 *EQ %RANGE("' *CAT &DSG01S +
+                          *CAT '" "' *CAT &DSG01E *CAT '") & SJ11 +
+                          *EQ "A0002" & SI18 *EQ " " & SI19 *NE "V" +
+                          & SJ04 *NE SJ08  ') KEYFLD((SJ01) (SJ11) +
+                          (SJ03) (SI21 *DESCEND) (SJ02 *DESCEND)) +
+                          JFLD((1/SJ02 2/SI02) (1/SJ01 2/SI01))
+
+  /*銷退折讓*/
+             OPNQRYF    FILE((SOSGPF)) OPTION(*ALL) QRYSLT(' SG01 +
+                          *EQ %RANGE("' *CAT &DSG01S *CAT '" "' +
+                          *CAT &DSG01E *CAT '") & SG04 *EQ "' *CAT +
+                          &DSG04 *CAT '" & SG26A *EQ %RANGE("' *CAT +
+                          &YSG06S *CAT '" "' *CAT &YSG06E *CAT '") +
+                          & SG03 *EQ "RA" & SG14 *NE "V" ') +
+                          KEYFLD((SG01) (SG02)) MAPFLD((SG26A SG26 +
+                          *CHAR 8))
+
+             CALL       PGM(ARA0151)
+
+             CLOF       OPNID(SOSGPF)
+             CLOF       OPNID(SOSJPF)
+             DLTOVR     FILE(*ALL)
+
+             ENDDO
+
+             CHGVAR     VAR(&IN98) VALUE('1')
+
+             GOTO       START
+             ENDPGM
+

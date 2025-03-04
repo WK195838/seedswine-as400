@@ -1,0 +1,106 @@
+             PGM PARM(&P7301I &P7302I &P7311O &P7312O)
+             DCL        VAR(&P7301I) TYPE(*CHAR) LEN(80)
+             DCL        VAR(&P7302I) TYPE(*CHAR) LEN(80)
+             DCL        VAR(&P7311O) TYPE(*CHAR) LEN(161)
+             DCL        VAR(&P7312O) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&POS) TYPE(*DEC) LEN(3 0) VALUE(80)
+             DCL        VAR(&END1) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&LEAD2) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ENDPOS) TYPE(*DEC) LEN(3 0)
+             DCL        VAR(&LEADPOS) TYPE(*DEC) LEN(3 0)
+             DCL        VAR(&RMD)  TYPE(*DEC) LEN(3 0)
+             DCL        VAR(&BYTE) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SISO) TYPE(*CHAR) LEN(2) VALUE('')
+             DCL        VAR(&SI) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SO) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&FLAG) TYPE(*CHAR) LEN(8) VALUE('GIANT/PT')
+     /***********************************************************/
+     /*      OCT. 06, 1990;      BY  HENRY SHAO.                */
+     /*   &POS   : POSITION CURSOR                              */
+     /*   &END1  : LAST NON-BLANK CHAR OF 1ST STRING            */
+     /*   &LEAD2 : FIRST NON-BLANK CHAR OF 2ND STRING           */
+     /*   &RMD   : STRING FOR LEFT-JUSTIFYING &P7302I           */
+     /*   &BYTE  : CONTENTS OF THE BYTE TO BE PROCESSED.        */
+     /***********************************************************/
+ /**/
+             CALL       PGM(R@S005) PARM(&FLAG)
+ /**/
+ CHECK:
+
+ START:      CHGVAR     VAR(&SI) VALUE(%SST(&SISO 1 1))
+             CHGVAR     VAR(&SO) VALUE(%SST(&SISO 2 1))
+             CHGVAR     VAR(&P7311O) VALUE(' ')
+             CHGVAR     VAR(&P7312O) VALUE(0)
+ /**/
+ LOOP1:
+             CHGVAR     VAR(&BYTE) VALUE(%SST(&P7301I &POS 1))
+             IF         COND(&BYTE = ' ') THEN(DO)
+                        CHGVAR  VAR(&END1) VALUE(&BYTE)
+                        CHGVAR  VAR(&ENDPOS) VALUE(&POS)
+                        GOTO CMDLBL(LOOP2INIT)
+                        ENDDO
+             CHGVAR     VAR(&POS) VALUE(&POS - 1)
+             IF         COND(&POS = 0) THEN(DO)
+                        CHGVAR  VAR(&END1) VALUE(' ')
+                        CHGVAR  VAR(&ENDPOS) VALUE(0)
+                        GOTO CMDLBL(LOOP2INIT)
+                        ENDDO
+             GOTO LOOP1
+ /**/
+ LOOP2INIT:
+             CHGVAR     VAR(&POS) VALUE(1)
+ LOOP2:
+             CHGVAR     VAR(&BYTE) VALUE(%SST(&P7302I &POS 1))
+             IF         COND(&BYTE = ' ') THEN(DO)
+                        CHGVAR  VAR(&LEAD2) VALUE(&BYTE)
+                        CHGVAR  VAR(&LEADPOS) VALUE(&POS)
+                        CHGVAR  VAR(&RMD) VALUE(81 - &LEADPOS)
+                        CHGVAR  VAR(&P7302I)                   +
+                                VALUE(%SST(&P7302I &LEADPOS &RMD))
+                        GOTO CMDLBL(LAST)
+                        ENDDO
+             CHGVAR     VAR(&POS) VALUE(&POS + 1)
+             IF         COND(&POS > 80) THEN(DO)
+                        CHGVAR  VAR(&LEAD2) VALUE(' ')
+                        CHGVAR  VAR(&LEADPOS) VALUE(0)
+                        GOTO CMDLBL(LAST)
+                        ENDDO
+             GOTO LOOP2
+ LAST:
+             IF   COND(&END1 = &SO & &LEAD2 = &SI) THEN(DO)
+                  CHGVAR VAR(%SST(&P7301I &ENDPOS 1)) VALUE(' ')
+                  CHGVAR VAR(&P7311O)                    +
+                         VALUE(&P7301I *TCAT %SST(&P7302I 2 79))
+                  GOTO COUNTLEN
+                  ENDDO
+
+             IF   COND(&END1 = &SO | &LEAD2 = &SI) THEN(DO)
+                  CHGVAR VAR(&P7311O) VALUE(&P7301I *TCAT &P7302I)
+                  GOTO COUNTLEN
+                  ENDDO
+
+             IF   COND(&END1 = ' ') THEN(DO)
+                  CHGVAR VAR(&P7311O) VALUE(&P7301I *TCAT &P7302I)
+                  GOTO COUNTLEN
+                  ENDDO
+
+             CHGVAR VAR(&P7311O) VALUE(&P7301I *BCAT &P7302I)
+
+ COUNTLEN:
+             CHGVAR     VAR(&POS) VALUE(161)
+ COUNTLOOP:
+             CHGVAR     VAR(&BYTE) VALUE(%SST(&P7311O &POS 1))
+             IF         COND(&BYTE = ' ') THEN(DO)
+                        CHGVAR  VAR(&P7312O) VALUE(&POS)
+                        GOTO CMDLBL(EOJ)
+                        ENDDO
+             CHGVAR     VAR(&POS) VALUE(&POS - 1)
+             IF         COND(&POS = 0) THEN(DO)
+                        CHGVAR  VAR(&P7312O) VALUE(0)
+                        GOTO CMDLBL(EOJ)
+                        ENDDO
+             GOTO COUNTLOOP
+
+ EOJ:
+             ENDPGM
+

@@ -1,0 +1,70 @@
+             PGM
+             DCL        VAR(&$EVR)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&JOB)   TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#PROC) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&LCK)    TYPE(*CHAR) LEN(1)
+
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN14)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN96)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN97)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN98)   TYPE(*LGL)  LEN(1)
+             CHGVAR     VAR(%SST(*LDA 162   1)) VALUE('2')
+             CHGVAR     VAR(%SST(*LDA 125   3)) VALUE('001')
+             CHGVAR     VAR(%SST(*LDA 598   2)) VALUE('00')
+             RTVJOBA    JOB(&JOB)
+
+            /* &W#PROC --> 0 =未處理, 1 =處理中*/
+            RTVDTAARA  DTAARA(SCDA01 (2   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('月結作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+ START:      CALL       PGM(INT010) PARM(&IN03 &IN14 &IN96 &IN97 &IN98)
+             IF         COND(&IN03) THEN(DO)
+             CHGVAR     VAR(%SST(*LDA 601 100)) VALUE(' ')
+             RETURN
+             ENDDO
+
+             IF         COND(&IN14) THEN(DO)
+
+             /* LOCK CHECK */
+             CHGVAR     VAR(&LCK) VALUE('1')
+             CALL       PGM(INT010C2) PARM(&LCK &IN96)
+             IF         COND(&IN96 *EQ '1') THEN( GOTO CMDLBL(START) )
+
+             /* 變更狀態碼-開始 */
+             CHGDTAARA  DTAARA(SCDA01 (2   1)) VALUE('1')
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             IF         COND(&$EVR *EQ '1') THEN(DO)
+
+             /* 即時處理*/
+             CALL       PGM(INT010C1)
+             CHGVAR     VAR(&IN98)  VALUE('1')
+             /* DLCOBJ */
+             CHGVAR     VAR(&LCK) VALUE(' ')
+             CALL       PGM(INT010C2) PARM(&LCK &IN96)
+             /* 變更狀態碼-完成 */
+             CHGDTAARA  DTAARA(SCDA01 (2   1)) VALUE('0')
+             ENDDO
+
+             ELSE       CMD(DO)
+             /* 批次處理*/
+
+             /* DLCOBJ */
+             CHGVAR     VAR(&LCK) VALUE(' ')
+             CALL       PGM(INT010C2) PARM(&LCK &IN96)
+             CALL       PGM(INT010C1)
+             CHGVAR     VAR(&IN97)  VALUE('1')
+
+             ENDDO   /* &$EVR */
+
+             ENDDO   /* &IN14 */
+
+             GOTO       CMDLBL(START)
+
+             ENDPGM
+

@@ -1,0 +1,191 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : MTC005                                        *
+      * AUTHER       : A1010  JOHN CHIOU                             *
+      * CREATE DATE  : 2010/10/29                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存數量重算                                 *
+      ****************************************************************
+     FINTXLF01IP  E           K        DISK
+     FINTBPF  UF  E           K        DISK
+     FC#EHPF  IF  E           K        DISK
+     E*===============================================================
+     ITX0
+     I                                              TX01  L1
+     I                                              TX02  L1
+     I                                              TX27  L1
+     I                                              TX12  L1
+     I                                              TX11  L1
+     I*==============================================================
+     I           UDS
+     I                                      101 110 $USER
+     I                                      201 2080$A8YMD
+     I                                      209 2160$C8YMD
+     I*
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C           *LIKE     DEFN TB08      XTB08
+     C           *LIKE     DEFN TB09      XTB09
+     C           *LIKE     DEFN TB10      XTB10
+     C           *LIKE     DEFN TB11      XTB11
+     C           *LIKE     DEFN TB12      XTB12
+     C           *LIKE     DEFN TB13      XTB13
+     C           *LIKE     DEFN TB16      XTB16
+     C           *LIKE     DEFN TB18      XTB18
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+     C*==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYEH     KLIST
+     C                     KFLD           INCOMP
+     C*
+     C           KEYTX     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           EH02
+     C*
+     C           KEYTB     KLIST
+     C                     KFLD           TX01
+     C                     KFLD           EH02
+     C                     KFLD           TX27
+     C                     KFLD           TX12
+     C                     KFLD           TX11
+     C*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C  N10                EXSR RTN000                     GET DATE FROM C#EHPF
+     C                     EXSR RTN100                     CALCULATE TB 10~18
+     CL1 10                EXSR RTN200                     UPDATE TB
+      *===============================================================*
+     C*          RTN000....GET DATE FROM C#EHPF
+      *===============================================================*
+01===C           RTN000    BEGSR
+|    C*
+|    C                     SETON                     10
+|    C*
+|    C           KEYEH     CHAINEH0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     SETON                     LR
+| 01-C                     ENDIF
+|    C*
+|    C                     Z-ADD0         XTB08            進貨量
+|    C                     Z-ADD0         XTB09            退出量
+|    C                     Z-ADD0         XTB10            調整入庫量
+|    C                     Z-ADD0         XTB11            調整出庫量
+|    C                     Z-ADD0         XTB12            銷售入庫量
+|    C                     Z-ADD0         XTB13            銷售出庫量
+|    C                     Z-ADD0         XTB13            銷售出庫量
+|    C                     Z-ADD0         XTB16            陳列異動量
+|    C                     Z-ADD0         XTB18            陳列借貨量
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....CALCULATE TB 08 09 10 11 12 13 16 18
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C* A1 A2  存貨調整
+| 01-C           TX03      IFEQ 'A1'
+|   C           TX03      OREQ 'A2'
+|   C           TX03      OREQ 'A6'
+| 02-C           TX15      IFGT 0
+|   C                     ADD  TX15      XTB10            調整入庫
+| 02*C                     ELSE
+|   C                     SUB  TX15      XTB11            調整出庫
+| 02-C                     ENDIF
+     C*
+     C           TX03      IFEQ 'A6'
+     C                     ADD  TX16      XTB16            陳列異動
+     C                     ENDIF
+     C*
+| 01-C                     ENDIF
+|    C* A4  陳列調整
+| 03-C           TX03      IFEQ 'A4'
+|   C                     SUB  TX15      XTB08            進貨
+|   C                     SUB  TX15      XTB11            調整出庫
+|   C                     ADD  TX15      XTB16            陳列異動
+| 03-C                     ENDIF
+|    C* B1 進貨退出
+| 04-C           TX03      IFEQ 'B1'
+|   C                     ADD  TX15      XTB09            進貨退出
+| 04-C                     ENDIF
+|    C*
+|    C* B2 陳列退出
+| 05-C           TX03      IFEQ 'B2'
+|   C                     SUB  TX15      XTB16            陳列異動
+| 05-C                     ENDIF
+|    C*
+|    C* C1 C2 進貨驗收
+| 06-C           TX03      IFEQ 'C1'
+|   C           TX03      OREQ 'C2'
+|   C                     ADD  TX15      XTB08            進貨
+| 06-C                     ENDIF
+|    C*
+|    C* C3    陳列驗收
+| 07-C           TX03      IFEQ 'C3'
+|   C                     ADD  TX15      XTB16            陳列異動
+| 07-C                     ENDIF
+|    C*
+|    C* E1    陳列轉進貨
+| 08-C           TX03      IFEQ 'E1'
+|   C                     SUB  TX15      XTB16            陳列異動
+|   C                     ADD  TX15      XTB08            進貨
+| 08-C                     ENDIF
+|    C*
+|    C* M1    調撥
+| 09-C           TX03      IFEQ 'M1'
+| 10-C           TX04      IFEQ 1                          調入
+|   C                     ADD  TX15      XTB10            調整入庫
+|   C                     ADD  TX16      XTB16            陳列調整
+| 10*C                     ELSE                            調出
+|   C                     ADD  TX15      XTB11            調整出庫
+|   C                     SUB  TX16      XTB16            陳列調整
+| 10-C                     ENDIF
+| 09-C                     ENDIF
+|    C*
+|    C* S1 銷售退貨
+| 11-C           TX03      IFEQ 'S1'
+|   C           TX15      ANDLT0
+|   C                     SUB  TX15      XTB12            銷售退回
+| 11-C                     ENDIF
+|    C*
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN200....UPDATE INTBPF
+      *===============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C           KEYTB     CHAINTB0                  41
+| 01-C           *IN41     IFEQ '0'
+|   C                     Z-ADDXTB08     TB08
+|   C                     Z-ADDXTB09     TB09
+|   C                     Z-ADDXTB10     TB10
+|   C                     Z-ADDXTB11     TB11
+|   C                     Z-ADDXTB12     TB12
+|   C                     Z-ADDXTB13     TB13
+|   C                     Z-ADDXTB16     TB16
+|   C*
+|   C                     UPDATTB0
+| 01-C                     ENDIF
+|    C*
+|    C                     Z-ADD0         XTB08            進貨量
+|    C                     Z-ADD0         XTB09            退出量
+|    C                     Z-ADD0         XTB10            調整入庫量
+|    C                     Z-ADD0         XTB11            調整出庫量
+|    C                     Z-ADD0         XTB12            銷售入庫量
+|    C                     Z-ADD0         XTB13            銷售出庫量
+|    C                     Z-ADD0         XTB13            銷售出庫量
+|    C                     Z-ADD0         XTB16            陳列異動量
+|    C                     Z-ADD0         XTB18            陳列借貨量
+|    C*
+03===C                     ENDSR
+      *===============================================================*
+

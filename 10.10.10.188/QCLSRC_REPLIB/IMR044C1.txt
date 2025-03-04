@@ -1,0 +1,163 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1118  PHILIP                             */
+     /*    CREATE DATE  : 81/04/22                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : IMR044C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :庫存系統                                 */
+     /*    REMARK       :送貨單列印                               */
+     /*    MODI CODE    : M001 將送貨單轉存檔案，供物流公司使用 */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DPATH)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSEL)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DPNO)   TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&DSE07)  TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSE02S)  TYPE(*CHAR) LEN(12)
+             DCL        VAR(&DSE02E)  TYPE(*CHAR) LEN(12)
+             DCL        VAR(&WSE06)  TYPE(*CHAR) LEN(8)
+/*M002A */   DCL        VAR(&NEW)    TYPE(*CHAR) LEN(1)
+
+             DCL        VAR(&JOB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&USR) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&NBR) TYPE(*CHAR) LEN(6)
+
+             CHGVAR     VAR(&DPATH) VALUE(%SST(*LDA 601 1))
+             CHGVAR     VAR(&DSEL) VALUE(%SST(*LDA 602 1))
+             CHGVAR     VAR(&DPNO) VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&DSE07)  VALUE(%SST(*LDA 659 5))
+             CHGVAR     VAR(&DSE02S)  VALUE(%SST(*LDA 617 12))
+             CHGVAR     VAR(&DSE02E)  VALUE(%SST(*LDA 636 12))
+             CHGVAR     VAR(&WSE06)  VALUE(%SST(*LDA 681 8))
+ /* M002A */ CHGVAR     VAR(&NEW  )  VALUE(%SST(*LDA 690 1))
+
+             IF         COND(&DSEL = 'B') THEN(DO)
+             RTVJOBA    JOB(&JOB) USER(&USR) NBR(&NBR)
+             CHGSPLFA   FILE(IMR044P) JOB(&NBR/&USR/&JOB) +
+                          SPLNBR(*LAST) PAGERANGE(&DPNO *END)
+             MONMSG     MSGID(CPF3309) EXEC(GOTO CMDLBL(ENDSR))
+             RLSSPLF    FILE(IMR044P) JOB(&NBR/&USR/&JOB) SPLNBR(*LAST)
+             GOTO ENDSR
+             ENDDO
+
+             OVRPRTF    FILE(IMR044P) PAGESIZE(42 198) LPI(6) +
+                          CPI(15) OVRFLW(42)  +
+                          USRDTA('送貨單')
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+
+             IF         COND(&DPATH = '1' ) THEN(DO)
+
+             IF         COND(&DSEL = 'A' ) THEN(DO)
+
+             CLRPFM     FILE(REFLIB/IMR044F) /* M002A */
+             MONMSG     MSGID(CPF0000)
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE02 +
+                          *EQ %RANGE("' *CAT &DSE02S *CAT '" "' +
+                          *CAT &DSE02E *CAT '") & SE07 *EQ "' *CAT +
+                          &DSE07 *CAT '" & SE06 *EQ ' *CAT &WSE06 +
+                          *CAT ' & SE36 *NE "T" & (SE09="C" | +
+                          SE09=" ") & SE27 *NE "E" &  SE20 *EQ 0 & +
+                          (SE21 *NE 0 *OR SE03 *EQ "D7")  & SE25 +
+                          *EQ "V" ') KEYFLD((SE02))
+             ENDDO
+
+             IF         COND(&DSEL = 'C' ) THEN(DO)
+
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE02 +
+                          *EQ %RANGE("' *CAT &DSE02S *CAT '" "' +
+                          *CAT &DSE02E *CAT '") & SE07 *EQ "' *CAT +
+                          &DSE07 *CAT '" & SE06 *EQ ' *CAT &WSE06 +
+                          *CAT ' & SE36 *NE "T" & (SE09="C" | +
+                          SE09=" ") & SE27 *NE "E"  & (SE21 *NE 0 +
+                          *OR SE03 *EQ "D7") & SE25 *EQ "V" ') +
+                          KEYFLD((SE02))
+             ENDDO
+
+             ENDDO
+
+             IF         COND(&DPATH = '2') THEN(DO)
+
+             IF         COND(&DSEL = 'A') THEN(DO)
+
+             CLRPFM     FILE(REFLIB/IMR044F) /* M002A */
+             MONMSG     MSGID(CPF0000)
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE02 +
+                          *EQ %RANGE("' *CAT &DSE02S *CAT '" "' +
+                          *CAT &DSE02E *CAT '") & SE07 *EQ "' *CAT +
+                          &DSE07 *CAT '" & SE06 *EQ ' *CAT &WSE06 +
+                          *CAT ' & SE36 *NE "T" & (SE09="C" | +
+                          SE09=" ") & SE27 *EQ "E" &  SE20 *EQ 0 & +
+                          (SE21 *NE 0 *OR SE03 *EQ "D7") & SE25 *EQ +
+                          "V" ') KEYFLD((SE02))
+             ENDDO
+
+             IF         COND(&DSEL = 'C') THEN(DO)
+
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE02 +
+                          *EQ %RANGE("' *CAT &DSE02S *CAT '" "' +
+                          *CAT &DSE02E *CAT '") & SE07 *EQ "' *CAT +
+                          &DSE07 *CAT '" & SE06 *EQ ' *CAT &WSE06 +
+                          *CAT ' & SE36 *NE "T" & (SE09="C" | +
+                          SE09=" ") & SE27 *EQ "E"  & (SE21 *NE 0 +
+                          *OR SE03 *EQ "D7") & SE25 *EQ "V" ') +
+                          KEYFLD((SE02))
+             ENDDO
+
+             ENDDO
+
+             IF         COND(&DPATH = '3') THEN(DO)
+
+             IF         COND(&DSEL = 'A') THEN(DO)
+
+             CLRPFM     FILE(REFLIB/IMR044F) /* M002A */
+             MONMSG     MSGID(CPF0000)
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE02 +
+                          *EQ %RANGE("' *CAT &DSE02S *CAT '" "' +
+                          *CAT &DSE02E *CAT '") & SE07 *EQ "' *CAT +
+                          &DSE07 *CAT '" & SE06 *EQ ' *CAT &WSE06 +
+                          *CAT ' & SE36 *NE "T" & (SE09="C" | +
+                          SE09=" ") & SE20 = 0 & (SE21 *NE 0 *OR +
+                          SE03 *EQ "D7") & SE25 *EQ "V" ') +
+                          KEYFLD((SE02))
+             ENDDO
+
+             IF         COND(&DSEL = 'C') THEN(DO)
+
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE02 +
+                          *EQ %RANGE("' *CAT &DSE02S *CAT '" "' +
+                          *CAT &DSE02E *CAT '") & SE07 *EQ "' *CAT +
+                          &DSE07 *CAT '" & SE06 *EQ ' *CAT &WSE06 +
+                          *CAT ' & SE36 *NE "T" & (SE09="C" | +
+                          SE09=" ") & (SE21 *NE 0 *OR SE03 *EQ +
+                          "D7") & SE25 *EQ "V" ') KEYFLD((SE02))
+             ENDDO
+
+             ENDDO
+
+             CALL       IMR0441
+
+             CLOF       OPNID(SOSEPF)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6601I) VALUE('IMR044P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+ENDSR:       ENDPGM
+

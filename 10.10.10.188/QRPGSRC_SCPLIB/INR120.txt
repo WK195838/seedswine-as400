@@ -1,0 +1,210 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     H*                                                              *
+     H* PROGRAM NAME : INR120                                        *
+     H* AUTHER       : DAISY                                         *
+     H* CREATE DATE  : 2013/12/30                                    *
+     H* UPDATE DATE  :                                               *
+     H* SYSTEM       :                                             *
+     H* SUBSYSTEM    :庫存系統                                     *
+     H* REMARK       :盤盈銷售明細表                               *
+     H****************************************************************
+     FPA#BPF  IF  E           K        DISK
+     FC#EHPF  IF  E           K        DISK
+     FINR120D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      600 600 DOWNL
+     I                                      601 602 DTQ01
+     I                                      603 604 DTQ02S
+     I                                      605 606 DTQ02E
+     I                                      607 6120DTQ03S
+     I                                      613 6180DTQ03E
+     I                                      651 6580DDATES
+     I                                      659 6660DDATEE
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+     C*
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+    C                     MOVEL*BLANK    DOWNL
+  02-C           *IN03     IFEQ '0'
+    C*
+    C                     EXSR RTN100                     .CHECK      ?
+    C*
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+     C*===============================================================*
+     C*          RTN010....INIT SCREEN
+     C*===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     IN   LDA
+|    C*
+|    C                     Z-ADD2         $EVR
+|    C                     MOVEL$USER     AUT     3
+|    C*
+|    C                     MOVEL*BLANK    DTQ01            公司代號
+|    C                     MOVEL*BLANK    D#B03            公司名稱
+|    C                     MOVEL*BLANK    DTQ02S           通路代號
+|    C                     MOVEL*BLANK    DTQ02E           通路代號
+|    C                     Z-ADD0         DTQ03S           銷售日期
+|    C                     Z-ADD0         DTQ03E           銷售日期
+|    C                     Z-ADD0         DDATES           調整日期
+|    C                     Z-ADD0         DDATEE           調整日期
+|    C                     Z-ADD0         W6      60
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+     C*===============================================================*
+     C*          RTN100....CHECK SCREEN
+     C*===============================================================*
+02===C           RTN100    BEGSR
+|    C**公司別
+| 01-C           DTQ01     IFEQ *BLANK
+|   C                     MOVEL*BLANK    D#B03
+|   C                     MOVEL'ERR0001' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     SETON                     6099
+| 01-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C           DTQ01     CHAINPA#BPF               40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANK    D#B03
+|   C                     MOVEL'ERR0018' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     SETON                     6099
+| 02*C                     ELSE
+|   C                     MOVEL#B03      D#B03
+| 02-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C           DTQ01     CHAINC#EHPF               40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL'ERR0049' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     SETON                     6099
+| 03-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C* 通路代號
+| 04-C           DTQ02S    IFEQ *BLANK
+|   C                     MOVE *LOVAL    DTQ02S
+| 04-C                     END
+|    C*
+| 05-C           DTQ02E    IFEQ *BLANK
+|   C                     MOVE *HIVAL    DTQ02E
+| 05-C                     END
+|    C*
+| 06-C           DTQ02S    IFGT DTQ02E
+|   C                     MOVEL'ERR0005' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+|   C                     SETON                     616299
+| 06-C                     END
+|    C   99                GOTO END100
+|    C*
+|    C*銷售日期
+| 13-C           DTQ03S    IFEQ 0
+|   C                     Z-ADD010192    DTQ03S
+| 13*C                     ELSE
+|   C                     CALL 'P09'
+|   C                     PARM DTQ03S    P0901I  60
+|   C                     PARM           P0901O  1
+| 14-C           P0901O    IFEQ 'N'
+|   C                     SETON                     6599
+|   C                     MOVEL'ERR0004' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 14-C                     END
+| 13-C                     END
+|    C   99                GOTO END100
+|    C*
+| 15-C           DTQ03E    IFEQ 0
+|   C                     Z-ADD123129    DTQ03E
+| 15*C                     ELSE
+|   C                     CALL 'P09'
+|   C                     PARM DTQ03E    P0901I  60
+|   C                     PARM           P0901O  1
+| 16-C           P0901O    IFEQ 'N'
+|   C                     SETON                     6699
+|   C                     MOVEL'ERR0004' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 16-C                     END
+| 15-C                     END
+|    C   99                GOTO END100
+|    C**
+| 15-C           DTQ03S    IFGE EH07
+|   C                     SETON                     6699
+|   C                     MOVEL'ERR0160' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 15-C                     END
+|    C   99                GOTO END100
+|    C**
+| 15-C           DTQ03E    IFGE EH07
+|   C                     SETON                     6699
+|   C                     MOVEL'ERR0160' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 15-C                     END
+|    C   99                GOTO END100
+|    C**
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM DTQ03S    S001I2  60
+|    C           W6        PARM           S001O1  60
+|    C                     MOVE W6        HB2@F6  6
+|    C                     EXSR HB@68L
+|    C                     MOVE HB2@T8    DDATES
+|    C*
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+|    C                     PARM DTQ03E    S001I2  60
+|    C           W6        PARM           S001O1  60
+|    C                     MOVE W6        HB2@F6  6
+|    C                     EXSR HB@68L
+|    C                     MOVE HB2@T8    DDATEE
+|    C*
+| 17-C           DDATES    IFGT DDATEE
+|   C                     SETON                     656699
+|   C                     MOVEL'ERR0005' ERRID
+|   C                     MOVEL'SCMF'    ERRF
+| 17-C                     END
+|    C   99                GOTO END100
+|    C*
+02===C           END100    ENDSR
+     C*===============================================================*
+     C*          OUTLDA....OUT LDA
+     C*===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+     C*===============================================================*
+     C/COPY HBP2CVTR
+

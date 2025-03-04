@@ -1,0 +1,80 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /* PROGRAM-ID   : PIA009C2                                     */
+     /* PROGRAM NAME :計算12/25庫存量-驗收數量                */
+     /* AUTHOR       : RACHEL                                       */
+     /* CREATE DATE  : 2022/10/06                                   */
+     /* UPDATE DATE  :                                              */
+     /* SYSTEM       :庫存系統作業                                */
+     /* SUBSYSTEM    :盤點系統　　                                */
+     /* REMARK       :計算盤點日與12/25之間的驗收數量           */
+     /*-------------------------------------------------------------*/
+     /* NOTES        : FROM PUR020C1所以不列入陳列驗收單          */
+     /*-------------------------------------------------------------*/
+     /*                                                             */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&DPI01)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DPI02)    TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DZA03S)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DZA03E)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&$DATA)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SELEC1)   TYPE(*CHAR) LEN(512)
+
+             CHGVAR     VAR(&DPI01)    VALUE(%SST(*LDA 501 2))
+             CHGVAR     VAR(&DPI02)    VALUE(%SST(*LDA 503 2))
+             CHGVAR     VAR(&DZA03S)   VALUE(%SST(*LDA 527 8))
+             CHGVAR     VAR(&DZA03E)   VALUE(%SST(*LDA 535 8))
+
+   /*  */
+                DLTF       FILE(QTEMP/INTXTM)
+                MONMSG     MSGID(CPF2105)
+                CRTDUPOBJ  OBJ(INTXTM) FROMLIB(*LIBL) OBJTYPE(*FILE) +
+                             TOLIB(QTEMP) NEWOBJ(INTXTM) DATA(*NO) +
+                             CST(*NO) TRG(*NO)
+
+                OVRDBF     FILE(INTXTM) TOFILE(QTEMP/INTXTM)
+             CALL       PGM(PUR900) PARM(&DPI01 &DZA03S &DZA03E 'A')
+                DLTOVR     FILE(INTXTM)
+
+/*   */
+        /*   OVRDBF     FILE(INTXTM)  SHARE(*YES)      */
+             OVRDBF     FILE(INTXTM) TOFILE(QTEMP/INTXTM) SHARE(*YES)
+             OPNQRYF    FILE(QTEMP/INTXTM)   OPTION(*ALL)                  +
+                         QRYSLT('TX01 = "' || &DPI01  || '"          +
+                         & TX27 = "' || &DPI02 || ' "                +
+                         & TX06 = %RANGE(  '|| &DZA03S ||'           +
+                                           '|| &DZA03E ||')          +
+                         & TX15 *NE 0                                +
+                         & (TX03  = "C1"                             +
+                             *OR TX03  = "C2"                        +
+                             *OR TX03  = "B1")             ')        +
+                        KEYFLD((TX01)(TX27)(TX12)(TX06)(TX11))
+
+
+ START:
+             CLRPFM     FILE(SCWK051) /*驗收單明細表工作檔*/
+             CALL       PIA00921      /* WRITE TO WORKFILE */
+
+             OVRDBF     FILE(PIZALF07)   SHARE(*YES)
+
+             OPNQRYF    FILE((PIZALF07)) OPTION(*ALL) QRYSLT('        +
+                          ZA01  = "' || &DPI01 || '"                  +
+                        & ZA02  = "' || &DPI02 || '"                  +
+                        & ZA03C = %RANGE("' || &DZA03S || '"          +
+                                         "' || &DZA03E || '")         +
+                        & ZA07 = " " ')                               +
+                          KEYFLD((ZA01)(ZA02)(ZA04)(ZA05))            +
+                          MAPFLD((ZA03C ZA03 *CHAR 8))
+
+             CALL       PIA00922
+
+             CLOF       OPNID(INTXTM)
+             DLTOVR     FILE(INTXTM)
+             CLOF       OPNID(PIZALF07)
+             DLTOVR     FILE(PIZALF07)
+
+             ENDPGM
+

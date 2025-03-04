@@ -1,0 +1,266 @@
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.07  Y2K MODIFY                    */
+     /*=============================================================*/
+     FPOPBPF  IP  E           K        DISK
+     FPOPCPF  IF  E           K        DISK
+     FPOPDPF  IF  E           K        DISK
+     FPOPELF01IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMBLF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FPOR053P O   E             39     PRINTER
+     IPB0
+     I                                              PB04  L1
+     I                                              PB05  L2
+     I                                              PB01  L3
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I                                      601 602 DPB01S
+     I                                      603 604 DPB01E
+     I                                      611 615 DPB05S
+     I                                      621 625 DPB05E
+     I*(MM/DD/YY)
+     I                                      631 6360DPB04S
+     I                                      641 6460DPB04E
+     I*(YY/MM/DD)
+     I                                      651 6560WPB04S
+     I                                      661 6660WPB04E
+     I*
+      *==============================================================*
+      *          KEY LIST
+      *==============================================================*
+     C           KEYPE     KLIST
+     C                     KFLD           PB02
+     C                     KFLD           PC03
+     C*
+      *==============================================================*
+      *          MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *INIT VALUE
+    C                     SETON                     10
+  01*C                     ELSE
+  02-C           *INL3     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR RTN100                     *PROC DATA
+     C*
+     CL1 10                SETOF                     31
+     CL2 10                EXSR RTNL2
+     CL3 10                EXSR RTNL3
+     CLR 10                EXSR RTNL4
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....INIT VALUE
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C           PB01      CHAIN#B0                  40
+| 03-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   #B03
+| 03-C                     END
+|    C                     WRITEPH1
+      *
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....PROC DATA
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*************
+|    C*供應商簡稱
+|    C*************
+|    C           PB05      CHAINMB0                  40
+|    C*
+|    C   40                MOVE *BLANK    MB03
+|    C***********
+|    C*採購日期
+|    C***********
+M001AC                     Z-ADDPB04      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM PB04      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           PPB04     PARM           S001O1  60
+|    C*採購產品
+     C                     EXSR RTN200
+      *
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....PROC DATA
+      *==============================================================*
+02===C           RTN200    BEGSR
+      *
+|    C           PB02      SETLLPC0
+|    C           PB02      READEPC0                      45
+| 01-C           *IN45     DOWEQ'0'
+     C                     SETOF                     27
+      *產品說明
+|   C           PC03      CHAINMA0                  40
+     C   40                MOVEL*BLANKS   MA03
+      *
+      *MARK='V'已結案
+| 02-C           PC06      IFNE PC11
+|   C                     MOVEL*BLANKS   MARK
+     C                     ELSE
+|   C                     MOVEL'V'       MARK
+| 02-C                     END
+      *
+     C                     ADD  PC06      T2PC06
+     C                     ADD  PC08      T2PC08
+      *驗收狀態
+     C                     EXSR RTN300
+      *
+|    C           PB02      READEPC0                      45
+02===C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....PROC DATA
+      *==============================================================*
+02===C           RTN300    BEGSR
+      *
+     C                     MOVEL*BLANKS   PE02
+      *
+     C                     Z-ADD0         PPE05
+     C                     Z-ADD0         PE06
+     C                     SETOF                     11
+|   C           KEYPE     SETLLPE0
+|   C           KEYPE     READEPE0                      46
+| 03-C           *IN46     DOWEQ'0'
+      *IN11有驗收
+     C                     SETON                     11
+     C                     Z-ADD0         AMT1
+     C                     Z-ADD0         AMT2
+     C                     Z-ADD0         AMT3
+     C                     Z-ADD0         AMT4
+|    C***********
+|    C*採購日期
+|    C***********
+M001AC                     Z-ADDPE05      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM PE05      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           PPE05     PARM           S001O1  60
+      *
+|   C                     ADD  PE07      AMT3
+|   C                     ADD  PE08      AMT4
+|   C           PE02      CHAINPD0                  40
+|   C           PE07      DIV  PD09      WORK   154
+|   C                     ADD  WORK      AMT1
+|   C           PE08      DIV  PD09      WORK   154
+|   C                     ADD  WORK      AMT2
+     C   39                EXSR RTN900
+     C                     WRITEPD1
+     C                     SETON                     273031
+     C                     SETOF                     20
+     C                     ADD  PE06      T1PE06
+     C                     ADD  AMT1      T1AMT1
+     C                     ADD  AMT2      T1AMT2
+     C                     ADD  AMT3      T1AMT3
+     C                     ADD  AMT4      T1AMT4
+      *
+|   C           KEYPE     READEPE0                      46
+| 03-C                     END
+      *
+     C           *IN11     IFEQ '1'
+     C   39                EXSR RTN900
+     C                     WRITEPT1
+     C                     SETON                     20
+     C                     ADD  T1PE06    T2PE06
+     C                     ADD  T1AMT1    T2AMT1
+     C                     ADD  T1AMT2    T2AMT2
+     C                     ADD  T1AMT3    T2AMT3
+     C                     ADD  T1AMT4    T2AMT4
+     C                     Z-ADD0         T1PE06
+     C                     Z-ADD0         T1AMT1
+     C                     Z-ADD0         T1AMT2
+     C                     Z-ADD0         T1AMT3
+     C                     Z-ADD0         T1AMT4
+     C                     ELSE
+     C                     MOVEL'*NONE'   PE02
+     C   39                EXSR RTN900
+     C                     WRITEPD1
+     C                     SETON                     3031
+     C                     SETOF                     20
+     C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTNL2.....PROC L2
+      *==============================================================*
+03===C           RTNL2     BEGSR
+|    C*
+|    C                     WRITEPT2
+|    C                     ADD  T2AMT3    T3AMT3
+|    C                     ADD  T2AMT4    T3AMT4
+|    C                     Z-ADD0         T2PC06
+|    C                     Z-ADD0         T2PC08
+|    C                     Z-ADD0         T2PE06
+|    C                     Z-ADD0         T2AMT1
+|    C                     Z-ADD0         T2AMT2
+|    C                     Z-ADD0         T2AMT3
+|    C                     Z-ADD0         T2AMT4
+|    C                     SETON                     20
+|    C                     SETOF                     30
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL3.....PROC L3
+      *==============================================================*
+04===C           RTNL3     BEGSR
+|    C*
+|    C                     WRITEPT3
+|    C                     ADD  T3AMT3    T4AMT3
+|    C                     ADD  T3AMT4    T4AMT4
+|    C                     Z-ADD0         T3AMT3
+|    C                     Z-ADD0         T3AMT4
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNL4.....PROC L4
+      *==============================================================*
+05===C           RTNL4     BEGSR
+|    C*
+|    C                     WRITEPT4
+|    C                     Z-ADD0         T4AMT3
+|    C                     Z-ADD0         T4AMT4
+|    C                     WRITEPE2
+      *
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+| 01-C           *IN39     IFEQ '1'
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+03===C           RTNLR     BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+     C                     WRITEPH1
+     C                     WRITEPE9
+| 01-C                     END
+|    C*
+|    C                     WRITEPE2
+|    C*
+03===C                     ENDSR
+

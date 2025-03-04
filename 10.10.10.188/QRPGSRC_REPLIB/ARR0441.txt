@@ -1,0 +1,203 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0441                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/04/02                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :票據收入明細表                               *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   98.12.22  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FARADPF  IP  E           K        DISK
+     FARACPF  IF  E           K        DISK
+     FSOSIPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FARR044P O   E             39     PRINTER
+     IAD0
+     I                                              AD02  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 602 DAD01
+     I*(MM/DD/YY)
+     I                                      603 6080DAD04S
+     I                                      609 6140DAD04E
+     I*(YY/MM/DD)
+M001MI*                                     620 6250YAD04S
+M001MI*                                     626 6310YAD04E
+M001MI                                      620 6270YAD04S
+M001MI                                      628 6350YAD04E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYAD     KLIST
+     C                     KFLD           DAD01
+     C                     KFLD           AD07
+     C*
+     C           KEYAC     KLIST
+     C                     KFLD           AD01
+     C                     KFLD           AD02
+     C                     KFLD           AD03
+     C                     KFLD           AD04
+     C                     KFLD           AD05
+     C                     KFLD           AD06
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME SALE
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     C*
+     CL1 10                EXSR RTN888
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*公司名稱
+|    C           DAD01     CHAIN#B0                  40
+|    C   40                MOVE *BLANK    D#B03
+|    C  N40                MOVEL#B03      D#B03
+|    C*
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C                     SETON                       3031
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     EXSR RTN300                     *CHAIN DATA
+|    C                     EXSR RTN350                     *SUBTOT-->ENDTOT
+|    C                     EXSR RTN400                     *WRITE DETAIL
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C*
+|    C*客戶簡稱
+|    C*
+|    C           AD02      CHAINME0                  41
+| 01-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 01-C                     END
+|    C*
+|    C*收款日期
+M001AC                     Z-ADDAD04      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM AD04      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|    C           DDATE     PARM           S001O1  60
+|    C*預計兌現日期
+|    C*
+B2000C           KEYAC     CHAINAC0                  42
+| 02-C           *IN42     IFEQ '0'
+|   C*
+M001AC                     Z-ADDAC07      W6
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM AC07      S001I2  80
+M001MC                     PARM W6        S001I2  60
+|   C           DAC07     PARM           S001O1  60
+| 02*C                     ELSE
+|   C                     Z-ADD0         DAC07
+|   C*
+| 02-C                     END
+|    C*
+|    C*業務員
+|    C*
+|    C           KEYAD     CHAINSI0                  43
+| 03-C           *IN43     IFEQ '0'
+|   C                     EXSR RTN340
+|   C*
+|   C           TEMPC     CHAINMC0                  44
+|   C   44                MOVE *BLANK    MC02
+|   C*
+| 03-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN340....COMP SALES
+      *==============================================================*
+04===C           RTN340    BEGSR
+|    C*
+| 01-C           SI31      IFNE TEMPC
+|   C                     MOVE SI31      TEMPC   6
+|   C                     SETON                     30
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN350....ADD SUBTOT  TO  ENDTOT
+      *==============================================================*
+05===C           RTN350    BEGSR
+|    C                     Z-ADDAD08      DAD08
+|    C                     ADD  AD08      CUSTOT
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE DETAIL
+      *==============================================================*
+06===C           RTN400    BEGSR
+|    C*
+|    C                     WRITEPD1
+|    C                     SETOF                     3031
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+07===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     31
+|    C                     SETOF                     39
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN888....WRITE CUSTOT  (ENDTOT)--L1
+      *==============================================================*
+08===C           RTN888    BEGSR
+|    C*
+|    C                     SETON                       31
+|    C                     WRITEPD2
+|    C                     WRITEPE4
+|    C                     ADD  CUSTOT    ENDTOT
+|    C                     Z-ADD0         CUSTOT
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+09===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE5
+|   C                     WRITEPE2
+| 01*C                     ELSE
+|   C                     WRITEPD3
+|   C                     WRITEPE2
+| 01-C                     END
+|    C*
+09===C                     ENDSR
+

@@ -1,0 +1,243 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INR0901                                       *
+      * AUTHER       : A1491  EASON                                  *
+      * CREATE DATE  : 99/03/11                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :銷貨成本表                                   *
+      ****************************************************************
+      *00A需求單號: 1080438
+      *00A108/06/28 CAROL增加篩選條件：供應商、產品歸屬
+      ****************************************************************
+     FINTXPF  IF  E           K        DISK
+ 00A+FMANCPF  IF  E           K        DISK
+     FSCWK21  UF  E           K        DISK                      A
+     FSCWK22  UF  E           K        DISK                      A
+     FSCWK23  UF  E           K        DISK                      A
+     E*
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      201 2080A8YMD
+     I                                      203 2080A6YMD
+ 00A-I*                                     671 6760DEK02
+ 00A+I                                      671 6760DEH02
+ 00A+I                                      701 705 DNB01S
+ 00A+I                                      706 710 DNB01E
+ 00A+I                                      711 712 DNC09
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+ 00A+C           KEYNC     KLIST
+ 00A+C                     KFLD           TX01
+ 00A+C                     KFLD           TX11
+     C           KEYTX     KLIST
+     C                     KFLD           TX01
+     C                     KFLD           TX27
+     C                     KFLD           TX12
+     C                     KFLD           TX11
+     C           KEY21     KLIST
+     C                     KFLD           W2101
+     C                     KFLD           W2102
+     C                     KFLD           W2103
+     C           KEY22     KLIST
+     C                     KFLD           W2101
+     C                     KFLD           W2102
+     C                     KFLD           W2104
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN100
+     C                     EXSR RTN200
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN100....撰寫工作檔
+      *===============================================================*
+01===C           RTN100    BEGSR
+|     *
+|    C                     Z-ADD0         TOTAL  150
+|    C                     Z-ADD0         TEMP   112
+|     *
+|    C           *LOVAL    SETLLTX0
+|    C                     READ TX0                      46
+| 01-C           *IN46     DOWEQ'0'
+|    *
+ 00A+C           KEYNC     CHAINNC0                  41
+ 00A+C           *IN41     IFEQ '0'
+ 00A+C           NC03      IFGE DNB01S
+ 00A+C           NC03      ANDLEDNB01E
+ 00A+C*
+ 00A+C           DNC09     IFNE *BLANK
+ 00A+C           NC09      ANDEQDNC09
+ 00A+C           DNC09     OREQ *BLANK
+ 00A+C*
+|   C           KEYTX     CHAINW21                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVELTX01      W2101            公司
+|   C                     MOVELTX27      W2102            通路代號
+|   C                     MOVELTX12      W2103            分店代號
+|   C                     MOVELTX11      W2104            產品代號
+|   C                     Z-ADDTX14      W2105            銷貨數量
+|   C                     Z-ADDTX19      W2106            銷貨金額-未稅
+|   C                     Z-ADD0         W2107            銷售佔比
+|   C                     Z-ADDTX21      W2108            銷貨成本-未稅
+|   C                     Z-ADD0         W2109            銷貨利潤-未稅
+|   C                     Z-ADD0         W2110            獲利率
+|   C                     Z-ADD0         W2111            毛利率
+|   C                     WRITEW21
+| 02*C                     ELSE
+|   C                     ADD  TX14      W2105            銷貨金額-未稅
+|   C                     ADD  TX19      W2106            銷售佔比
+|   C                     ADD  TX21      W2108            銷貨成本-未稅
+|   C                     UPDATW21
+| 02-C                     ENDIF
+|    *
+|   C                     ADD  TX19      TOTAL
+|    *
+ 00A+C                     END
+ 00A+C                     END
+ 00A+C                     END
+|   C                     READ TX0                      46
+| 01-C                     ENDDO
+|     *
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN200....撰寫工作檔
+      *===============================================================*
+02===C           RTN200    BEGSR
+|     *
+|    C           *LOVAL    SETLLW21
+|    C                     READ W21                      46
+| 01-C           *IN46     DOWEQ'0'
+|    *
+|   C           W2106     DIV  TOTAL     QTEMP   75H
+|   C           QTEMP     MULT 100       W2107
+|   C           W2106     SUB  W2108     W2109
+| 02-C           W2106     IFNE 0
+|   C           W2109     DIV  W2106     QTEMP   75H
+|   C           QTEMP     MULT 100       W2110
+| 02*C                     ELSE
+|   C                     Z-ADD0         W2110
+| 02-C                     ENDIF
+| 03-C           W2108     IFNE 0
+|   C           W2109     DIV  W2108     QTEMP   75H
+|   C           QTEMP     MULT 100       W2111
+| 03*C                     ELSE
+|   C                     Z-ADD0         W2111
+| 03-C                     ENDIF
+|   C                     UPDATW21
+|    *
+|   C                     EXSR RTN300
+|    *
+|   C                     READ W21                      46
+| 01-C                     ENDDO
+|     *計算工作檔
+|    C                     EXSR RTN400
+|     *
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN300....撰寫工作檔
+      *===============================================================*
+03===C           RTN300    BEGSR
+|     *
+|    C           KEY21     CHAINW22                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  W2105     W2204
+|   C                     ADD  W2106     W2205
+|   C                     ADD  W2108     W2207
+|   C                     UPDATW22
+| 01*C                     ELSE
+|   C                     MOVELW2101     W2201
+|   C                     MOVELW2102     W2202
+|   C                     MOVELW2103     W2203
+|   C                     Z-ADDW2105     W2204
+|   C                     Z-ADDW2106     W2205
+|   C                     Z-ADDW2108     W2207
+|   C                     WRITEW22
+| 01-C                     ENDIF
+|     *
+|    C           KEY22     CHAINW23                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     ADD  W2105     W2304
+|   C                     ADD  W2106     W2305
+|   C                     ADD  W2108     W2307
+|   C                     UPDATW23
+| 02*C                     ELSE
+|   C                     MOVELW2101     W2301
+|   C                     MOVELW2102     W2302
+|   C                     MOVELW2104     W2303
+|   C                     Z-ADDW2105     W2304
+|   C                     Z-ADDW2106     W2305
+|   C                     Z-ADDW2108     W2307
+|   C                     WRITEW23
+| 02-C                     ENDIF
+|     *
+03===C                     ENDSR
+      *===============================================================*
+     C*          RTN400....計算工作檔
+      *===============================================================*
+04===C           RTN400    BEGSR
+|     *
+|    C           *LOVAL    SETLLW22
+|    C                     READ W22                      46
+| 01-C           *IN46     DOWEQ'0'
+|    *
+|   C           W2205     DIV  TOTAL     QTEMP
+|   C           QTEMP     MULT 100       W2206
+|   C           W2205     SUB  W2207     W2208
+| 02-C           W2205     IFNE 0
+|   C           W2208     DIV  W2205     QTEMP
+|   C           QTEMP     MULT 100       W2209
+| 02*C                     ELSE
+|   C                     Z-ADD0         W2209
+| 02-C                     ENDIF
+| 03-C           W2207     IFNE 0
+|   C           W2208     DIV  W2207     QTEMP
+|   C           QTEMP     MULT 100       W2210
+| 03*C                     ELSE
+|   C                     Z-ADD0         W2210
+| 03-C                     ENDIF
+|    *
+|   C                     UPDATW22
+|    *
+|   C                     READ W22                      46
+| 01-C                     ENDDO
+|     *
+|    C           *LOVAL    SETLLW23
+|    C                     READ W23                      46
+| 04-C           *IN46     DOWEQ'0'
+|    *
+|   C           W2305     DIV  TOTAL     QTEMP
+|   C           QTEMP     MULT 100       W2306
+|   C           W2305     SUB  W2307     W2308
+| 05-C           W2305     IFNE 0
+|   C           W2308     DIV  W2305     QTEMP
+|   C           QTEMP     MULT 100       W2309
+| 05*C                     ELSE
+|   C                     Z-ADD0         W2309
+| 05-C                     ENDIF
+| 06-C           W2307     IFNE 0
+|   C           W2308     DIV  W2307     QTEMP
+|   C           QTEMP     MULT 100       W2310
+| 06*C                     ELSE
+|   C                     Z-ADD0         W2310
+| 06-C                     ENDIF
+|    *
+|   C                     UPDATW23
+|    *
+|   C                     READ W23                      46
+| 04-C                     ENDDO
+|     *
+04===C                     ENDSR
+

@@ -1,0 +1,80 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       :                                           */
+     /*    CREATE DATE  :                                           */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : INT009                                    */
+     /*    SYSTEM       :西祺進銷存                               */
+     /*    SUBSYSTEM    :應收帳款作業                             */
+     /*    REMARK       :備份當日未處理單據                       */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&WCD03) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&WCD03X) TYPE(*DEC) LEN(8 0) VALUE(0)
+             DCL        VAR(&SCD03) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&SCD03X) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&P3702I) TYPE(*CHAR) LEN(1) VALUE('2')
+             DCL        VAR(&P3703I) TYPE(*CHAR) LEN(1) VALUE('2')
+             DCL        VAR(&P3704I) TYPE(*DEC) LEN(4 0) VALUE(-1)
+
+             CALL       PGM(P63)
+
+             RTVDTAARA  DTAARA(*LDA (201 8)) RTNVAR(&SCD03)
+             CHGVAR     VAR(&WCD03)  VALUE(&SCD03)
+
+  /*前一日*/
+             CALL       PGM(P37) PARM(&WCD03 &P3702I &P3703I &P3704I +
+                                      &WCD03X)
+
+             CHGVAR     VAR(&SCD03X)  VALUE(&WCD03X)
+
+  /* CHECK 備份檔 */
+             /* 1.檢查訂貨單主檔 */
+             CHKOBJ     OBJ(POCDPFBK) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(SCFLIB/POCDPFBK) +
+                          SRCFILE(SCFLIB/QDDSSRC) SRCMBR(POCDPF) +
+                          SIZE(*NOMAX)
+             ENDDO
+
+             /* 2.檢查訂貨單明細檔 */
+             CHKOBJ     OBJ(POCEPFBK) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(SCFLIB/POCEPFBK) +
+                          SRCFILE(SCFLIB/QDDSSRC) SRCMBR(POCEPF) +
+                          SIZE(*NOMAX)
+             ENDDO
+
+             /* 3.檢查訂貨單客戶資料檔 */
+             CHKOBJ     OBJ(POCFPFBK) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(SCFLIB/POCFPFBK) +
+                          SRCFILE(SCFLIB/QDDSSRC) SRCMBR(POCFPF) +
+                          SIZE(*NOMAX)
+             ENDDO
+
+             /* 4.檢查訂貨單供應商備註檔 */
+             CHKOBJ     OBJ(POCGPFBK) OBJTYPE(*FILE)
+             MONMSG     MSGID(CPF9801) EXEC(DO)
+             CRTPF      FILE(SCFLIB/POCGPFBK) +
+                          SRCFILE(SCFLIB/QDDSSRC) SRCMBR(POCGPF) +
+                          SIZE(*NOMAX)
+             ENDDO
+
+  /*訂貨單主檔*/
+             OVRDBF     FILE(POCDPF) SHARE(*YES)
+             OPNQRYF    FILE((POCDPF)) OPTION(*ALL) QRYSLT('  +
+                        CD03C <=  "' || &SCD03X || '"         +
+                      & CD12 = " " ')                         +
+                        KEYFLD((*FILE)) MAPFLD((CD03C CD03 *CHAR 8))
+
+
+             CALL       PGM(INT009)
+
+             CLOF       OPNID(POCDPF)
+             DLTOVR     FILE(*ALL)
+
+ ENDPGM:     ENDPGM
+

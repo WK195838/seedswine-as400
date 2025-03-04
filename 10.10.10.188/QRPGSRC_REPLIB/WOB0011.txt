@@ -1,0 +1,217 @@
+     A****************************************************************
+     A*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+     A*                                                              *
+     A*    PROGRAM ID   : WOB0011                                    *
+     A*    AUTHOR       : AN MING HSIA                               *
+     A*    DATE WRITTEN : 82/03/05                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收帳款作業                              *
+     A*    REMARK       :銷貨折讓批次處理                          *
+     A****************************************************************
+     FSOSCPF  IP  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FWOWAPF  UF  E           K        DISK                      A
+     FWOWCPF  UF  E           K        DISK                      A
+     FWOWDPF  UF  E           K        DISK                      A
+     FWOB001P O   E             39     PRINTER
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I*客戶
+     I                                      605 609 DSC04
+     I*銷退日期（期間）
+     I                                      610 6150DSC39S
+     I                                      616 6210DSC39E
+     I                                      622 6270YSC39S
+     I                                      628 6330YSC39E
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYWA     KLIST
+     C                     KFLD           SC08
+     C                     KFLD           SC02
+     C                     KFLD           SC04
+     C                     KFLD           SD03
+     C           KEYWC     KLIST
+     C                     KFLD           SC04
+     C                     KFLD           SD03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *INIT ENVIRM
+  01-C                     END
+     C*
+     C                     EXSR RTN100                     *訂單明細
+     C*
+     CLR                   EXSR RTN999
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*系統日期DATE
+|    C                     MOVE 'SCR001'  APPSCR  6
+|    C                     Z-ADD0         DATE    60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C                     PARM $EGMDY    S001I2  80
+B2INF *CVR3012 sev.30 Field $EGMDY contains more than one year
+B2INF *CVR5011 sev.50 Field S001I2 is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+|    C           DATE      PARM           S001O1  60
+|    C*
+|    C* GET 公司代號
+|    C           SC04      CHAINME0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 02-C                     END
+|    C                     WRITEPH1
+|    C*
+|    C                     SETON                     10
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....SOSDPF
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*訂單明細檔
+|    C           SC02      SETLLSD0
+|    C           SC02      READESD0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C*
+|   C                     Z-ADDSD04      TOT     50
+|   C                     ADD  SD05      TOT
+|   C*檢查經銷商進貨檔
+B2???C           KEYWA     CHAINWA0                  41
+B2INF *CVR0001 sev.00 Field WA01 is not a date or year
+B2INF *CVR0001 sev.00 Field SC02 is not a date or year
+B2INF *CVR0001 sev.00 Field WA02 is not a date or year
+B2INF *CVR0001 sev.00 Field SC04 is not a date or year
+B2INF *CVR0001 sev.00 Field WA03 is not a date or year
+| 02-C           *IN41     IFEQ '1'
+     C           TOT       ANDNE0
+|   C                     EXSR RTN110                     *寫入進貨
+|   C*庫存初值檔
+|   C           KEYWC     CHAINWC0                  42
+| 03-C           *IN42     IFEQ '1'
+|   C                     EXSR RTN120                      *寫入初值
+| 03-C                     END
+|   C*庫存現況檔
+|   C           KEYWC     CHAINWD0                  43
+|   C                     EXSR RTN130                      *寫入初值
+|   C*
+|   C   39                EXSR RTN900
+|   C           SD03      CHAINMA0                  44
+| 04-C           *IN44     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 04-C                     END
+|   C*日期轉換
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM SC08      S001I2  80
+B2000C           DSC08     PARM           S001O1  60
+|   C*
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM SC39      S001I2  80
+B2000C           DSC39     PARM           S001O1  60
+|   C                     WRITEPD1
+| 02-C                     END
+|   C*
+|   C           SC02      READESD0                      40*讀下個產品
+|   C*
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN110....寫入經銷商進貨檔
+     C*==============================================================*
+03===C           RTN110    BEGSR
+|    C*
+|    C                     MOVE SC04      WA01
+B2???C                     MOVE SC08      WA02
+B2INF *CVR0001 sev.00 Field WA02 is not a date or year
+|    C                     MOVE SD03      WA03
+|    C                     Z-ADDTOT       WA04
+|    C                     MOVE SC02      WA05
+|    C                     Z-ADDDATE      WAXX
+B2000C                     TIME           WAYY
+|    C                     MOVE $USER     WAZZ
+|    C*
+|    C                     WRITEWA0
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN120....寫入庫存初值檔
+     C*==============================================================*
+04===C           RTN120    BEGSR
+|    C*
+|    C                     MOVE SC04      WC01
+B2???C                     MOVE SC08      WC02
+B2INF *CVR0001 sev.00 Field WC02 is not a date or year
+|    C                     MOVE SD03      WC03
+|    C                     Z-ADD0         WC04
+|    C                     Z-ADDDATE      WCXX
+B2000C                     TIME           WCYY
+|    C                     MOVE $USER     WCZZ
+|    C*
+|    C                     WRITEWC0
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN130....寫入庫存現況檔
+     C*==============================================================*
+05===C           RTN130    BEGSR
+|    C*
+| 01-C           *IN43     IFEQ '0'
+|   C                     ADD  TOT       WD04
+|   C                     Z-ADDDATE      WDXX
+B2000C                     TIME           WDYY
+|   C                     MOVE $USER     WDZZ
+|   C                     UPDATWD0
+| 01*C                     ELSE
+|   C                     MOVE SC04      WD01
+|   C                     MOVE SD03      WD03
+|   C                     Z-ADDTOT       WD04
+|   C                     Z-ADDDATE      WDXX
+B2000C                     TIME           WDYY
+|   C                     MOVE $USER     WDZZ
+|   C                     WRITEWD0
+| 01-C                     END
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....跳頁
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+07===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+07===C                     ENDSR
+

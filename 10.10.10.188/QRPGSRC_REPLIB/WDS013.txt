@@ -1,0 +1,352 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     H*                                                              *
+     H*    PROGRAM NAME : WDS013                                     *
+     H*    AUTHOR       : A1139  JANE                                *
+     H*    CREATE DATE  : 81/03/04                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :人頭馬匯東洋酒股份有限公司                *
+     H*    SUBSYSTEM    :                                            *
+     H*    REMARK       :物流點資料查詢(WINDOW)                    *
+     F****************************************************************
+     FPA#FLF  IF  E           K        DISK
+     F                                              KINFDS #FRCDN
+     F            #A0                               KRENAME#F01L
+     FPA#APF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FWDS013D CF  E                    WORKSTN
+     E* OP CODE
+     E                    W01         8  1
+     E* COMBINED BY 物流點代號X(05) 物流點說明X(23)
+     E                    W02         8 29
+     I*
+     E                    W03         8  1
+     IWOP0        DS
+@    I                                        1   8 W01
+     I                                        1   1 D1011
+     I                                        2   2 D1021
+     I                                        3   3 D1031
+     I                                        4   4 D1041
+     I                                        5   5 D1051
+     I                                        6   6 D1061
+     I                                        7   7 D1071
+     I                                        8   8 D1081
+     IWD0         DS
+@    I                                        1 232 W02
+     I                                        1  29 D1012
+     I                                       30  58 D1022
+     I                                       59  87 D1032
+     I                                       88 116 D1042
+     I                                      117 145 D1052
+     I                                      146 174 D1062
+     I                                      175 203 D1072
+     I                                      204 232 D1082
+@    IS013I1      DS
+@    I                                        1   8 W03
+     I*
+     I            DS
+@    I                                        1  29 WT
+     I                                        1   5 #F01
+     I                                        7  29 D#A03
+     I#FRCDN      DS
+     I                                     *RECORD  RCDN
+     I            DS
+     I                                        1   5 DD
+     I                                        1   1 S#F01
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           S013I1  8        物流點類別
+     C                     PARM           S013O1  5        物流點代號
+     C*==============================================================*
+     C*                KEY LIST FOR CHAIN DATA
+     C*==============================================================*
+     C           KEY#F     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C*
+     C           KEY#M     KLIST
+     C                     KFLD           #F01
+     C*==============================================================*
+     C*                KEY LIST FOR TOP & BOTTOM
+     C*==============================================================*
+     C           KEY#FT    KLIST                           *KEY TOP
+     C                     KFLD           W#F01T
+     C*
+     C           KEY#FB    KLIST                           *KEY BOTTOM
+     C                     KFLD           W#F01B
+     C*
+     C           *LIKE     DEFN #F01      W#F01T
+     C           *LIKE     DEFN #F01      W#F01B
+     C*
+     C           *LIKE     DEFN WP        HWPT
+     C           *LIKE     DEFN WP        HWPB
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C                     EXSR RTN100                     *1 READ NEXT
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+    C                     EXFMTDSPC1
+    C*
+  02-C           *IN25     IFEQ '1'                        *ROLLUP
+    C           *IN97     ANDEQ'0'                        *LAST PAGE
+    C           KEY#FB    SETGTPA#FLF                     *AFTER 1 SETLL
+    C                     EXSR RTN100                     *READ NEXT
+  02-C                     END
+    C*
+  03-C           *IN26     IFEQ '1'                        *ROLLDOWN
+    C           *IN98     ANDEQ'0'                        *FIRST PAGE
+    C           KEY#FT    SETLLPA#FLF
+    C                     EXSR RTN200                     *READ PREV
+  03-C                     END
+    C*
+  04-C           *IN25     IFEQ '0'
+    C           *IN26     ANDEQ'0'
+    C                     EXSR RTN300
+  04-C                     END
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*--------
+| 05-C           S013I1    IFEQ 'STORAGE'
+|   C                     MOVEL*BLANKS   W03
+|   C                     Z-ADD0         I       10
+|   C                     MOVEL'STORAGE '#A01
+|   C           #A01      SETLL#A0
+|   C           #A01      READE#A0                      40
+| 06-C           I         DOWLE7
+|   C           *IN40     ANDEQ'0'
+|   C                     ADD  1         I
+|   C                     MOVEL#A02      W03,I
+|   C           #A01      READE#A0                      40
+| 06-C                     END
+| 05-C                     END
+      *------------
+|    C                     MOVE *BLANKS   TEMP    5
+|    C                     Z-ADD1         WP      10
+|    C*
+| 07-C           W03,WP    IFNE *BLANK
+|   C                     MOVELW03,WP    TEMP
+|   C           TEMP      SETLLPA#FLF                     *1 SETLL
+| 07-C                     END
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....READ NEXT
+     C*==============================================================*
+02===CSR         RTN100    BEGSR
+|    C*
+|    C                     MOVEA*BLANKS   W01
+|    C                     MOVEA*BLANKS   W02
+|    C                     Z-ADD0         CT      10
+|    C*
+|    C   25                SETOF                     98
+|    C*
+|    C                     EXSR RTN400                     *FIRSTCODE
+|    C  N97                EXSR RTN810                     *GET KEY TOP
+|    C*
+|    C*
+| 01-C           CT        DOWLE7
+|   C           *IN10     ANDEQ'1'                        *MATCH
+|   C*
+| 02-C           *IN97     IFEQ '0'
+| 03-C           *IN21     IFEQ '0'
+|   C                     EXSR RTN500                     *JUDGE RCDN
+|   C                     ADD  1         CT
+|   C                     MOVE WT        W02,CT
+|   C                     EXSR RTN820                     *GET KEY BOT
+| 03-C                     END
+| 02*C                     ELSE
+|   C           CT        ADD  61        WO      20
+|   C                     MOVEA*ALL'1'   *IN,WO
+|   C                     SETOF                       98
+|   C                     Z-ADD9         CT
+| 02-C                     END
+|   C*
+|   C                     EXSR RTN400                     *FIRST CODE
+|   C*
+| 01-C                     END
+|    C*
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....READ PREVIOUS
+     C*==============================================================*
+03===CSR         RTN200    BEGSR
+|    C*
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C                     MOVEA*BLANKS   W01
+|    C                     MOVEA*BLANKS   W02
+|    C                     Z-ADD9         CT
+|    C                     Z-ADD0         AA      10
+|    C*
+|    C                     EXSR RTN410
+|    C                     EXSR RTN820                     *GET BOTTOM
+|    C*
+| 01-C           AA        DOWLE7                          *SFL FULL
+|   C           *IN11     ANDEQ'1'                        *MATCH
+|   C*
+| 02-C           *IN98     IFEQ '0'
+|   C*
+| 03-C           *IN22     IFEQ '0'
+|   C                     EXSR RTN500                     *JUDGE RCDN
+|   C*
+|   C                     SUB  1         CT
+|   C                     MOVE WT        W02,CT
+|   C                     EXSR RTN810                     *GET KEY TOP
+|   C                     ADD  1         AA
+| 03-C                     END
+| 02*C                     ELSE
+|   C                     ADD  9         AA
+| 02-C                     END
+|   C*
+|   C                     EXSR RTN410
+|   C*
+| 01-C                     END
+|    C*
+| 04-C           *IN98     IFEQ '1'                        *FIRST PAGE
+|   C                     MOVE W#F01T    W#F01B
+|   C                     MOVE HWPT      HWPB
+|   C*
+|   C                     MOVE HWPB      WP
+|   C           KEY#FB    SETLLPA#FLF
+|   C                     EXSR RTN100                     *READ NEXT
+|   C                     GOTO END200
+| 04-C                     END
+|    C*
+|    C*
+03===C           END200    ENDSR
+     C*==============================================================*
+     C*          RTN300....TRANSFER DATA TO CALLING PROGRAM
+     C*==============================================================*
+04===CSR         RTN300    BEGSR
+|    C*
+|    C                     Z-ADD1         WJ      10
+|    C           '/'       LOKUPW01,WJ                   30
+| 01-C           *IN30     IFEQ '1'
+|   C                     MOVELW02,WJ    S013O1
+|   C                     SETON                     03
+| 01*C                     ELSE
+|   C                     MOVE D#F01     W#F01B
+|   C                     MOVE D#F01     W#F01T
+|   C                     MOVEA*ALL'0'   *IN,60
+|   C           KEY#FB    SETLLPA#FLF                     *1 SETLL
+|   C                     EXSR RTN100                     *1 READ NEXT
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN400....
+     C*==============================================================*
+05===CSR         RTN400    BEGSR
+|    C*
+| 01-C           W03,WP    IFNE *BLANK
+|   C*
+|   C                     SETOF                     10
+|   C                     READ PA#FLF                   97
+|   C                     MOVE #F01      DD
+|   C*
+|   C                     SETOF                     21
+|   C*
+|   C                     Z-ADD1         WP
+|   C           S#F01     LOKUPW03,WP                   20
+| 02-C           *IN20     IFEQ '1'                        *FOUND
+|   C                     SETON                         10
+| 02*C                     ELSE
+|   C                     SETON                         10
+|   C                     SETON                         21
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 03-C           W03,WP    IFEQ *BLANK
+|   C                     SETON                         10
+|   C                     SETON                         97
+| 03-C                     END
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN410....
+     C*==============================================================*
+06===CSR         RTN410    BEGSR
+|    C*
+|    C                     SETOF                     22
+| 01-C           W03,WP    IFNE *BLANK
+|   C*
+|   C                     SETOF                     11
+|   C                     READPPA#FLF                   98
+|   C                     MOVE #F01      DD
+|   C*
+|   C*
+|   C                     Z-ADD1         WP
+|   C           S#F01     LOKUPW03,WP                   20
+| 02-C           *IN20     IFEQ '1'                        *FOUND
+|   C                     SETON                         11
+| 02*C                     ELSE
+|   C                     SETON                         11
+|   C*                    SETON                         22
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 03-C           W03,WP    IFEQ *BLANK
+|   C                     SETON                         11
+|   C                     SETON                         98
+| 03-C                     END
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN500....JUDGE RECDN
+     C*==============================================================*
+07===CSR         RTN500    BEGSR
+|    C*
+| 01-C           RCDN      IFEQ 'MD0'
+|   C*
+|   C           KEY#M     CHAINME0                  41
+| 02-C           *IN41     IFEQ '0'
+|   C                     MOVELME04      D#A03
+| 02*C                     ELSE
+|   C                     MOVE *BLANK    D#A03
+| 02-C                     END
+|   C*
+| 01*C                     ELSE
+|   C*
+|   C                     MOVEL'STORAGE' #A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVEL#F01      #A02
+|   C           KEY#F     CHAIN#A0                  41
+| 03-C           *IN41     IFEQ '0'
+|   C                     MOVEL#A02      #F01
+|   C                     MOVEL#A03      D#A03
+| 03*C                     ELSE
+|   C                     MOVE *BLANKS   D#A03
+| 03-C                     END
+|   C*
+| 01-C                     END
+|    C*
+07===C                     ENDSR
+     C*==============================================================*
+     C*          RTN810....READ NEXT CLEAR & INIT
+     C*==============================================================*
+08===CSR         RTN810    BEGSR
+|    C                     MOVE #F01      W#F01T
+|    C                     Z-ADDWP        HWPT
+08===C                     ENDSR
+     C*==============================================================*
+     C*          RTN820....READ PREV CLEAR & INIT
+     C*==============================================================*
+09===CSR         RTN820    BEGSR
+|    C                     MOVE #F01      W#F01B
+|    C                     Z-ADDWP        HWPB
+09===C                     ENDSR
+

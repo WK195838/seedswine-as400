@@ -1,0 +1,493 @@
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.02 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     FRES18WF UF  E           K        DISK                      A
+     FSOSRPF  IF  E           K        DISK
+     FMTMFLF01IF  E           K        DISK
+     FMTMALF  IF  E           K        DISK
+      *產品代號
+     E                    MA         10  9
+      *訂購數量
+     E                    CNT        10  6 0
+      *搭購數量
+     E                    CNT1       10  6 0
+      *金額
+     E                    AMT        10 10 0
+      *中間訂購成本
+     E                    FOB        10 13 2
+     E                    FHI        10 13 2
+     E                    DTY        10 13 2
+      *中間搭贈成本
+     E                    FOB1       10 13 2
+     E                    FHI1       10 13 2
+     E                    DTY1       10 13 2
+      *轉帳訂購成本
+     E                    FOB2       10 13 2
+     E                    FHI2       10 13 2
+     E                    DTY2       10 13 2
+      *轉帳搭贈成本
+     E                    FOB3       10 13 2
+     E                    FHI3       10 13 2
+     E                    DTY3       10 13 2
+      *KEEP最大值之陣列數，最大成本（金額）及差異成本（金額）
+      *1=FOB   2=FHI   3=DTY   4=FOB1   5=FHI1   6=DTY1   7=AMT
+      *轉帳
+      *8=FOB2  9=FHI2 10=DTY2 11=FOB3  12=FHI3  13=DTY3
+     E                    MAX        13  2 0
+     E                    CST        13 13 2
+     E                    DIF        13 13 2
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           S08I1   9        禮盒代號
+      *若不為訂單則為空白
+     C                     PARM           S08I2  12        訂單號碼
+     C                     PARM           S08I3   60       牌價判斷日
+     C                     PARM           S08I4   60       禮盒訂購數量
+     C                     PARM           S08I5   60       禮盒搭贈數量
+     C                     PARM           S08I6   90       禮盒金額
+      *部份－單位成本－中間
+     C                     PARM           S08I7   82       禮盒成本FOB
+     C                     PARM           S08I8   82       禮盒成本FHI
+     C                     PARM           S08I9   82       禮盒成本DUTY
+      *部份－單位成本－轉帳
+     C                     PARM           S08IA   82       禮盒成本FOB
+     C                     PARM           S08IB   82       禮盒成本FHI
+     C                     PARM           S08IC   82       禮盒成本DUTY
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYMF     KLIST
+     C                     KFLD           S08I1
+     C           KEYSR     KLIST
+     C                     KFLD           S08I2
+     C                     KFLD           S08I1
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+      *分析方式－單瓶需拆解禮盒為單瓶
+     C                     EXSR RTN100
+      *計算差異數，並放入最大值
+     C                     EXSR RTN200
+      *WRITE TO RES18WF
+     C                     EXSR RTN300
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....禮盒單瓶成本
+      *==============================================================*
+01===C           RTN100    BEGSR
+      *禮盒拆解為產品
+|    C                     Z-ADD0         TAMT   132
+|    C                     Z-ADD0         SR07T  132
+|    C                     Z-ADD0         SR08T  132
+|    C                     Z-ADD0         SR09T  132
+      *ARRAY KEEP DATA
+|    C                     Z-ADD0         I       20
+|    C                     MOVE *BLANKS   MA
+|    C                     Z-ADD0         CNT
+|    C                     Z-ADD0         CNT1
+|    C                     Z-ADD0         AMT
+|    C                     Z-ADD0         FOB
+|    C                     Z-ADD0         FHI
+|    C                     Z-ADD0         DTY
+|    C                     Z-ADD0         FOB1
+|    C                     Z-ADD0         FHI1
+|    C                     Z-ADD0         DTY1
+|    C                     Z-ADD0         FOB2
+|    C                     Z-ADD0         FHI2
+|    C                     Z-ADD0         DTY2
+|    C                     Z-ADD0         FOB3
+|    C                     Z-ADD0         FHI3
+|    C                     Z-ADD0         DTY3
+      *差異成本
+|    C           KEYSR     SETLLSR0                      48
+|    C  N48      KEYMF     SETLLMF0
+      *IN48 READ SOSRPF OR MTMFLF01
+| 01-C           *IN48     IFEQ '1'
+|   C           KEYSR     READESR0                      47
+| 01*C                     ELSE
+|   C           KEYMF     READEMF0                      47
+| 01-C                     END
+| 02-C           *IN47     DOWEQ'0'
+      *
+| 03-C           *IN48     IFEQ '1'
+|   C           SR04      CHAINMA0                  40
+| 03*C                     ELSE
+|   C           MF02      CHAINMA0                  40
+| 03-C                     END
+| 04-C*M001M     S08I3     IFLT MA39
+M001AC                     MOVE S08I3     HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    WS08I3  80
+M001AC*
+M001MC           WS08I3    IFLT MA39
+|   C                     Z-ADDMA41      WAMT   132
+| 04*C                     ELSE
+|   C                     Z-ADDMA46      WAMT
+| 04-C                     END
+      *
+|   C                     ADD  1         I
+| 05-C           *IN48     IFEQ '1'
+|   C                     MOVELSR04      MA,I
+      *GET銷售數量成本CNT
+      *訂購
+|   C           S08I4     MULT SR06      CNT,I            *訂購數量
+|   C           CNT,I     MULT WAMT      AMT,I
+|   C                     MULT S08I6     AMT,I            *金額
+      *中間成本
+|   C           CNT,I     MULT SR07      FOB,I
+|   C                     MULT S08I7     FOB,I            *FOB
+|   C           CNT,I     MULT SR08      FHI,I
+|   C                     MULT S08I8     FHI,I            *FHI
+|   C           CNT,I     MULT SR09      DTY,I
+|   C                     MULT S08I9     DTY,I            *DUTY
+      *搭贈
+|   C           S08I5     MULT SR06      CNT1,I           *搭贈數量
+|   C           CNT1,I    MULT SR07      FOB1,I
+|   C                     MULT S08I7     FOB1,I           *FOB
+|   C           CNT1,I    MULT SR08      FHI1,I
+|   C                     MULT S08I8     FHI1,I           *FHI
+|   C           CNT1,I    MULT SR09      DTY1,I
+|   C                     MULT S08I9     DTY1,I           *DUTY
+      *轉帳成本
+|   C           CNT,I     MULT SR07      FOB2,I
+|   C                     MULT S08IA     FOB2,I           *FOB
+|   C           CNT,I     MULT SR08      FHI2,I
+|   C                     MULT S08IB     FHI2,I           *FHI
+|   C           CNT,I     MULT SR09      DTY2,I
+|   C                     MULT S08IC     DTY2,I           *DUTY
+      *搭贈
+|   C           CNT1,I    MULT SR07      FOB3,I
+|   C                     MULT S08IA     FOB3,I           *FOB
+|   C           CNT1,I    MULT SR08      FHI3,I
+|   C                     MULT S08IB     FHI3,I           *FHI
+|   C           CNT1,I    MULT SR09      DTY3,I
+|   C                     MULT S08IC     DTY3,I           *DUTY
+|   C*GET金額比率總數
+|   C           SR06      MULT WAMT      WFLD
+|   C                     ADD  WFLD      TAMT
+|   C*GET成本比率總數
+|   C           SR06      MULT SR07      WFLD   132
+|   C                     ADD  WFLD      SR07T
+|   C           SR06      MULT SR08      WFLD
+|   C                     ADD  WFLD      SR08T
+|   C           SR06      MULT SR09      WFLD
+|   C                     ADD  WFLD      SR09T
+|   C           KEYSR     READESR0                      47
+| 05*C                     ELSE
+|   C                     MOVELMF02      MA,I
+      *GET銷售數量成本CNT
+      *訂購
+|   C           S08I4     MULT MF04      CNT,I            *訂購數量
+|   C           CNT,I     MULT WAMT      AMT,I
+|   C                     MULT S08I6     AMT,I            *金額
+      *中間成本
+|   C           CNT,I     MULT MF06      FOB,I
+|   C                     MULT S08I7     FOB,I            *FOB
+|   C           CNT,I     MULT MF08      FHI,I
+|   C                     MULT S08I8     FHI,I            *FHI
+|   C           CNT,I     MULT MF09      DTY,I
+|   C                     MULT S08I9     DTY,I            *DUTY
+      *搭贈
+|   C           S08I5     MULT MF04      CNT1,I           *搭贈數量
+|   C           CNT1,I    MULT MF06      FOB1,I
+|   C                     MULT S08I7     FOB1,I           *FOB
+|   C           CNT1,I    MULT MF08      FHI1,I
+|   C                     MULT S08I8     FHI1,I           *FHI
+|   C           CNT1,I    MULT MF09      DTY1,I
+|   C                     MULT S08I9     DTY1,I           *DUTY
+      *轉帳成本
+      *訂購
+|   C           CNT,I     MULT MF06      FOB2,I
+|   C                     MULT S08IA     FOB2,I            *FOB
+|   C           CNT,I     MULT MF08      FHI2,I
+|   C                     MULT S08IB     FHI2,I            *FHI
+|   C           CNT,I     MULT MF09      DTY2,I
+|   C                     MULT S08IC     DTY2,I            *DUTY
+      *搭贈
+|   C           CNT1,I    MULT MF06      FOB3,I
+|   C                     MULT S08IA     FOB3,I           *FOB
+|   C           CNT1,I    MULT MF08      FHI3,I
+|   C                     MULT S08IB     FHI3,I           *FHI
+|   C           CNT1,I    MULT MF09      DTY3,I
+|   C                     MULT S08IC     DTY3,I           *DUTY
+|   C*GET金額比率總數
+|   C           MF04      MULT WAMT      WFLD
+|   C                     ADD  WFLD      TAMT
+|   C*GET成本比率總數
+|   C           MF04      MULT MF06      WFLD   132
+|   C                     ADD  WFLD      SR07T
+|   C           MF04      MULT MF08      WFLD
+|   C                     ADD  WFLD      SR08T
+|   C           MF04      MULT MF09      WFLD
+|   C                     ADD  WFLD      SR09T
+|   C           S08I1     READEMF0                      47
+| 05-C                     END
+|   C*
+| 02-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....計算最大成本
+      *==============================================================*
+02===C           RTN200    BEGSR
+      *
+|    C                     Z-ADD0         DIF
+      *總成本
+|    C           S08I7     MULT S08I4     DIF,1
+|    C           S08I8     MULT S08I4     DIF,2
+|    C           S08I9     MULT S08I4     DIF,3
+|    C           S08I7     MULT S08I5     DIF,4
+|    C           S08I8     MULT S08I5     DIF,5
+|    C           S08I9     MULT S08I5     DIF,6
+      *轉帳成本
+|    C           S08IA     MULT S08I4     DIF,8
+|    C           S08IB     MULT S08I4     DIF,9
+|    C           S08IC     MULT S08I4     DIF,10
+|    C           S08IA     MULT S08I5     DIF,11
+|    C           S08IB     MULT S08I5     DIF,12
+|    C           S08IC     MULT S08I5     DIF,13
+      *總金額
+|    C           S08I6     MULT S08I4     DIF,7
+      *
+|    C                     Z-ADD0         MAX
+|    C                     Z-ADD0         CST
+|    C                     Z-ADD1         I
+|    C*
+| 01-C           I         DOWLT10
+|   C           MA,I      ANDNE*BLANKS
+      *
+| 02-C           SR07T     IFNE 0
+      *中間
+|   C                     DIV  SR07T     FOB,I     H      *訂購FOB
+|   C                     DIV  SR07T     FOB1,I    H      *搭贈FOB
+      *轉帳
+|   C                     DIV  SR07T     FOB2,I    H      *訂購FOB
+|   C                     DIV  SR07T     FOB3,I    H      *搭贈FOB
+| 02*C                     ELSE
+|   C                     Z-ADD0         FOB,I
+|   C                     Z-ADD0         FOB1,I
+|   C                     Z-ADD0         FOB2,I
+|   C                     Z-ADD0         FOB3,I
+| 02-C                     END
+|   C                     SUB  FOB,I     DIF,1
+|   C                     SUB  FOB1,I    DIF,4
+|   C                     SUB  FOB2,I    DIF,8
+|   C                     SUB  FOB3,I    DIF,11
+| 03-C           CST,1     IFLT FOB,I
+|   C                     Z-ADDFOB,I     CST,1
+|   C                     Z-ADDI         MAX,1
+| 03-C                     END
+| 04-C           CST,4     IFLT FOB1,I
+|   C                     Z-ADDFOB1,I    CST,4
+|   C                     Z-ADDI         MAX,4
+| 04-C                     END
+| 04-C           CST,8     IFLT FOB2,I
+|   C                     Z-ADDFOB2,I    CST,8
+|   C                     Z-ADDI         MAX,8
+| 04-C                     END
+| 04-C           CST,11    IFLT FOB3,I
+|   C                     Z-ADDFOB3,I    CST,11
+|   C                     Z-ADDI         MAX,11
+| 04-C                     END
+      *
+| 05-C           SR08T     IFNE 0
+|   C                     DIV  SR08T     FHI,I     H      *訂購FHI
+|   C                     DIV  SR08T     FHI1,I    H      *搭贈FHI
+|   C                     DIV  SR08T     FHI2,I    H      *訂購FHI
+|   C                     DIV  SR08T     FHI3,I    H      *搭贈FHI
+| 05*C                     ELSE
+|   C                     Z-ADD0         FHI,I
+|   C                     Z-ADD0         FHI1,I
+|   C                     Z-ADD0         FHI2,I
+|   C                     Z-ADD0         FHI3,I
+| 05-C                     END
+|   C                     SUB  FHI,I     DIF,2
+|   C                     SUB  FHI1,I    DIF,5
+|   C                     SUB  FHI2,I    DIF,9
+|   C                     SUB  FHI3,I    DIF,12
+| 06-C           CST,2     IFLT FHI,I
+|   C                     Z-ADDFHI,I     CST,2
+|   C                     Z-ADDI         MAX,2
+| 06-C                     END
+| 07-C           CST,5     IFLT FHI1,I
+|   C                     Z-ADDFHI1,I    CST,5
+|   C                     Z-ADDI         MAX,5
+| 07-C                     END
+| 07-C           CST,9     IFLT FHI2,I
+|   C                     Z-ADDFHI2,I    CST,9
+|   C                     Z-ADDI         MAX,9
+| 07-C                     END
+| 07-C           CST,12    IFLT FHI3,I
+|   C                     Z-ADDFHI3,I    CST,12
+|   C                     Z-ADDI         MAX,12
+| 07-C                     END
+      *
+| 08-C           SR09T     IFNE 0
+|   C                     DIV  SR09T     DTY,I     H      *訂購DUTY
+|   C                     DIV  SR09T     DTY1,I    H      *搭贈DUTY
+|   C                     DIV  SR09T     DTY2,I    H      *訂購DUTY
+|   C                     DIV  SR09T     DTY3,I    H      *搭贈DUTY
+| 08*C                     ELSE
+|   C                     Z-ADD0         DTY,I
+|   C                     Z-ADD0         DTY1,I
+|   C                     Z-ADD0         DTY2,I
+|   C                     Z-ADD0         DTY3,I
+| 08-C                     END
+|   C                     SUB  DTY,I     DIF,3
+|   C                     SUB  DTY1,I    DIF,6
+|   C                     SUB  DTY2,I    DIF,10
+|   C                     SUB  DTY3,I    DIF,13
+| 09-C           CST,3     IFLT DTY,I
+|   C                     Z-ADDDTY,I     CST,3
+|   C                     Z-ADDI         MAX,3
+| 09-C                     END
+| 10-C           CST,6     IFLT DTY1,I
+|   C                     Z-ADDDTY1,I    CST,6
+|   C                     Z-ADDI         MAX,6
+| 10-C                     END
+| 10-C           CST,10    IFLT DTY2,I
+|   C                     Z-ADDDTY2,I    CST,10
+|   C                     Z-ADDI         MAX,10
+| 10-C                     END
+| 10-C           CST,13    IFLT DTY3,I
+|   C                     Z-ADDDTY3,I    CST,13
+|   C                     Z-ADDI         MAX,13
+| 10-C                     END
+      *
+| 11-C           TAMT      IFNE 0
+|   C                     DIV  TAMT      AMT,I     H      *金額
+| 11*C                     ELSE
+|   C                     Z-ADD0         AMT,I
+| 11-C                     END
+|   C                     SUB  AMT,I     DIF,7
+| 12-C           CST,7     IFLT AMT,I
+|   C                     Z-ADDAMT,I     CST,7
+|   C                     Z-ADDI         MAX,7
+| 12-C                     END
+|   C                     ADD  1         I
+| 01-C                     END
+|    C*將成本放入最大值
+|    C                     Z-ADDMAX,1     I
+| 13-C           I         IFNE 0
+|   C           DIF,1     ANDNE0
+|   C                     ADD  DIF,1     FOB,I
+| 13-C                     END
+|    C*
+|    C                     Z-ADDMAX,2     I
+| 14-C           I         IFNE 0
+|   C           DIF,2     ANDNE0
+|   C                     ADD  DIF,2     FHI,I
+| 14-C                     END
+|    C*
+|    C                     Z-ADDMAX,3     I
+| 15-C           I         IFNE 0
+|   C           DIF,3     ANDNE0
+|   C                     ADD  DIF,3     DTY,I
+| 15-C                     END
+|    C*
+|    C                     Z-ADDMAX,4     I
+| 16-C           I         IFNE 0
+|   C           DIF,4     ANDNE0
+|   C                     ADD  DIF,4     FOB1,I
+| 16-C                     END
+|    C*
+|    C                     Z-ADDMAX,5     I
+| 17-C           I         IFNE 0
+|   C           DIF,5     ANDNE0
+|   C                     ADD  DIF,5     FHI1,I
+| 17-C                     END
+|    C*
+|    C                     Z-ADDMAX,6     I
+| 18-C           I         IFNE 0
+|   C           DIF,6     ANDNE0
+|   C                     ADD  DIF,6     DTY1,I
+| 18-C                     END
+|    C*
+|    C                     Z-ADDMAX,7     I
+| 19-C           I         IFNE 0
+|   C           DIF,7     ANDNE0
+|   C                     ADD  DIF,7     AMT,I
+| 19-C                     END
+|    C*
+|    C                     Z-ADDMAX,8     I
+| 13-C           I         IFNE 0
+|   C           DIF,8     ANDNE0
+|   C                     ADD  DIF,8     FOB2,I
+| 13-C                     END
+|    C*
+|    C                     Z-ADDMAX,9     I
+| 14-C           I         IFNE 0
+|   C           DIF,9     ANDNE0
+|   C                     ADD  DIF,9     FHI2,I
+| 14-C                     END
+|    C*
+|    C                     Z-ADDMAX,10    I
+| 15-C           I         IFNE 0
+|   C           DIF,10    ANDNE0
+|   C                     ADD  DIF,10    DTY2,I
+| 15-C                     END
+|    C*
+|    C                     Z-ADDMAX,11    I
+| 16-C           I         IFNE 0
+|   C           DIF,11    ANDNE0
+|   C                     ADD  DIF,11    FOB3,I
+| 16-C                     END
+|    C*
+|    C                     Z-ADDMAX,12    I
+| 17-C           I         IFNE 0
+|   C           DIF,12    ANDNE0
+|   C                     ADD  DIF,12    FHI3,I
+| 17-C                     END
+|    C*
+|    C                     Z-ADDMAX,13    I
+| 18-C           I         IFNE 0
+|   C           DIF,13    ANDNE0
+|   C                     ADD  DIF,13    DTY3,I
+| 18-C                     END
+|    C*
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....MOVE ARRAY
+      *==============================================================*
+03===C           RTN300    BEGSR
+      *
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     DELETRE18R
+|   C                     READ RE18R                    46
+| 01-C                     END
+      *
+|    C*
+|    C                     Z-ADD1         I
+| 02-C           I         DOWLT10
+|   C           MA,I      ANDNE*BLANKS
+|   C                     MOVELMA,I      R181
+|   C                     Z-ADDCNT,I     R182
+|   C                     Z-ADDCNT1,I    R183
+|   C                     Z-ADDAMT,I     R184
+|   C                     Z-ADDFOB,I     R185
+|   C                     Z-ADDFHI,I     R186
+|   C                     Z-ADDDTY,I     R187
+|   C                     Z-ADDFOB1,I    R188
+|   C                     Z-ADDFHI1,I    R189
+|   C                     Z-ADDDTY1,I    R18A
+|   C                     Z-ADDFOB2,I    R18B
+|   C                     Z-ADDFHI2,I    R18C
+|   C                     Z-ADDDTY2,I    R18D
+|   C                     Z-ADDFOB3,I    R18E
+|   C                     Z-ADDFHI3,I    R18F
+|   C                     Z-ADDDTY3,I    R18G
+|   C                     WRITERE18R
+|   C                     ADD  1         I
+| 02-C                     END
+|    C*
+03===C                     ENDSR
+M001AC/COPY HBP2CVTR
+

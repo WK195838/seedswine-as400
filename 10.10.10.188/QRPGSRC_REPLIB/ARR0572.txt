@@ -1,0 +1,193 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0571                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/05/01                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款系統                                 *
+     A* REMARK       :折讓單                                       *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M004      | 00.06.07 |菸酒稅法實施
+     A*================================================================
+      ****************************************************************
+     FARAFPF  IF  E           K        DISK
+     FSOSIPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARR057APO   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 606 DSG11S
+     I                                      607 612 DSG11E
+     I                                      613 621 DSG45S
+     I                                      622 630 DSG45E
+     I*(MM/DD/YY)
+     I                                      631 6360DSG06S
+     I                                      637 6420DSG06E
+     I*(YY/MM/DD)
+     I                                      650 6550YSG06S
+     I                                      656 6610YSG06E
+     I*(YY/MM/DD)
+     I                                      681 6860CHDATE
+     I                                      681 682 PYY
+     I                                      683 684 PMM
+     I                                      685 686 PDD
+     I            DS
+     I                                        1   60WSI21
+     I                                        1   2 PSIYY
+     I                                        3   4 PSIMM
+     I                                        5   6 PSIDD
+     I            DS
+     I                                        1  10 SI02
+     I                                        1   2 PSI02F
+     I                                        3  10 PSI02B
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN SI12      OSI12
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYSI     KLIST
+     C                     KFLD           AF01
+     C                     KFLD           AF06
+     C           KEYMD     KLIST
+     C                     KFLD           SI12
+     C           KEYME     KLIST
+     C                     KFLD           SI12
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRM
+     C*
+    C                     READ AF0                      45
+    C                     MOVE *BLANKS   OSI12
+  02-C           *IN45     DOWEQ'0'
+    C*
+|    C                     MOVE *BLANKS   SI22D
+|    C                     MOVE *BLANKS   SI22B
+|    C                     MOVE *BLANKS   SI22Z
+|    C* GET 發票資料
+|    C           KEYSI     CHAINSI0                  40
+|    C*
+| 01-C           *IN40     IFEQ '0'
+     C           SI16      ANDNE'Y'
+    C                     EXSR RTN100                     *FILE TO SCR
+    C                     EXSR RTN200
+| 01-C                     END
+    C*
+    C                     READ AF0                      45
+  02-C                     END
+    C*
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INIT ENVIRMENT
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         DATA1
+|    C                     Z-ADD0         DATA2
+|    C                     Z-ADD0         TOTA
+|    C                     Z-ADD0         TOTB
+|    C                     MOVEL'折　讓'CHAR
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....MOVE DATA TO SCREEN
+     C*==============================================================*
+03===C           RTN100    BEGSR
+|    C*
+|   C                     EXSR RTN150
+|   C*
+B2???C           SI21      SUB  110000    WSI21
+B2INF *CVR0001 sev.00 Field WSI21 is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|   C* GET 發票金額／營業稅額
+| 03-C           SI22      IFEQ 'D'
+|   C*M004D     AF07      MULT 100       WDATA1 234
+|   C*M004D     WDATA1    DIV  105       DATA1     H
+M004AC                     Z-ADDAF07      DATA1
+      *課稅別5%
+|   C*M004D     DATA1     MULT 5         WDATA2 234
+|   C*M004D     WDATA2    DIV  100       DATA2     H
+M004AC                     Z-ADDAF09      DATA2
+| 03*C                     ELSE
+|   C                     Z-ADDAF07      DATA1
+M004AC                     Z-ADD0         DATA2
+| 03-C                     END
+|   C* GET 發票稅率備註
+|   C                     SELEC
+|   C           SI22      WHEQ 'D'
+|   C                     MOVE 'V'       SI22D
+|   C           SI22      WHEQ 'B'
+|   C                     MOVE 'V'       SI22B
+|   C           SI22      WHEQ 'Z'
+|   C                     MOVE 'V'       SI22Z
+|   C                     ENDSL
+|   C*
+|    C*
+|    C                     WRITEPD1
+|    C*
+|    C                     ADD  DATA1     TOTA
+|    C                     ADD  DATA2     TOTB
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN150....GET HEADING
+     C*==============================================================*
+02===C           RTN150    BEGSR
+|    C*
+|    C* GET發票公司名稱／統一編號／地址
+|    C           AF01      CHAIN#B0                  40
+| 01-C           *IN40     IFEQ '0'
+|   C*
+|   C           #B17      CHAIN#B0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   #B02
+|   C                     MOVE *BLANKS   #B12
+|   C                     MOVE *BLANKS   #B04
+| 02-C                     END
+|   C*
+| 01*C                     ELSE
+|   C                     MOVE *BLANKS   #B02
+|   C                     MOVE *BLANKS   #B12
+|   C                     MOVE *BLANKS   #B04
+| 01-C                     END
+|    C                     WRITEPH1
+|    C*
+|    C                     Z-ADD0         TOTA
+|    C                     Z-ADD0         TOTB
+|    C*
+|    C                     SETOF                     39
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE 合計＋備註
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*
+|    C                     WRITEPD2
+|    C* GET買受人名稱／統一編號／地址
+|    C           KEYMD     CHAINMD0                  40
+|    C   40                MOVE *BLANKS   MD17
+|    C           KEYME     CHAINME0                  40
+|    C   40                MOVE *BLANKS   ME03
+|    C   40                MOVE *BLANKS   ME05
+|    C   40                MOVE *BLANKS   ME06
+|    C*
+|    C                     WRITEPE1
+|    C*
+04===C                     ENDSR
+

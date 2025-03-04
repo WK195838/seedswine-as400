@@ -1,0 +1,105 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1388  WIND                               */
+     /*    CREATE DATE  : 81/01/27                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : PUR050C1                                  */
+     /*    SYSTEM       :                                           */
+     /*    SUBSYSTEM    :採購系統                                 */
+     /*    REMARK       :供應商負擔運費表                         */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DOWNL)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DCK01)  TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DCK03S) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DCK03E) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DCK08S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DCK08E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DCK09S) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DCK09E) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DDOC)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&SELECT) TYPE(*CHAR) LEN(1024)
+
+             CHGVAR     VAR(&DOWNL)  VALUE(%SST(*LDA 600 1))
+             CHGVAR     VAR(&DCK01)  VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DDOC)   VALUE(%SST(*LDA 617 1))
+             CHGVAR     VAR(&DCK08S) VALUE(%SST(*LDA 618 5))
+             CHGVAR     VAR(&DCK08E) VALUE(%SST(*LDA 623 5))
+             CHGVAR     VAR(&DCK09S) VALUE(%SST(*LDA 628 1))
+             CHGVAR     VAR(&DCK09E) VALUE(%SST(*LDA 629 1))
+             CHGVAR     VAR(&DCK03S) VALUE(%SST(*LDA 631 8))
+             CHGVAR     VAR(&DCK03E) VALUE(%SST(*LDA 641 8))
+             CHGVAR     VAR(&SELECT) VALUE('CK01 = "' || &DCK01 || +
+                          '" *AND CK08 = %RANGE("' || &DCK08S || '" +
+                          "' || &DCK08E || '") *AND CK03 = %RANGE(' +
+                          || &DCK03S || ' ' || &DCK03E || ') *and +
+                          ck09 = %range("' || &DCK09S || '" "' || +
+                          &DCK09E || '")  *AND CK06 = "1" *AND CK17 +
+                          = "P" ')
+
+             OVRDBF     FILE(POCKPF) SHARE(*YES)
+             OPNQRYF    FILE((POCKPF)) QRYSLT(&SELECT) KEYFLD((CK01) +
+                          (CK08) (CK03) (CK09) (CK10))
+
+             IF         COND(&DOWNL *EQ '1') THEN(DO)
+             GOTO       DOWNLOAD
+             ENDDO
+
+             ELSE       CMD(DO)
+             GOTO       PRINT
+             ENDDO
+
+ DOWNLOAD:
+         /*  CALL       PUR0503    */
+             CALL       PUR050C2
+
+             CLOF       OPNID(POCKPF)
+             DLTOVR     FILE(*ALL)
+             GOTO       END
+ PRINT:
+             OVRDBF     FILE(SCWK061) SHARE(*YES)
+             OVRDBF     FILE(SCWK062) SHARE(*YES)
+             CLRPFM     FILE(SCWK061)
+             CLRPFM     FILE(SCWK062)
+
+             IF         COND(&DDOC *EQ '1') THEN(DO)
+             OVRPRTF    FILE(PUR050P) USRDTA('負擔總表')
+             CALL       PUR0503
+             CALL       PUR0501
+             CHGVAR     VAR(&P6601I) VALUE('PUR050P')
+             ENDDO
+
+             ELSE
+             IF         COND(&DDOC *EQ '2') THEN(DO)
+             OVRPRTF    FILE(PUR050P1) USRDTA('負擔明細')
+             CALL       PUR0503
+             CALL       PUR0502
+             CHGVAR     VAR(&P6601I) VALUE('PUR050P1')
+             ENDDO
+
+             CLOF       OPNID(POCKPF)
+             DLTOVR     FILE(*ALL)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             GOTO       END
+
+ END:
+             ENDPGM
+

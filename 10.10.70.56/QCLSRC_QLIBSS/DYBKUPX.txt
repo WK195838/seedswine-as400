@@ -1,0 +1,74 @@
+             PGM        PARM(&MSGYN)
+             DCL        VAR(&MSGYN) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN88) TYPE(*LGL) LEN(1) VALUE('0')
+             DCL        VAR(&TIME) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN90) TYPE(*CHAR) LEN(1) VALUE('0')
+             DCL        VAR(&CDATE) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&ENDINT) TYPE(*CHAR) LEN(1) VALUE('Y')
+             DCL        VAR(&OPTLIB) TYPE(*CHAR) LEN(1) VALUE('*')
+             DCLF       FILE(WKBKUPF)
+             MONMSG     MSGID(MCH0000 CPF0000 CPF9999)
+                           /*EXECEPTION HANDER */
+    /*       CHGJOB     LOGCLPGM(*YES)      */
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*NOTIFY)
+             MONMSG     MSGID(MCH0000 CPF0000 CPF9999)
+             IF         COND((&MSGYN *NE 'n') *AND (&MSGYN *NE 'N')) +
+                          THEN(DO)
+             SNDBRKMSG  MSG('一分鐘後將END SUBSYSTEM +
+                          QINTER請立刻SIGNOFF AND POWERDOWN YOUR +
+                          WORKSTATION有困難者請於一分鐘內通知OPERATO+
+                          R謝謝！') TOMSGQ(*ALLWS)
+             ENDDO
+             ELSE       CMD(CHGVAR VAR(&ENDINT) VALUE(&MSGYN))
+             STRSBS     SBSD(QPGMR)
+             MONMSG     MSGID(CPF0000)
+             DLYJOB     DLY(30)
+
+             CALL       PGM(SET) PARM(&IN03 &ENDINT &OPTLIB)
+             IF         COND(&IN03 *EQ '0') THEN(DO)
+             IF         COND(&ENDINT *EQ 'Y') THEN(DO)
+             SNDBRKMSG  MSG('三十秒後將END SUBSYSTEM +
+                          QINTER請立刻SIGNOFF AND POWERDOWN YOUR +
+                          WORKSTATION謝謝！') TOMSGQ(*ALLWS)
+             ENDDO
+             CALL PTB805              /* CLEAR PGM:Q* IN QRPLOBJ */
+             RTVSYSVAL  SYSVAL(QDATE) RTNVAR(&CDATE)
+             SBMJOB     CMD(CALL PGM(CLRSPLF) PARM(&CDATE))
+             SAVOBJ     OBJ(PTB801) LIB(PTPLIB) DEV(TAP01) SEQNBR(1) +
+                          EXPDATE(090189) ENDOPT(*LEAVE) +
+                          TGTRLS(*CURRENT)
+
+             IF         COND(&ENDINT *EQ 'Y') THEN(DO)
+             TFRJOB     JOBQ(QPGMR) RTGDTA(TFR)
+             MONMSG     MSGID(CPI0000)
+             ENDDO
+             ELSE       CMD(DO)
+
+ /* LOOP:    RCVF                 */
+RCVFIL:      RCVF
+             MONMSG     MSGID(CPF0864) EXEC(GOTO CMDLBL(ENDPGM)) +
+                        /*EXIT OF FILE REACHED */
+             IF         COND(&LIB *EQ '          ') THEN(GOTO +
+                          CMDLBL(RCVFIL))
+             CHKOBJ     OBJ(QSYS/&LIB) OBJTYPE(*LIB) /*CHECK IF FILE +
+                          EXISTS */
+             MONMSG     MSGID(CPF9801) EXEC(GOTO CMDLBL(RCVFIL))
+             MONMSG     MSGID(CPF0000) EXEC(GOTO CMDLBL(RCVFIL))
+
+ /*          SAVCHGOBJ            */
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('此LIB: ' *CAT &LIB *CAT +
+                          '正在做DAIRLY BACKUP') TOPGMQ(*EXT) +
+                          MSGTYPE(*STATUS)
+             SAVCHGOBJ  OBJ(Q*) LIB(&LIB) DEV(TAP01) OBJTYPE(*FILE) +
+                          EXPDATE(090189) ENDOPT(*LEAVE)
+             GOTO       RCVFIL
+ /*          GOTO LOOP            */
+ENDPGM:      CLOF       OPNID(WKBKUP)
+             CHKTAP     DEV(TAP01) ENDOPT(*UNLOAD)
+             CHGMSGQ    MSGQ(*USRPRF) DLVRY(*BREAK)
+             ENDDO
+             ENDDO      /*  &IN03 = '0'  */
+             ENDPGM
+

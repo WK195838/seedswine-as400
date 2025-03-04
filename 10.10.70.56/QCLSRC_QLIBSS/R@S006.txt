@@ -1,0 +1,101 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    PROGRAM NAME : R@S006                                    */
+     /*    AUTHOR       : A1062   JEANNY LIN                        */
+     /*    CREATE DATE  : 79/05/18                                  */
+     /*    UPDATE DATE  :                                           */
+     /***************************************************************/
+             PGM        PARM(&CMPCD &CMPSN &TAPE &STYPE &DEXIST)
+             DCL        VAR(&CMPCD) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&CMPSN) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&TAPE) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&STYPE) TYPE(*CHAR) LEN(7)
+             DCL        VAR(&DEXIST) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ERR) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&TRNDTA) TYPE(*CHAR) LEN(1)
+             DCLF       FILE(PTFLIB/PF859)
+     /* 1 */
+             DSPOBJD    OBJ(QTEMP/*ALL) OBJTYPE(*ALL) OUTPUT(*PRINT)
+             MONMSG     MSGID(CPF2123) EXEC(GOTO CMDLBL(STEP2))
+             IF         COND(&DEXIST = 'Y') THEN(DO)
+             CLRLIB     LIB(QTEMP)
+             GOTO       STEP2
+             ENDDO
+             ELSE (DO)
+             SNDPGMMSG  MSG('請先COPY +
+                          QTEMP中所有OBJECTS至其他LIBRARY, +
+                          再重新執行SAVPTFLIB')
+             GOTO       EOJ
+             ENDDO
+     /* 2 */
+ STEP2:      CRTDTAARA  DTAARA(*CURLIB/R@DA02) TYPE(*CHAR) LEN(108)
+             CHGVAR     VAR(&ERR) VALUE(' ')
+             CHGVAR     VAR(&TRNDTA) VALUE('N')
+             CALL       R@S007 PARM(&CMPCD &CMPSN &TRNDTA &ERR)
+             IF         COND(&ERR *EQ 'Y') THEN(DO)
+             SNDPGMMSG  MSG('此公司應用程式管制資料尚未建立，無法+
+                          執行!')
+             DLTDTAARA  DTAARA(*CURLIB/R@DA02)
+             GOTO       EOJ
+             ENDDO
+     /* 3 */
+             IF         COND(&STYPE = '*SAVLIB') THEN(DO)
+             CRTDUPOBJ  OBJ(*ALL) FROMLIB(PTFLIB) OBJTYPE(*ALL) +
+                          TOLIB(QTEMP) DATA(*YES)
+             DLTDTAARA  DTAARA(QTEMP/R@DA01)
+             ENDDO
+     /* 4 */
+             CHGVAR     VAR(&ERR) VALUE(' ')
+             CHGVAR     VAR(&TRNDTA) VALUE('Y')
+             CALL       R@S007 PARM(&CMPCD &CMPSN &TRNDTA &ERR)
+             CRTDUPOBJ  OBJ(R@DA02) FROMLIB(*CURLIB) OBJTYPE(*DTAARA) +
+                          TOLIB(QTEMP) NEWOBJ(R@DA01)
+             DLTDTAARA  DTAARA(*CURLIB/R@DA02)
+             IF         COND(&STYPE = '*SAVOBJ') THEN(GOTO +
+                          CMDLBL(STEP6))
+     /* 5 */
+             DSPOBJD    OBJ(QTEMP/*ALL) OBJTYPE(*ALL) DETAIL(*FULL) +
+                          OUTPUT(*OUTFILE) OUTFILE(QTEMP/R@TEMP) +
+                          OUTMBR(*FIRST *REPLACE)
+     /**/
+             CRTPF      FILE(QTEMP/PF859) SRCFILE(PTFLIB/QDDSSRC) +
+                          OPTION(*NOSRC *NOLIST *NOSECLVL)
+             MONMSG     MSGID(CPF7302)     /* FILE "PF859" ALREADY   */
+                                           /* EXISTED, IT IS OKEY.  */
+             CPYF       FROMFILE(QTEMP/R@TEMP) TOFILE(QTEMP/PF859) +
+                          MBROPT(*REPLACE) INCREL((*IF ODOBOW *NE +
+                          QSECOFR)) FMTOPT(*MAP *DROP)
+             DLTF       FILE(QTEMP/R@TEMP)
+             OVRDBF     FILE(PF859) TOFILE(QTEMP/PF859) +
+                          POSITION(*START) SHARE(*YES)
+             OPNDBF     FILE(QTEMP/PF859) OPTION(*INP) +
+                          OPNID(PF859)
+ RCVF:
+             RCVF
+             MONMSG     MSGID(CPF0864) EXEC(DO)
+             GOTO       EOF
+             ENDDO
+             CHGOBJOWN  OBJ(&ODLBNM/&ODOBNM) OBJTYPE(&ODOBTP) +
+                          NEWOWN(QSECOFR) CUROWNAUT(*SAME)
+             GOTO  RCVF
+ EOF:
+             CLOF       OPNID(PF859)
+             CLRPFM     FILE(PF859)
+             DLTOVR     FILE(PF859)
+     /* 6 */
+ STEP6:      IF         COND(&STYPE = '*SAVLIB') THEN(DO)
+             SAVOBJ     OBJ(*ALL) LIB(QTEMP) DEV(&TAPE) ENDOPT(*LEAVE)
+             ENDDO
+             ELSE (DO)
+             CHGOBJOWN  OBJ(QTEMP/R@DA01) OBJTYPE(*DTAARA) +
+                          NEWOWN(QSECOFR) CUROWNAUT(*SAME)
+             SAVOBJ     OBJ(R@DA01) LIB(QTEMP) DEV(&TAPE) +
+                          OBJTYPE(*DTAARA) ENDOPT(*LEAVE)
+             ENDDO
+     /* 7 */
+             CLRLIB     LIB(QTEMP)
+     /* 99 */
+  EOJ:
+             ENDPGM
+

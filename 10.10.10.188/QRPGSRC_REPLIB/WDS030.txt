@@ -1,0 +1,290 @@
+     H****************************************************************
+     H*    PROGRAM NAME : WDS020                                     *
+     H*    AUTHOR       : ANDY                                       *
+     H*    CREATE DATE  : 81/06/09                                   *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :人頭馬匯東洋酒股份有限公司                *
+     H*    SUBSYSTEM    :                                            *
+     H*    REMARK       :送貨單號查詢(WINDOW)                      *
+     F****************************************************************
+     FSOSELF92IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FWDS020D CF  E                    WORKSTN
+     F*
+     E*OPT X(1)
+     E                    WOP         8  1
+     E*
+     E*SE10 X(05) & SE11 X(04) & FILLER X(01) & ME04 X(18) &
+     E*FILLER X(01) & SE02 X(12)
+     E                    W01         8 41
+     E*
+     E*SE08 S(09)
+     E                    W02         8  9 0
+     E*
+     IWOP0        DS
+     I                                        1   8 WOP
+     I                                        1   1 OPT1
+     I                                        2   2 OPT2
+     I                                        3   3 OPT3
+     I                                        4   4 OPT4
+     I                                        5   5 OPT5
+     I                                        6   6 OPT6
+     I                                        7   7 OPT7
+     I                                        8   8 OPT8
+     I*
+     IW01D        DS
+     I                                        1 328 W01
+     I                                        1  41 D01
+     I                                       42  82 D02
+     I                                       83 123 D03
+     I                                      124 164 D04
+     I                                      165 205 D05
+     I                                      206 246 D06
+     I                                      247 287 D07
+     I                                      288 328 D08
+     I*
+     IW02D        DS
+     I                                        1  720W02
+     I                                        1   90E01
+     I                                       10  180E02
+     I                                       19  270E03
+     I                                       28  360E04
+     I                                       37  450E05
+     I                                       46  540E06
+     I                                       55  630E07
+     I                                       64  720E08
+     I*
+     I            DS
+     I                                        1  41 WT
+     I                                        1  12 SE02
+     I                                       14  18 SE10
+     I                                       19  22 SE11
+     I                                       24  41 ME04
+     I*
+     I            DS
+     I                                        1  41 WCONT
+     I                                        1  12 WCONT1
+      *****************************************************************
+      *          KLIST
+      *****************************************************************
+     C           *ENTRY    PLIST
+     C                     PARM           CUNTNO 12
+     C*                    PARM           DSE01   2
+B2MODC                     PARM           WSE06   80
+     C                     PARM           DSE07   5
+     C*
+     C           MEKEY     KLIST
+     C                     KFLD           SE10
+     C                     KFLD           SE11
+     C*
+     C           SEKEYB    KLIST
+     C*                    KFLD           DSE01
+     C                     KFLD           WSE06
+     C                     KFLD           BBGN
+     C*
+     C           SEKEYO    KLIST
+     C*                    KFLD           DSE01
+     C                     KFLD           WSE06
+     C                     KFLD           OBGN
+     C*
+     C           *LIKE     DEFN DBGN      OBGN
+     C           *LIKE     DEFN DBGN      SBGN
+     C           *LIKE     DEFN DBGN      BBGN
+     C           *LIKE     DEFN DBGN      WBGN
+      *****************************************************************
+      *          MAIN ROUTINE
+      *****************************************************************
+     C                     EXSR RTN000                     *SET INIT
+     C                     EXSR RTN191                     *INIT DATA
+     C                     EXSR RTN194                     *ADD DATA
+     C*
+     C                     EXFMTDSPC1
+     C*
+  01-C           *IN03     DOWEQ'0'
+    C*
+  02-C           *IN25     CASEQ'1'       RTN192           *ROLL UP
+  02-C           *IN26     CASEQ'1'       RTN193           *ROLL DOWN
+     C                     CAS            RTN170           *ENTER
+  02-C                     ENDCS
+    C*
+  05-C           *IN03     IFEQ '0'
+    C                     EXFMTDSPC1
+  05-C                     END
+    C                     SETOF                     98
+    C*
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+      *****************************************************************
+      *          RTN000....SET INIT
+      *****************************************************************
+01===C           RTN000    BEGSR
+|    C*
+|    C                     MOVE *BLANK    WOP
+|    C                     MOVE *BLANK    W01
+|    C                     Z-ADD0         W02
+     C                     MOVE *BLANK    DBGN
+     C                     MOVE *BLANK    WBGN
+     C                     MOVEA'11111111'*IN,60
+|    C*(CHANGE TO CHINESE DATE)
+M001AC                     Z-ADDWSE06     WWSE06  60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC*M001M               PARM WSE06     S001I2  80
+M001MC                     PARM WWSE06    S001I2  60
+B2???C*M001M     DSE06     PARM           S001OI  80
+M001MC           DSE06     PARM           S001OI  60
+B2INF *CVR5011 sev.50 Field S001OI is generic. Propagation engine found
+B2INF *   relationships with seeded dates and non-dates. Therefore, the
+B2INF *   tool cannot decide whether this is a date field or not. The
+B2INF *   cause of the problem may be incorrect or insufficient seeding.
+B2INF *   Please verify.
+B2INF *CVR3012 sev.30 Field DSE06 contains more than one year
+     C*
+01===C                     ENDSR
+      *****************************************************************
+      *          RTN170....ENTER
+      *****************************************************************
+02===C           RTN170    BEGSR
+     C*
+     C           DBGN      IFNE WBGN
+     C                     MOVE *BLANK    WOP
+     C                     MOVE *BLANK    W01
+     C                     Z-ADD0         W02
+     C                     MOVEA'11111111'*IN,60
+     C                     MOVE DBGN      BBGN
+|   C                     EXSR RTN191                     *INIT KEY
+|   C                     EXSR RTN194                     *ADD DATA
+     C                     MOVE DBGN      OBGN
+     C                     MOVE DBGN      WBGN
+     C                     ELSE
+     C                     EXSR RTN300                     *GET CUNTNO
+     C                     END
+     C*
+     C                     ENDSR
+      *****************************************************************
+      *          RTN191....INIT KEY
+      *****************************************************************
+02===C           RTN191    BEGSR
+     C*
+B2000C           SEKEYB    SETLLSE0
+|    C*
+06===C                     ENDSR
+      *****************************************************************
+      *          RTN192....ROLL UP
+      *****************************************************************
+03===C           RTN192    BEGSR
+     C*
+B2000C           *LOVAL    SETLLSE0
+     C*
+B2000C           SEKEYB    SETGTSE0
+     C                     EXSR RTN194                     *ADD DATA
+     C*
+     C                     ENDSR
+      *****************************************************************
+      *          RTN193....ROLL DOWN
+      *****************************************************************
+03===C           RTN193    BEGSR
+|    C*
+|    C                     Z-ADD0         NU1     10
+|    C*
+B2000C           SEKEYO    SETLLSE0
+|    C                     READPSE0                      41
+|    C*
+B2000C           *IN41     IFEQ '1'
+     C*          SE01      ORNE DSE01
+     C           SE06      ORNE WSE06
+     C                     MOVE *LOVAL    BBGN
+     C                     SETON                     41
+     C                     END
+     C*
+     C           *IN41     DOWEQ'0'
+|   C           NU1       ANDLE7
+     C*          SE01      ANDEQDSE01
+     C*
+B2000C           SE07      IFEQ DSE07
+     C           SE06      ANDEQWSE06
+|   C                     ADD  1         NU1
+     C                     MOVE SE02      BBGN
+     C                     END
+|    C*
+|   C                     READPSE0                      41
+| 02-C                     END
+|    C*
+|    C                     SETOF                     41
+B2000C           SEKEYB    SETLLSE0
+|    C                     EXSR RTN194
+|    C*
+03===C           END193    ENDSR
+      *****************************************************************
+      *          RTN194....ADD  DATA
+      *****************************************************************
+02===C           RTN194    BEGSR
+     C*
+|    C                     Z-ADD0         NU      20
+     C*
+|    C                     READ SE0                      40
+     C*
+B2000C           *IN40     IFEQ '1'
+     C*          SE01      ORNE DSE01
+     C           SE06      ORNE WSE06
+     C                     GOTO END194
+     C                     ELSE
+     C*
+     C                     MOVE SE02      OBGN
+|    C                     MOVE *BLANK    WOP
+|    C                     MOVE *BLANK    W01
+|    C                     Z-ADD0         W02
+     C                     END
+|    C*
+| 01-C           *IN40     DOWEQ'0'
+|   C           NU        ANDLE7
+     C*          SE01      ANDEQDSE01
+     C*
+B2000C           SE07      IFEQ DSE07
+     C           SE06      ANDEQWSE06
+|   C                     ADD  1         NU
+     C*
+     C           MEKEY     CHAINME0                  51
+     C*
+     C   51                MOVE *BLANK    ME04
+     C*
+|   C                     MOVE WT        W01,NU
+|   C                     Z-ADDSE08      W02,NU
+     C                     MOVE SE02      BBGN
+     C                     END
+     C*
+|   C                     READ SE0                      40
+| 01-C                     END
+|    C*
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+|    C           NU        ADD  60        NU
+|    C*
+| 02-C           NU        DOWLE67
+|   C                     MOVE '1'       *IN,NU
+|   C                     ADD  1         NU
+| 02-C                     END
+|    C*
+02===C           END194    ENDSR
+      *****************************************************************
+      *          RTN300....GET CUNTNO
+      *****************************************************************
+04===C           RTN300    BEGSR
+|    C*
+|    C                     Z-ADD1         ND      10
+|    C*
+| 01-C           WOP,ND    DOWEQ*BLANK
+|   C           ND        ANDLE7
+|   C                     ADD  1         ND
+| 01-C                     END
+|    C*
+| 02-C           WOP,ND    IFEQ '/'
+|   C                     MOVE W01,ND    WCONT
+     C                     MOVE WCONT1    CUNTNO
+|   C                     SETON                     9803
+| 02-C                     END
+|    C*
+04===C                     ENDSR
+

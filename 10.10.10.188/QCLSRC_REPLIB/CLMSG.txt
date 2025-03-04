@@ -1,0 +1,109 @@
+/*********************************************************************/
+/* Copyright   Remy Eastward Ltd.            1992                    */
+/*********************************************************************/
+/*                                                                   */
+/*  PROGRAM ID          -                                            */
+/*  APPLICATION ID      -    MTA005                                  */
+/*  APPLICATION NAME    -    company member maintenance              */
+/*  DATE GENERATED      -    Jan 14, 1992                            */
+/*                                                                   */
+/*********************************************************************/
+/*                  P A R A M E T E R S                              */
+/*-------------------------------------------------------------------*/
+/* PARAMETERS: &ACTION   1A   - 'A' - ADD MESSAGE TO PREVIOUS MSGQ   */
+/*                              'C' - CLEAR MESSAGE FROM PREVIOUS    */
+/*                                    MSGQ                           */
+/*                              'R' - RETRIEVE MESSAGE               */
+/*                              'Q' - REMOVED THIS PGM FROM STACK    */
+/*             &MSGID    7A   - MESSAGE NUMBER                       */
+/*             &MSGF    10A   - MESSAGE FILE                         */
+/*             &MSGFLIB 10A   - MESSAGE FILE LIBRARY                 */
+/*             &MSGDTA 132A   - MESSAGE DATA FOR MESSAGE VARIABLE    */
+/*                                                                   */
+/*********************************************************************/
+             PGM        PARM(&ACTION &MSGID &MSGF &MSGFLIB &MSGDTA)
+             DCL        VAR(&ACTION) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&MSGID) TYPE(*CHAR) LEN(7)
+             DCL        VAR(&MSGF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGFLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGDTA) TYPE(*CHAR) LEN(132)
+
+/*********************************************************************/
+/* ADD MESSAGE                                                       */
+/*********************************************************************/
+             IF         COND((&ACTION *EQ 'A') *OR (&ACTION *EQ +
+                          'R')) THEN(DO)
+
+             /*------------------------------------------------------*/
+             /* SEND GENERIC MESSAGE IF NO MSGID SPECIFIED           */
+             /*------------------------------------------------------*/
+             IF         COND(&MSGID *EQ ' ') THEN(DO)
+                        CHGVAR &MSGID  'CPF9898'
+                        CHGVAR &MSGF   'QCPFMSG'
+                        CHGVAR &MSGFLIB '*LIBL'
+             ENDDO
+
+             /*------------------------------------------------------*/
+             /* USE *LIBL FOR MESSAGE FILE LIB IF NOT SPECIFIED      */
+             /*------------------------------------------------------*/
+             IF         COND(&MSGFLIB  *EQ ' ') THEN(DO)
+                        CHGVAR &MSGFLIB '*LIBL'
+             ENDDO
+
+             /*------------------------------------------------------*/
+             /* USE QCPFMSG FOR MESSAGE FILE, IF NOT SPECIFIED       */
+             /*------------------------------------------------------*/
+             IF         COND(&MSGF  *EQ ' ') THEN(DO)
+                        CHGVAR &MSGF  'QCPFMSG'
+             ENDDO
+
+             IF         COND(&ACTION *EQ 'A') THEN(DO)
+             /*------------------------------------------------------*/
+             /* SEND MESSAGE TO PREVIOUS PGM MSGQ                    */
+             /*------------------------------------------------------*/
+             SNDPGMMSG  MSGID(&MSGID) MSGF(&MSGFLIB/&MSGF) +
+                        MSGDTA(&MSGDTA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             ENDDO
+             ELSE DO
+             /*------------------------------------------------------*/
+             /* RETRIEVE MESSAGE                                     */
+             /*------------------------------------------------------*/
+             RTVMSG     MSGID(&MSGID) MSGF(&MSGFLIB/&MSGF) +
+                          MSGDTA(&MSGDTA) MSG(&MSGDTA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             ENDDO
+             ENDDO
+
+/*********************************************************************/
+/* CLEAR MESSAGE FILE                                                */
+/*********************************************************************/
+             IF         COND(&ACTION *EQ 'C') THEN(DO)
+             RMVMSG     PGMQ(*PRV) CLEAR(*ALL)
+             GOTO       CMDLBL(ENDCLPGM)
+             ENDDO
+             GOTO       CMDLBL(ENDCLPGM)
+
+/*********************************************************************/
+/* ERROR HANDLER                                                     */
+/*********************************************************************/
+ERROR:
+             RCVMSG     MSGDTA(&MSGDTA) MSGID(&MSGID) MSGF(&MSGF) +
+                        MSGFLIB(&MSGFLIB)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             SNDPGMMSG  MSGID(&MSGID) MSGF(&MSGFLIB/&MSGF) +
+                        MSGDTA(&MSGDTA)
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+
+
+/*********************************************************************/
+/* END OF JOB                                                        */
+/* KEEP THIS PGM IS STACK UNLESS &ACTION IS 'Q'                      */
+/*********************************************************************/
+
+ENDCLPGM:
+             IF         COND(&ACTION *NE 'Q') THEN(DO)
+             RETURN
+             ENDDO
+             ENDPGM
+

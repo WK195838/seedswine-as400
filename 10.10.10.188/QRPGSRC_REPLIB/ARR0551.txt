@@ -1,0 +1,241 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0551                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/04/23                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :物流點存貨成本表                             *
+      *===============================================================
+      * MODI CODE | AUTHOR |  DATE  | DESCRIPTION
+      *---------------------------------------------------------------
+      *  M001     |MICHELLE|01.09.24|不同公司，用不同產品主檔
+      *---------------------------------------------------------------
+      ****************************************************************
+     FIMIAPF  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+M001AFMTMHPF  IF  E           K        DISK
+M001AF            MA0                               KRENAMEMH0
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#FLF  IF  E           K        DISK
+     F            #A0                               KRENAME#A0L
+     F                                              KINFDS #FRCDF
+     FARR055P O   E             39     PRINTER
+     IIA0
+     I                                              IA02  L1
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I                                      601 601 DIA01
+     I                                      603 603 DIA02F
+     I                                      604 608 DIA02S
+     I                                      609 613 DIA02E
+     I                                      614 622 DIA03S
+     I                                      623 631 DIA03E
+     I#FRCDF      DS
+     I                                     *RECORD  RCDF
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39N38             EXSR RTN900                     *OVRFLW-THE SAME CUST
+     C   39 38             EXSR RTN910                     *OVRFLW-THE SAME CUST
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     C*
+     CL1 10                EXSR RTN888
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C****
+|    C*公司名稱
+|    C****
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'COMPANY '#A01
+|   C                     MOVELDIA01     #A02
+|   C           KEY#A     CHAIN#A0                  43
+|   C   43                MOVE *BLANK    D#A03
+|   C  N43                MOVEL#A03      D#A03
+|    C****
+|    C*物流點
+|    C****
+|    C           IA02      CHAINPA#FLF               41
+| 01-C           *IN41     IFEQ '0'
+|   C*
+| 02-C           RCDF      IFEQ 'MD0'
+|   C           IA02      CHAINME0                  42
+|   C   42                MOVE *BLANK    NAME
+|   C  N42                MOVELME04      NAME
+| 02*C                     ELSE
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVELIA02      #A02
+|   C           KEY#A     CHAIN#A0                  43
+|   C   43                MOVE *BLANK    NAME
+|   C  N43                MOVEL#A03      NAME
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C****
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     EXSR RTN300                     *CHAIN DATA
+|    C**                   EXSR RTN350                     *SUBTOT-->ENDTOT
+|    C                     EXSR RTN400                     *WRITE
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C****
+|    C*產品名稱＆單位
+|    C****
+      *+EASON
+     C           IA03      CHAINMA0                  40
+M001AC           MA07      IFEQ 'K'
+M001AC           IA03      CHAINMH0                  40
+M001AC                     ELSE
+|    C           IA03      CHAINMA0                  40
+M001AC                     END
+|    C*
+|    C   40                MOVE *BLANK    MA03
+|    C   40                MOVE *BLANK    MA13
+|    C   40                Z-ADD0         MA31
+|    C   40                Z-ADD0         MA32
+|    C   40                Z-ADD0         MA33
+|    C**
+|    C*金額
+|    C**
+|    C           IA06      MULT MA31      DTOT1
+|    C           IA06      MULT MA32      DTOT2
+|    C           IA06      MULT MA33      DTOT3
+     C                     ADD  DTOT1     T1TOT1
+     C                     ADD  DTOT2     T1TOT2
+     C           DTOT1     ADD  DTOT2     DTOT4
+     C                     ADD  DTOT3     T1TOT3
+     C                     ADD  DTOT4     T1TOT4
+     C                     ADD  IA06      T1TOT0
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN350....ADD SUBTOT  TO  ENDTOT
+      *==============================================================*
+04===C**         RTN350    BEGSR
+04===C**                   ENDSR
+      *==============================================================*
+      *          RTN400....WRITE DETAIL
+      *==============================================================*
+05===C           RTN400    BEGSR
+|    C*
+     C           MA31      ADD  MA32      UNIT
+     C                     ADD  MA33      UNIT
+|    C*
+|    C                     WRITEPD1
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW--同一物流點
+      *==============================================================*
+06===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1                        *續下頁
+|    C                     WRITEPH1                        *HEADING
+|    C                     SETOF                     39
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN910....OVERFLOW --不同物流點
+      *==============================================================*
+07===C           RTN910    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C****
+|    C*公司名稱
+|    C****
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'COMPANY '#A01
+|   C                     MOVELDIA01     #A02
+|   C           KEY#A     CHAIN#A0                  43
+|   C   43                MOVE *BLANK    D#A03
+|   C  N43                MOVEL#A03      D#A03
+|    C****
+|    C****
+|    C*物流點
+|    C****
+|    C           IA02      CHAINPA#FLF               41
+| 01-C           *IN41     IFEQ '0'
+|   C*
+| 02-C           RCDF      IFEQ 'MD0'
+|   C           IA02      CHAINME0                  42
+|   C   42                MOVE *BLANK    NAME
+|   C  N42                MOVELME04      NAME
+| 02*C                     ELSE
+|   C                     MOVE *BLANK    #A01
+|   C                     MOVE *BLANK    #A02
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVELIA02      #A02
+|   C           KEY#A     CHAIN#A0                  43
+|   C   43                MOVE *BLANK    NAME
+|   C  N43                MOVEL#A03      NAME
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C****
+|    C                     WRITEPH1
+|    C                     SETOF                     3938
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN888....---L1
+      *==============================================================*
+08===C           RTN888    BEGSR
+|    C*
+     C                     WRITEPT1
+     C                     Z-ADD0         T1TOT0
+     C                     Z-ADD0         T1TOT1
+     C                     Z-ADD0         T1TOT2
+     C                     Z-ADD0         T1TOT3
+     C                     Z-ADD0         T1TOT4
+|    C                     SETON                     3839
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+09===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE4
+| 01-C                     END
+|   C                     WRITEPE2                        *報表結束
+|    C*
+09===C                     ENDSR
+

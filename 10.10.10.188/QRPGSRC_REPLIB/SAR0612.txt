@@ -1,0 +1,337 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : SAR0612                                       *
+      * AUTHER       : A1084  CHARLES                                *
+      * CREATE DATE  : 81/05/05                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      * REMARK       :產品標準箱數彙總表                           *
+      ****************************************************************
+     FREWF45  IP  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#HPF  IF  E           K        DISK
+     FSAR061P O   E             39     PRINTER
+     E*
+     IWF450
+     I                                              WF4504L2
+     I                                              WF4505L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *產品
+     I                                      601 609 DSD03S
+     I                                      610 618 DSD03E
+      *SELECT起迄日期
+      *YY/MM/DD
+     I                                      619 6240YMDS
+     I                                      625 6300YMDE
+     I                                      631 6360DSC39S
+     I                                      637 6420DSC39E
+     I*                                     643 6472DCASE
+     I                                      648 648 DSEL
+     I                                      720 720 DSEL2
+     I                                      750 750 IN20
+      *種類
+     I                                      797 797 DMA11
+     I                                      798 798 DMA11S
+     I                                      799 799 DMA11E
+     I            DS
+     I                                        1   9 WF4501
+     I                                        3   4 W4501L
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#H     KLIST
+     C                     KFLD           #H01
+     C                     KFLD           #H02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01-C                     END
+     C*
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200                                 L
+     CL2 10                EXSR RTN300                                 L
+     CLR                   EXSR RTNLR
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+      *
+| 02-C           DSEL      IFEQ 'F'
+|   C                     MOVEL'國外'  DSELC
+| 02*C                     ELSE
+|   C                     MOVEL'國內'  DSELC
+| 02-C                     END
+|    C*種類
+|    C                     MOVEL*BLANKS   GROUP
+| 03-C           DMA11     IFEQ '1'
+|   C                     MOVEL'白蘭地'GROUP
+| 03*C                     ELSE
+| 04-C           DMA11     IFEQ '2'
+|   C                     MOVEL'威士忌'GROUP
+| 04*C                     ELSE
+| 05-C           DMA11     IFEQ '3'
+|   C                     MOVEL'葡萄酒'GROUP
+| 05*C                     ELSE
+|   C                     MOVEL'全部'  GROUP
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|    C*禮盒
+|    C                     SETOF                     22
+| 06-C           DSEL2     IFEQ 'A'
+|   C                     SETOF                     22
+| 06*C                     ELSE
+|   C                     SETON                     22
+| 06-C                     END
+|    C                     WRITEPH1
+      *
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*產品
+|    C           WF4501    CHAINMA0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVEL*BLANKS   MA03
+|   C                     Z-ADD0         MA15
+| 01-C                     END
+|    C*GET 標準容積
+|    C                     Z-ADD0         DCASE
+|    C                     MOVEL'STANDARD'#H01
+|    C                     MOVELW4501L    #H02
+|    C           KEY#H     CHAIN#H0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     Z-ADD#H03      DCASE   52
+| 02-C                     END
+|    C*實際數量
+|    C           WF4502    SUB  WF4503    QTY1
+|    C           W4502A    SUB  W4503A    QTY2
+|    C           W4502B    SUB  W4503B    QTY3
+|    C           QTY1      ADD  QTY2      QTY4
+|    C                     ADD  QTY3      QTY4
+|    C*總容積
+|    C           QTY4      MULT MA15      LITER
+|    C*標準箱數
+|    C           QTY1      MULT MA15      WORK1  113
+|    C           QTY2      MULT MA15      WORK2  113
+|    C           QTY3      MULT MA15      WORK3  113
+|    C*
+| 03-C           DCASE     IFNE 0
+|   C           WORK1     DIV  DCASE     CASE1     H
+|   C           WORK2     DIV  DCASE     CASE2     H
+|   C           WORK3     DIV  DCASE     CASE3     H
+|   C           LITER     DIV  DCASE     CASE4     H
+| 03*C                     ELSE
+|   C                     Z-ADD0         CASE1
+|   C                     Z-ADD0         CASE2
+|   C                     Z-ADD0         CASE3
+|   C                     Z-ADD0         CASE4
+| 03-C                     END
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     SETOF                     20
+|    C*FOR計算標準箱數之LITER數
+|    C                     ADD  WORK1     WORKA  113
+|    C                     ADD  WORK2     WORKB  113
+|    C                     ADD  WORK3     WORKC  113
+|    C*
+|    C                     ADD  WF4502    T1TOT1
+|    C                     ADD  W4502A    T1TOT2
+|    C                     ADD  W4502B    T1TOT3
+|    C                     ADD  WF4503    T1TOT4
+|    C                     ADD  W4503A    T1TOT5
+|    C                     ADD  W4503B    T1TOT6
+|    C                     ADD  QTY1      T1TOT7
+|    C                     ADD  QTY2      T1TOT8
+|    C                     ADD  QTY3      T1TOT9
+|    C                     ADD  QTY4      T1TO10
+|    C                     ADD  LITER     LITER1
+|    C*
+|    C                     Z-ADD0         WF4502
+|    C                     Z-ADD0         W4502A
+|    C                     Z-ADD0         W4502B
+|    C                     Z-ADD0         WF4503
+|    C                     Z-ADD0         W4503A
+|    C                     Z-ADD0         W4503B
+|    C                     Z-ADD0         QTY1
+|    C                     Z-ADD0         QTY2
+|    C                     Z-ADD0         QTY3
+|    C                     Z-ADD0         QTY4
+|    C                     Z-ADD0         LITER
+|    C                     Z-ADD0         WORK1
+|    C                     Z-ADD0         WORK2
+|    C                     Z-ADD0         WORK3
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....SUBTOT
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*實際量合計
+|    C           T1TOT7    ADD  T1TOT8    T1TO10
+|    C                     ADD  T1TOT9    T1TO10
+|    C*標準箱數
+|    C*
+| 01-C           DCASE     IFNE 0
+|   C           WORKA     DIV  DCASE     T1TO11    H
+|   C           WORKB     DIV  DCASE     T1TO12    H
+|   C           WORKC     DIV  DCASE     T1TO13    H
+|   C           LITER1    DIV  DCASE     T1TO14    H
+| 01*C                     ELSE
+|   C                     Z-ADD0         T1TO11
+|   C                     Z-ADD0         T1TO12
+|   C                     Z-ADD0         T1TO13
+|   C                     Z-ADD0         T1TO14
+| 01-C                     END
+|    C*
+|    C*EGRM OR ESRM系列產品才列印產品代號前六碼小計
+| 02-C           WF4504    IFEQ 'ESRM'
+|   C           WF4504    OREQ 'EGRM'
+|   C                     WRITEPT1
+|   C   39                EXSR RTN900
+|   C                     SETON                     20
+| 02-C                     END
+|    C*FOR計算標準箱數之LITER數
+|    C                     ADD  WORKA     WORKX  113
+|    C                     ADD  WORKB     WORKY  113
+|    C                     ADD  WORKC     WORKZ  113
+|    C*
+|    C                     ADD  T1TOT1    T2TOT1
+|    C                     ADD  T1TOT2    T2TOT2
+|    C                     ADD  T1TOT3    T2TOT3
+|    C                     ADD  T1TOT4    T2TOT4
+|    C                     ADD  T1TOT5    T2TOT5
+|    C                     ADD  T1TOT6    T2TOT6
+|    C                     ADD  T1TOT7    T2TOT7
+|    C                     ADD  T1TOT8    T2TOT8
+|    C                     ADD  T1TOT9    T2TOT9
+|    C                     ADD  T1TO10    T2TO10
+|    C                     ADD  LITER1    LITER2
+|    C                     Z-ADD0         T1TOT1
+|    C                     Z-ADD0         T1TOT2
+|    C                     Z-ADD0         T1TOT3
+|    C                     Z-ADD0         T1TOT4
+|    C                     Z-ADD0         T1TOT5
+|    C                     Z-ADD0         T1TOT6
+|    C                     Z-ADD0         T1TOT7
+|    C                     Z-ADD0         T1TOT8
+|    C                     Z-ADD0         T1TOT9
+|    C                     Z-ADD0         T1TO10
+|    C                     Z-ADD0         T1TO11
+|    C                     Z-ADD0         T1TO12
+|    C                     Z-ADD0         T1TO13
+|    C                     Z-ADD0         T1TO14
+|    C                     Z-ADD0         LITER1
+|    C                     Z-ADD0         WORKA
+|    C                     Z-ADD0         WORKB
+|    C                     Z-ADD0         WORKC
+|    C*
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....SUBTOT
+      *==============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C*實際量合計
+|    C           T2TOT7    ADD  T2TOT8    T2TO10
+|    C                     ADD  T2TOT9    T2TO10
+|    C*標準箱數
+|    C*
+| 01-C           DCASE     IFNE 0
+|   C           WORKX     DIV  DCASE     T2TO11    H
+|   C           WORKY     DIV  DCASE     T2TO12    H
+|   C           WORKZ     DIV  DCASE     T2TO13    H
+|   C           LITER2    DIV  DCASE     T2TO14    H
+| 01*C                     ELSE
+|   C                     Z-ADD0         T2TO11
+|   C                     Z-ADD0         T2TO12
+|   C                     Z-ADD0         T2TO13
+|   C                     Z-ADD0         T2TO14
+| 01-C                     END
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT2
+|    C                     SETON                     20
+|    C*
+|    C                     ADD  T2TOT1    T3TOT1
+|    C                     ADD  T2TOT2    T3TOT2
+|    C                     ADD  T2TOT3    T3TOT3
+|    C                     ADD  T2TOT4    T3TOT4
+|    C                     ADD  T2TOT5    T3TOT5
+|    C                     ADD  T2TOT6    T3TOT6
+|    C                     ADD  T2TOT7    T3TOT7
+|    C                     ADD  T2TOT8    T3TOT8
+|    C                     ADD  T2TOT9    T3TOT9
+|    C                     ADD  T2TO10    T3TO10
+|    C                     ADD  T2TO11    T3TO11
+|    C                     ADD  T2TO12    T3TO12
+|    C                     ADD  T2TO13    T3TO13
+|    C                     ADD  T2TO14    T3TO14
+|    C                     ADD  LITER2    LITER3
+|    C*
+|    C                     Z-ADD0         T2TOT1
+|    C                     Z-ADD0         T2TOT2
+|    C                     Z-ADD0         T2TOT3
+|    C                     Z-ADD0         T2TOT4
+|    C                     Z-ADD0         T2TOT5
+|    C                     Z-ADD0         T2TOT6
+|    C                     Z-ADD0         T2TOT7
+|    C                     Z-ADD0         T2TOT8
+|    C                     Z-ADD0         T2TOT9
+|    C                     Z-ADD0         T2TO10
+|    C                     Z-ADD0         T2TO11
+|    C                     Z-ADD0         T2TO12
+|    C                     Z-ADD0         T2TO13
+|    C                     Z-ADD0         T2TO14
+|    C                     Z-ADD0         LITER2
+|    C                     Z-ADD0         WORKX
+|    C                     Z-ADD0         WORKY
+|    C                     Z-ADD0         WORKZ
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....SUBTOT
+      *==============================================================*
+05===C           RTNLR     BEGSR
+|    C*
+|    C*實際量合計
+|    C           T3TOT7    ADD  T3TOT8    T3TO10
+|    C                     ADD  T3TOT9    T3TO10
+|    C*
+|    C*  39                EXSR RTN900
+|    C*                    WRITEPT3
+|    C*                    WRITEPE2
+|    C*
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPT3
+|    C                     WRITEPE2
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+06===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     3920
+      *
+06===C                     ENDSR
+

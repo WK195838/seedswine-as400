@@ -1,0 +1,210 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARI023                                     *
+     A*    AUTHOR       : A1139  JANE                                *
+     A*    DATE WRITTEN : 81/04/10                                   *
+     A*    UPDATE DATE  : 81/04/13                                   *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收系統                                  *
+     A*    REMARK       :應收款查詢－帳齡分析查詢                  *
+     A****************************************************************
+     FSOSILF07IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARI0232DCF  E                    WORKSTN
+     E*: FUNCTION DATA :
+     E*                   WFUN    6   6  6
+     E*: FUNCTION DATA :
+     E**                  WTYPE   5   9 10
+     E*: A/U/D/I AUT
+     E                    WA01        6  1
+     I*
+     I*SDS        SDS
+     I*                                     *PROGRAM APPPGM
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+ @   I                                      135 135 $ADD
+ @   I                                      136 136 $UPD
+ @   I                                      137 137 $DLT
+ @   I                                      138 138 $INQ
+ @   I                                      139 139 $RMK01
+M001AI                                      211 2160CDATE
+     I            DS
+     I                                        1   1 DOPT1
+     I                                        1   10WNUM
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           ASI12   5
+     C                     PARM           MD30   100
+     C                     PARM           MD31   100
+      *==============================================================*
+      *                    DEFN RTN
+      *==============================================================*
+     C*
+     C           *LIKE     DEFN DSI30Z    WSI30Z
+     C           *LIKE     DEFN DSI30A    WSI30A
+     C           *LIKE     DEFN DSI30B    WSI30B
+     C           *LIKE     DEFN DSI30C    WSI30C
+     C           *LIKE     DEFN DSI30D    WSI30D
+     C           *LIKE     DEFN DSI30E    WSI30E
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYSI     KLIST
+     C                     KFLD           ASI12
+     C           KEYME     KLIST
+     C                     KFLD           ASI12
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT
+     C*
+     C                     EXSR RTN100                     *PROC DATA
+     C*
+     C           *IN12     DOWEQ'0'
+     C                     EXFMTDSPC1
+     C                     END
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+      *==============================================================*
+      *          RTN010....INIT
+      *==============================================================*
+10===CSR         RTN010    BEGSR
+|    C*
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+B2???C*M001D               PARM $EGMDY    S001I2  80
+B2INF *CVR3012 sev.30 Field $EGMDY contains more than one year
+B2INF *CVR3012 sev.30 Field S001I2 contains more than one year
+B2MODC*M001D     DATE      PARM           S001O1  80
+     C*
+     C                     EXSR RTN200                     *CLR FLD
+     C*
+     C           KEYME     CHAINME0                  40
+     C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTN100....MOVE DATA TO SFLSR2
+      *==============================================================*
+10===CSR         RTN100    BEGSR
+     C*
+     C           KEYSI     CHAINSI0                  40
+     C*
+     C           *IN40     DOWEQ'0'
+     C                     EXSR RTN110
+     C           KEYSI     READESI0                      40
+     C                     END
+     C*
+     C                     EXSR RTN120
+     C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTN110....MOVE DATA TO SFLSR2
+      *==============================================================*
+10===CSR         RTN110    BEGSR
+|    C*
+|    C                     Z-ADD0         DAY     90
+|    C***
+|    C* (UPD BY 81/05/05 --->應收日轉成中國年月日)
+|    C***
+B2CHKC           SI29      IFNE 0
+B2INF *CVR2001 sev.20 Converted code may contain conceptual errors. Please
+B2INF *   verify
+B2???C*M001M     SI29      SUB  110000    DSI29   60
+M001MC           SI29      SUB  19110000  DSI29   60
+B2INF *CVR0001 sev.00 Field DSI29 is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C***
+|    C*(系統日轉成中國年月日)
+|    C***
+B2???C*M001D     DATE      SUB  110000    CDATE   60
+B2INF *CVR3012 sev.30 Field DATE contains more than one year
+B2INF *CVR0001 sev.00 Field CDATE is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C***
+|    C*發票日與系統日之相距天數
+|    C***
+|    C                     CALL 'P20'
+|    C                     PARM DSI29     P2001I  60       *交貨日
+|    C                     PARM CDATE     P2002I  60       *系統日
+|    C           DAY       PARM           P2011O  90
+     C*
+     C                     ELSE
+     C                     Z-ADD-1        DAY
+     C                     END
+|    C*(Z)
+| 01-C           DAY       IFLT 0
+|   C                     ADD  SI30      WSI30Z
+| 01-C                     END
+|    C*(A)
+| 01-C           DAY       IFLE 30
+| 01-C           DAY       ANDGE0
+|   C                     ADD  SI30      WSI30A
+| 01-C                     END
+|    C*(B)
+| 02-C           DAY       IFGE 31
+|   C           DAY       ANDLE60
+|   C                     ADD  SI30      WSI30B
+| 02-C                     END
+|    C*(C)
+| 03-C           DAY       IFGE 61
+|   C           DAY       ANDLE90
+|   C                     ADD  SI30      WSI30C
+| 03-C                     END
+|    C*(D)
+| 04-C           DAY       IFGE 91
+|   C           DAY       ANDLE180
+|   C                     ADD  SI30      WSI30D
+| 04-C                     END
+|    C*(E)
+| 05-C           DAY       IFGT 180
+|   C                     ADD  SI30      WSI30E
+| 05-C                     END
+|    C*
+10===CSR                   ENDSR
+      *==============================================================*
+      *          RTN120....MOVE DATA TO SFLSR2
+      *==============================================================*
+11===C           RTN120    BEGSR
+|    C*
+|    C                     Z-ADDWSI30Z    DSI30Z
+|    C                     Z-ADDWSI30A    DSI30A
+|    C                     Z-ADDWSI30B    DSI30B
+|    C                     Z-ADDWSI30C    DSI30C
+|    C                     Z-ADDWSI30D    DSI30D
+|    C                     Z-ADDWSI30E    DSI30E
+|    C*
+11===CSR                   ENDSR
+      *==============================================================*
+      *          RTN200....CLR DSI30A DSI30B DSI30C DSI30D DSI30E
+      *==============================================================*
+12===C           RTN200    BEGSR
+|    C*
+|    C                     Z-ADD0         WSI30Z
+|    C                     Z-ADD0         WSI30A
+|    C                     Z-ADD0         WSI30B
+|    C                     Z-ADD0         WSI30C
+|    C                     Z-ADD0         WSI30D
+|    C                     Z-ADD0         WSI30E
+|    C*
+|    C                     Z-ADD0         DSI30Z
+|    C                     Z-ADD0         DSI30A
+|    C                     Z-ADD0         DSI30B
+|    C                     Z-ADD0         DSI30C
+|    C                     Z-ADD0         DSI30D
+|    C                     Z-ADD0         DSI30E
+|    C*
+12===CSR                   ENDSR
+

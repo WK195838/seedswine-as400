@@ -1,0 +1,101 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       :                                           */
+     /*    CREATE DATE  :                                           */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : ARA011                                    */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款作業                             */
+     /*    REMARK       :轉帳資料批次作業   AUTO JOB              */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&WSC39S) TYPE(*CHAR) LEN(6)       /*BP2MOD */
+             DCL        VAR(&WSC39) TYPE(*DEC) LEN(6 0)
+             DCL        VAR(&YMD) TYPE(*DEC) LEN(6 0)          /*BP2MOD*/
+             DCL        VAR(&MDY) TYPE(*DEC) LEN(6 0)          /*BP2MOD*/
+  /* M001A*/ DCL        VAR(&YY) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&YY2) TYPE(*DEC) LEN(2 0)
+             DCL        VAR(&YY4) TYPE(*DEC) LEN(4 0)
+             DCL        VAR(&YY4C) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&MD) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&YMD4) TYPE(*CHAR) LEN(8)
+ /* M001A */ DCL        VAR(&WQCEN) TYPE(*CHAR) LEN(1)
+
+             CALL       PGM(P63)
+
+             CHGVAR     VAR(&WSC39) VALUE(%SST(*LDA 187 6))
+
+  /*前一日*/
+             CALL       PGM(CUNDAT) PARM(&WSC39 &YMD &MDY)
+
+             CHGVAR     VAR(&WSC39S) VALUE(&YMD)               /*BP2000*/
+ /* M001A */
+             RTVSYSVAL  SYSVAL(QCENTURY) RTNVAR(&WQCEN)
+             CHGVAR     VAR(&YY)  VALUE(%SST(&WSC39S 1 2))
+             CHGVAR     VAR(&YY2) VALUE(&YY)
+             CHGVAR     VAR(&MD)  VALUE(%SST(&WSC39S 3 4))
+             IF (&YY2 < 30  ) THEN(CHGVAR (&YY4) (&YY2 + 2000))
+             ELSE
+                IF (&YY2 >=30 ) THEN(CHGVAR (&YY4) (&YY2 + 1900))
+             CHGVAR     VAR(&YY4C) VALUE(&YY4)
+ /* M001A*/  CHGVAR VAR(&YMD4) VALUE(&YY4C *CAT &MD)
+
+             CHGVAR     VAR(%SST(*LDA 603 8 )) VALUE(&YMD4)     /*BP2000*/
+                                                               /*BP2MOD*/
+             CHGVAR     VAR(%SST(*LDA 649 6 )) VALUE(&MDY)      /*BP2000*/
+                                                               /*BP2MOD*/
+             CHGVAR     VAR(%SST(*LDA 655 6 )) VALUE(&MDY)      /*BP2000*/
+                                                               /*BP2MOD*/
+  /*銷售訂單*/
+             OVRDBF     FILE(SOSCPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSCPF)) OPTION(*ALL) QRYSLT(' SC39 +
+                          *LE ' *CAT &YMD4   *CAT '  & ( ( +
+                          SC03 *EQ "S3" & (SC13 *EQ "V"  +
+                          *OR  SC13 *EQ "C" *OR SC13 *EQ " ") & +
+                          (SC30 *NE " ")) | ((SC03 *NE "S2" *AND +
+                          SC03 *NE "S3" ) & (SC13 *EQ "V" )))  & +
+                          SC35 *EQ " " ') KEYFLD((SC02))
+
+  /*送貨單*/
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' SE24 +
+                          *LE ' *CAT &YMD4   *CAT '  & SE09 *EQ "V" +
+                          & SE29 *EQ " " & SE36 *EQ " "  ') +
+                          KEYFLD((SE02))
+
+
+  /*銷貨退回*/
+             OVRDBF     FILE(SOSGPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSGPF)) OPTION(*ALL) QRYSLT(' SG26 +
+                          *LE ' *CAT &YMD4   *CAT '  & SG17 *EQ " " +
+                          & (SG14 *EQ " " *OR SG14 *EQ "V")') +
+                          KEYFLD((SG02))
+
+  /*產品收回*/
+             OVRDBF     FILE(SOSNPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSNPF)) OPTION(*ALL) QRYSLT(' SN06 +
+                          *LE ' *CAT &YMD4   *CAT ' & SN06 *NE 0   +
+                          & SN10 *EQ " "  ') KEYFLD((SN02))
+
+  /*產品調撥*/
+             OVRDBF     FILE(IMIIPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIIPF)) OPTION(*ALL) QRYSLT(' II06 +
+                          *LE ' *CAT &YMD4   *CAT ' & II06 *NE 0   +
+                          & II08 *EQ " "  ') KEYFLD((II02))
+
+             CALL       PGM(ARA0091)
+
+             CLOF       OPNID(SOSCPF)
+             CLOF       OPNID(SOSEPF)
+             CLOF       OPNID(SOSGPF)
+             CLOF       OPNID(SOSNPF)
+             CLOF       OPNID(IMIIPF)
+             DLTOVR     FILE(*ALL)
+             SNDMSG     +
+                          MSG('もももも恭喜！轉帳作業成功，普天同慶+
+                          もももも') TOUSR(REPGMRT)
+
+ ENDPGM:     ENDPGM
+

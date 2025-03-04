@@ -1,0 +1,200 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : ANDY                                      */
+     /*    CREATE DATE  : 81/05/09                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : SAR042C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款作業                             */
+     /*    REMARK       :產品退貨彙總表                           */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DSG01S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSG01E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSG01) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSH03S) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DSH03E) TYPE(*CHAR) LEN(9)
+             DCL        VAR(&DATES) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATEE) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DATA)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DATA1)  TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSG07S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSG07E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&IN20)  TYPE(*CHAR) LEN(1)
+/*M001A*/    DCL        VAR(&YMD8S) TYPE(*CHAR) LEN(8)
+/*M001A*/    DCL        VAR(&YMD8E) TYPE(*CHAR) LEN(8)
+
+             CHGVAR     VAR(&DSG01S) VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&DSG01E) VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&DSH03S) VALUE(%SST(*LDA 605 9))
+             CHGVAR     VAR(&DSH03E) VALUE(%SST(*LDA 614 9))
+             CHGVAR     VAR(&DSG07S) VALUE(%SST(*LDA 671 5))
+             CHGVAR     VAR(&DSG07E) VALUE(%SST(*LDA 676 5))
+             CHGVAR     VAR(&DATES) VALUE(%SST(*LDA 647 6))
+             CHGVAR     VAR(&DATEE) VALUE(%SST(*LDA 653 6))
+             CHGVAR     VAR(&DATA)   VALUE(%SST(*LDA 661 1))
+             CHGVAR     VAR(&DATA1)   VALUE(%SST(*LDA 663 1))
+             CHGVAR     VAR(&IN20)   VALUE(%SST(*LDA 662 1))
+             CHGVAR     VAR(&DSG01) VALUE(%SST(*LDA 664 2))
+/*M001A*/    CHGVAR     VAR(&YMD8S) VALUE(%SST(*LDA 850 8))
+/*M001A*/    CHGVAR     VAR(&YMD8E) VALUE(%SST(*LDA 858 8))
+
+     /*******銷貨退回*/
+             CPYF       FROMFILE(REWF54) TOFILE(QTEMP/REWF54) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF54))
+             OVRDBF     FILE(REWF54) TOFILE(QTEMP/REWF54) SHARE(*YES)
+
+             IF         COND(&DATA *EQ 'A') THEN(DO)
+             OVRPRTF    FILE(SAR042AP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('產退貨總')
+             OVRDBF     FILE(SOSGPF) SHARE(*YES)
+             IF         COND(&IN20 *EQ '0') THEN(DO)
+             OPNQRYF    FILE((SOSGPF)) QRYSLT(' SG01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SG01B *NE "K" &                     +
+                          SG06 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SG07 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '") & SG17 *EQ " "  ') +
+                          MAPFLD((SG01B '%SST(SG01 1 1)'))
+/*M001D                   SG06 *EQ %RANGE(' *CAT &DATES *CAT +
+                          ' ' *CAT &DATEE *CAT ') & SG07 *EQ +  */
+             ENDDO
+             ELSE       CMD(DO)
+             OPNQRYF    FILE((SOSGPF)) QRYSLT('SG01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") &  SG01B *NE "K" &                     +
+                          SG26 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SG07 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '") & SG17 *EQ " " ') +
+                          MAPFLD((SG01B '%SST(SG01 1 1)'))
+/*M001D                   SG26 *EQ %RANGE(' *CAT &DATES *CAT +
+                          ' ' *CAT &DATEE *CAT ') & SG07 *EQ +  */
+
+             ENDDO
+             CALL       SAR0421
+             CALL       SAR0422
+
+             CLOF       OPNID(SOSGPF)
+             ENDDO
+     /*******產品收回*/
+             ELSE       CMD(DO)
+             OVRPRTF    FILE(SAR042BP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('產退貨總')
+             OVRDBF     FILE(SOSNPF) SHARE(*YES)
+
+             IF         COND(&IN20 *EQ '0') THEN(DO)
+     /*含試飲退回－打單日期*/
+             IF         COND(&DATA1 *EQ '1') THEN(DO)
+             OPNQRYF    FILE((SOSNPF)) QRYSLT('SN01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SN01B *NE "K" &                     +
+                          SN05 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SN04 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '") & SN10 *NE "T" & (SN06 +
+                          *NE 0) ') MAPFLD((SN01B '%SST(SN01 1 1)'))
+             ENDDO
+     /*不含試飲退回－打單日期*/
+             IF         COND(&DATA1 *EQ '2') THEN(DO)
+             OPNQRYF    FILE((SOSNPF)) QRYSLT('SN01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SN01B *NE "K" &                     +
+                          SN05 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SN04 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '") & SN10 *NE "T" & SN02A +
+                          *NE "R3" &(SN06 *NE 0)') MAPFLD((SN02A +
+                          '%SST(SN02 3 2)' *CHAR 2) (SN01B +
+                          '%SST(SN01 1 1)'))
+             ENDDO
+
+     /*僅含試飲退回－打單日期*/
+             IF         COND(&DATA1 *EQ '3') THEN(DO)
+             OPNQRYF    FILE((SOSNPF)) QRYSLT('SN01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SN01B *NE "K" &                     +
+                          & SN05 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SN04 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '") & SN10 *NE "T" &  SN02A +
+                          *EQ "R3" & (SN06 *NE 0)') MAPFLD((SN02A +
+                          '%SST(SN02 3 2)' *CHAR 2) (SN01B +
+                          '%SST(SN01 1 1)'))
+             ENDDO
+             ENDDO
+             ELSE       CMD(DO)
+     /*含試飲退回－確認日期*/
+             IF         COND(&DATA1 *EQ '1') THEN(DO)
+             OPNQRYF    FILE((SOSNPF)) QRYSLT('SN01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SN01B *NE "K" &                     +
+                          SN06 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SN04 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '" ) & SN10 *NE "T" ') +
+                          MAPFLD((SN01B '%SST(SN01 1 1)'))
+             ENDDO
+
+     /*不含試飲退回－確認日期*/
+             IF         COND(&DATA1 *EQ '2') THEN(DO)
+             OPNQRYF    FILE((SOSNPF)) QRYSLT('SN01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SN01B *NE "K" &                     +
+                          SN06 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SN04 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '") & SN10 *NE "T" & SN02A +
+                          *NE "R3" ') MAPFLD((SN02A ' %SST(SN02 3 +
+                          2)' *CHAR 2) (SN01B '%SST(SN01 1 1)'))
+             ENDDO
+     /*僅含試飲退回－確認日期*/
+             IF         COND(&DATA1 *EQ '3') THEN(DO)
+             OPNQRYF    FILE((SOSNPF)) QRYSLT('SN01 *EQ %RANGE("' +
+                          *CAT &DSG01S *CAT '" "' *CAT &DSG01E *CAT +
+                          '") & SN01B *NE "K" &                     +
+                          SN06 *EQ %RANGE(' *CAT &YMD8S *CAT +
+                          ' ' *CAT &YMD8E *CAT ') & SN04 *EQ +
+                          %RANGE("' *CAT &DSG07S *CAT '" "' *CAT +
+                          &DSG07E *CAT '")  & SN10 *NE "T" & SN02A +
+                          *EQ "R3" ') MAPFLD((SN02A '%SST(SN02 3 +
+                          2)' *CHAR 2) (SN01B '%SST(SN01 1 1 )'))
+             ENDDO
+
+             ENDDO
+             CALL       SAR0423
+             CALL       SAR0424
+
+             CLOF       OPNID(SOSNPF)
+             ENDDO
+
+             DLTOVR     FILE(*ALL)
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             IF         COND(&DATA *EQ 'A') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('SAR042AP')
+                        ENDDO
+             ELSE
+             IF         COND(&DATA *EQ 'B') THEN(DO)
+               CHGVAR     VAR(&P6601I) VALUE('SAR042BP')
+                        ENDDO
+
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+             ENDPGM
+

@@ -1,0 +1,184 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : ARR0762                                       *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 01/24/94                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :應收票據明細表                               *
+     A*===============================================================
+     A* MODI CODE | AUTHOR |  DATE  | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      |MICHELLE| 000901 | MATCH WITH ARR080AP
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FARACLF01IP  E           K        DISK
+M001AFARADLF05IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARR076P O   E             39     PRINTER
+     IAC0
+     I                                              AC01A L2
+     I                                              AC01  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 602 DAC01S
+     I                                      603 604 DAC01E
+     I*(MM/DD/YY)
+     I                                      610 6150AC04A
+     I*(YY/MM/DD)
+     I                                      620 6250YAC04
+     I*
+     I                                      641 649 DAC23S
+     I                                      651 659 DAC23E
+M001AI*(YYYY/MM/DD)
+M001AI                                      850 8570YMD8S
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+M001AC           KEYAD     KLIST
+M001AC                     KFLD           AC01
+M001AC                     KFLD           AC02
+M001AC                     KFLD           AC03
+M001AC                     KFLD           AC04
+M001AC                     KFLD           AC05
+M001AC                     KFLD           AC06
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+     C                     Z-ADD0         TOT2    90
+  01*C                     ELSE
+  02-C           *INL1     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010                     *HEADING
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900                     *OVRFLW-THE SAME CUST
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN300
+     CL2 10                EXSR RTN400
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     Z-ADD0         TOT1
+|    C*公司名稱
+|    C           AC01      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    D#B03
+|    C  N40                MOVEL#B03      D#B03
+|    C*
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C*預計兌現日
+M001AC                     Z-ADDAC07      DAC07   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM AC07      S001I2  80
+M001AC                     PARM DAC07     S001I2  60
+|    C           DAC07     PARM           S001O1  60
+|    C*
+|    C*實際兌現日
+M001AC                     Z-ADDAC11      DAC11   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM AC11      S001I2  80
+M001AC                     PARM DAC11     S001I2  60
+|    C           DAC11     PARM           S001O1  60
+|    C*
+|    C*收款日期
+M001AC                     Z-ADDAC04      DAC04   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+M001DC*                    PARM AC04      S001I2  80
+M001AC                     PARM DAC04     S001I2  60
+|    C           DAC04     PARM           S001O1  60
+|    C*
+|    C*客戶代號／名稱
+|    C           AC02      CHAINME0                  41
+|    C   41                MOVE *BLANK    ME04
+|    C*
+|    C                     ADD  AC08      TOT1
+|    C*
+M001AC           KEYAD     CHAINAD0                  42
+M001AC           *IN42     DOWEQ'0'
+M001AC           AD12      IFGT YMD8S
+M001AC                     ADD  AD08      DAD08
+M001AC                     END
+M001AC           KEYAD     READEAD0                      42
+M001AC                     END
+M001AC*
+M001AC                     ADD  AC10      T110
+M001AC                     ADD  DAD08     T108
+M001AC                     ADD  AC10      T210
+M001AC                     ADD  DAD08     T208
+|    C                     WRITEPD1
+M001AC                     Z-ADD0         DAD08
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....跳頁
+      *==============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C                     WRITEPT1
+     C                     ADD  TOT1      TOT2
+|    C                     Z-ADD0         TOT1
+M001AC                     Z-ADD0         T110
+M001AC                     Z-ADD0         T108
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN400....跳頁
+      *==============================================================*
+04===C           RTN400    BEGSR
+|    C*
+|    C                     WRITEPT2
+|    C                     Z-ADD0         TOT2
+M001AC                     Z-ADD0         T210
+M001AC                     Z-ADD0         T208
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW--
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+05===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+05===C                     ENDSR
+

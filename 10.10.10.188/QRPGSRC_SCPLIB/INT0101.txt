@@ -1,0 +1,199 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : INT0101                                       *
+      * AUTHER       : A1491  EASON                                  *
+      * CREATE DATE  : 99/01/31                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :西祺進銷存                                   *
+      * SUBSYSTEM    :庫存管理系統                                 *
+      * REMARK       :庫存月結還原批次處理                         *
+      ****************************************************************
+     FINTPLF02IF  E           K        DISK
+     FINTNPF  UF  E           K        DISK
+     FINTAPF  UF  E           K        DISK
+     FINTBPF  UF  E           K        DISK
+     FC#EHPF  UF  E           K        DISK
+     FMANDPF  UF  E           K        DISK
+     E*
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      201 2080A8YMD
+     I                                      203 2080A6YMD
+     I                                      601 601 MODE
+     I                                      602 603 WEH01
+     I                                      604 6110DATFM
+     I                                      604 6070DSYY
+     I                                      608 6090DSMM
+     I                                      612 6190DATTO
+     I                                      612 6150DEYY
+     I                                      616 6170DEMM
+     I                                      620 6270DS
+     I                                      630 6370DE
+     I            DS
+     I                                        1   60EH02
+     I                                        1   40EH02Y
+     I                                        5   60EH02M
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+     C           KEYTN     KLIST
+     C                     KFLD           TP01
+     C                     KFLD           TP02
+     C                     KFLD           TP13
+     C                     KFLD           TP04
+     C                     KFLD           TP05
+     C                     KFLD           TP12
+     C*          KEYTN1    KLIST
+     C*                    KFLD           TP01
+     C*                    KFLD           TP02
+     C*                    KFLD           TP04
+     C*                    KFLD           TP05
+     C           KEYTA     KLIST
+     C                     KFLD           TP01
+     C                     KFLD           EH02
+     C                     KFLD           TP05
+     C           KEYTB     KLIST
+     C                     KFLD           TP01
+     C                     KFLD           EH02
+     C                     KFLD           TP02
+     C                     KFLD           TP04
+     C                     KFLD           TP05
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN010
+     C*
+     C                     EXSR RTN100
+     C                     EXSR RTN200
+     C*
+     C                     SETON                     LR
+      *===============================================================*
+     C*          RTN010....INITIAL VALUE
+      *===============================================================*
+01===C           RTN010    BEGSR
+|     *
+|    C                     MOVEL'INT0101' PGWW   10
+|     *
+01===C                     ENDSR
+      *===============================================================*
+     C*          RTN100....修改公司參數檔以及通路商檔
+      *===============================================================*
+02===C           RTN100    BEGSR
+|     *
+|    C           WEH01     CHAINEH0                  40
+| 01-C           *IN40     IFEQ '0'
+| 02-C           EH02M     IFEQ 1
+|   C                     SUB  1         EH02Y
+|   C                     Z-ADD12        EH02M
+| 02*C                     ELSE
+|   C                     SUB  1         EH02M
+| 02-C                     ENDIF
+|    *
+|   C                     Z-ADDDATFM     EH07
+|   C                     Z-ADDDATTO     EH08
+|    *
+|   C                     UPDATEH0
+| 01-C                     ENDIF
+|     *
+|    C           *LOVAL    SETLLEH0
+|     *
+|    C           WEH01     SETLLND0
+|    C           WEH01     READEND0                      45
+| 03-C           *IN45     DOWEQ'0'
+|   C                     MOVEL'R'       ND22             銷售確認
+|   C                     MOVEL*BLANK    NDWW
+|   C                     MOVELPGWW      NDWW
+|   C                     Z-ADDA8YMD     NDXX
+|   C                     TIME           NDYY
+|   C                     MOVEL$USER     NDZZ
+|   C                     UPDATND0
+|   C           WEH01     READEND0                      45
+| 03-C                     ENDDO
+|     *
+|    C           *LOVAL    SETLLND0
+|     *
+02===C                     ENDSR
+      *===============================================================*
+     C*          RTN200....先還原陳列借貨量
+      *===============================================================*
+03===C           RTN200    BEGSR
+|     *
+|    C           *HIVAL    SETGTTP0
+|    C                     READPTP0                      46
+| 01-C           *IN46     DOWEQ'0'
+|    *
+|   C*                    Z-ADDTP06      TP06U   60
+|    *
+|   C*          KEYTN     SETGTTN0
+|   C*          KEYTN1    READETN0                      47
+|    *
+|   C*          *IN47     DOWEQ'0'
+|    *
+|   C*          TP06U     IFGT TN13
+|   C*                    SUB  TN13      TP06U
+|   C*                    Z-ADD0         TN13
+|   C*                    ELSE
+|   C*                    SUB  TP06U     TN13
+|   C*                    Z-ADD0         TP06U
+|   C*                    ENDIF
+|    *
+|   C*                    MOVELPGWW      TNWW
+|   C*                    Z-ADDA8YMD     TNXX
+|   C*                    TIME           TNYY
+|   C*                    MOVEL$USER     TNZZ
+|    *
+|   C*                    UPDATTN0
+|    *
+|   C*          TP06U     IFEQ 0
+|   C*                    LEAVE
+|   C*                    ENDIF
+|    *
+|   C*          KEYTN1    READETN0                      47
+|   C*                    ENDDO
+|    *
+|   C           KEYTN     CHAINTN0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     SUB  TP06      TN13
+|   C                     ADD  TP06      TN07
+|   C*                    MOVELPGWW      TNWW
+|   C*                    Z-ADDA8YMD     TNXX
+|   C*                    TIME           TNYY
+|   C*                    MOVEL$USER     TNZZ
+|   C                     UPDATTN0
+| 02-C                     ENDIF
+|    *
+|    *更新INTAPF
+|   C           KEYTA     CHAINTA0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C                     SUB  TP06      TA19
+|   C                     MOVELPGWW      TAWW
+|   C                     Z-ADDA8YMD     TAXX
+|   C                     TIME           TAYY
+|   C                     MOVEL$USER     TAZZ
+|   C                     UPDATTA0
+| 03-C                     ENDIF
+|    *更新INTBPF
+|   C           KEYTB     CHAINTB0                  40
+| 04-C           *IN40     IFEQ '0'
+|   C                     SUB  TP06      TB18
+|   C                     MOVELPGWW      TBWW
+|   C                     Z-ADDA8YMD     TBXX
+|   C                     TIME           TBYY
+|   C                     MOVEL$USER     TBZZ
+|   C                     UPDATTB0
+| 04-C                     ENDIF
+|    *
+|   C                     READPTP0                      46
+| 01-C                     ENDDO
+|     *
+03===C                     ENDSR
+

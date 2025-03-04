@@ -1,0 +1,255 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0421                                       *
+      * AUTHER       : A1139  JANE                                   *
+      * CREATE DATE  : 81/04/09                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :帳齡分析表                                   *
+      ****************************************************************
+     FSOSILF07IP  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FARR042APO   E             39     PRINTER
+     ISI0
+     I                                              SI01  L2
+     I                                              SI12  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+     I*
+     I                                      601 602 DSI01S
+     I                                      603 604 DSI01E
+     I                                      605 605 DSI03S
+     I                                      606 606 DSI03E
+     I                                      607 608 DSI04S
+     I                                      609 610 DSI04E
+     I                                      617 6220YDATES
+     I*(YYYY/MM/DD)
+     I                                      850 8570YMD8S
+     I*(YYYY/MM/DD)
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+      *==============================================================*
+      *                    DEFN ROUTINE
+      *==============================================================*
+     C*
+     C           *LIKE     DEFN YDATES    WSDATE
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39N38             EXSR RTN900                     *OVRFLW-THE SAME COP.
+     C   39 38             EXSR RTN910                     *OVRFLW-NOT THE SAME
+     C                     EXSR RTN200                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN777
+     CL2 10                EXSR RTN888
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C***
+|    C*公司名稱
+|    C***
+|    C           SI01      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    D#B03
+|    C  N40                MOVEL#B03      D#B03
+|    C*
+|    C                     WRITEPH1
+|    C                     SETON                         10
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....READE DETAIL
+      *==============================================================*
+02===C           RTN200    BEGSR
+|    C*
+|    C                     EXSR RTN300                     *CHAIN DATA
+|    C                     EXSR RTN350                     *SUBTOT-->ENDTOT
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN300....CHAIN DATA
+      *==============================================================*
+03===C           RTN300    BEGSR
+|    C***
+|    C*客戶簡稱
+|    C***
+|    C           SI12      CHAINME0                  41
+| 01-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN350....ADD SUBTOT  TO  ENDTOT
+      *==============================================================*
+04===C           RTN350    BEGSR
+|    C*
+|    C                     Z-ADD0         DAY     90
+|    C***
+|    C*(交貨日轉成中國年月日)
+|    C***
+|    C* (UPD BY 81/05/05 --->應收日轉成中國年月日)
+|    C***
+B2???C           SI29      SUB  110000    DSI29   60
+B2INF *CVR0001 sev.00 Field DSI29 is not a date or year
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code SUB
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C***
+|    C*(確認日轉成中國年月日)
+|    C***
+M001DC*          YDATES    SUB  110000    WSDATE
+M001AC           YMD8S     SUB  110000    WSDATE
+|    C***
+|    C*發票日與確認日之相距天數
+|    C***
+|    C*                    CALL 'P20'
+|    C*                    PARM DSI29     P2001I  60       *應收日
+|    C*                    PARM WSDATE    P2002I  60       *確認日
+|    C*          DAY       PARM           P2011O  90
+     C*   CHANGE BY JOHN  2011/08/30 ---------------------------------
+     C                     CALL 'P32'
+     C                     PARM SI29      P3201I  80       *應收日
+     C                     PARM YMD8S     P3202I  80       *確認日
+     C                     PARM '2'       P3203I  1        *日期格式
+     C                     PARM '1'       P3203I  1        *曆別
+     C           DAY       PARM           P3201O  90
+|    C*(O)
+| 01-C           DAY       IFLE 0
+|   C                     ADD  SI30      DSI30O
+| 01-C                     END
+|    C*(A)
+| 02-C           DAY       IFGT 0
+|   C           DAY       ANDLE30
+|   C                     ADD  SI30      DSI30A
+| 02-C                     END
+|    C*(B)
+| 03-C           DAY       IFGE 31
+|   C           DAY       ANDLE60
+|   C                     ADD  SI30      DSI30B
+| 03-C                     END
+|    C*(C)
+| 04-C           DAY       IFGE 61
+|   C           DAY       ANDLE90
+|   C                     ADD  SI30      DSI30C
+| 04-C                     END
+|    C*(D)
+| 05-C           DAY       IFGE 91
+|   C           DAY       ANDLE180
+|   C                     ADD  SI30      DSI30D
+| 05-C                     END
+|    C*(E)
+| 06-C           DAY       IFGT 180
+|   C                     ADD  SI30      DSI30E
+| 06-C                     END
+|    C***
+|    C*(總額)---SUBTOT
+|    C***
+|    C           DSI30O    ADD  DSI30A    TOTAL
+|    C                     ADD  DSI30B    TOTAL
+|    C                     ADD  DSI30C    TOTAL
+|    C                     ADD  DSI30D    TOTAL
+|    C                     ADD  DSI30E    TOTAL
+|    C***
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW --同一公司別
+      *==============================================================*
+05===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN910....OVERFLOW --不同公司別
+      *==============================================================*
+06===C           RTN910    BEGSR
+|    C*
+|    C*(CLEAR TOTAL)
+|    C                     WRITEPE3
+|    C***
+|    C*公司簡稱
+|    C***
+|    C           SI01      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    D#B03
+|    C  N40                MOVEL#B03      D#B03
+|    C***
+|    C*確認日
+|    C***
+|    C                     MOVE YDATES    WSDATE
+|    C*
+|    C                     WRITEPH1
+|    C****                 SETON                     303136
+|    C                     SETOF                     3938
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN777....--L1 客戶
+      *==============================================================*
+07===C           RTN777    BEGSR
+|    C*
+|    C                     WRITEPD1
+|    C*(CLEAR DETAIL)
+|    C                     ADD  DSI30O    ENDO
+|    C                     ADD  DSI30A    ENDA
+|    C                     ADD  DSI30B    ENDB
+|    C                     ADD  DSI30C    ENDC
+|    C                     ADD  DSI30D    ENDD
+|    C                     ADD  DSI30E    ENDE
+|    C                     ADD  TOTAL     ENDTOT
+|    C                     Z-ADD0         DSI30O
+|    C                     Z-ADD0         DSI30A
+|    C                     Z-ADD0         DSI30B
+|    C                     Z-ADD0         DSI30C
+|    C                     Z-ADD0         DSI30D
+|    C                     Z-ADD0         DSI30E
+|    C                     Z-ADD0         TOTAL
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN888....--L2
+      *==============================================================*
+08===C           RTN888    BEGSR
+|    C*
+|    C                     WRITEPE4                        印空白行
+|    C*
+|    C                     WRITEPD3                        *印合計
+|    C*(合計）
+|    C                     Z-ADD0         ENDO
+|    C                     Z-ADD0         ENDA
+|    C                     Z-ADD0         ENDB
+|    C                     Z-ADD0         ENDC
+|    C                     Z-ADD0         ENDD
+|    C                     Z-ADD0         ENDE
+|    C                     Z-ADD0         ENDTOT
+|    C                     SETON                     3839
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+09===C           RTN999    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     EXSR RTN010
+|   C                     WRITEPE5
+|   C                     WRITEPE2
+| 01*C                     ELSE
+|   C                     WRITEPE2
+| 01-C                     END
+|    C*
+09===C                     ENDSR
+

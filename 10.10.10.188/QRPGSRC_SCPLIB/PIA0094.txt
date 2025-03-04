@@ -1,0 +1,218 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     H*                                                              *
+     H*    PROGRAM-ID   : PIA0094                                    *
+     H*    PROGRAM NAME :計算12/25庫存量-系統異動調整調撥數量  *
+     H*    AUTHOR       : RACHEL                                     *
+     H*    CREATE DATE  : 2022/10/18                                 *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :庫存系統作業                              *
+     H*    SUBSYSTEM    :盤點系統　　                              *
+     H*    REMARK       :計算盤點日與12/25之間的調撥數量         *
+     H*                                                              *
+     H****************************************************************
+     FINTCLF21IF  E           K        DISK
+     FINTCLF22IF  E           K        DISK
+     F            TC0                               KRENAMETCL
+     FINTDPF  IF  E           K        DISK
+     F*                                             KINFSR ERRSR
+     FPIA9WF  UF  E           K        DISK
+     FPIA9LF01IF  E           K        DISK
+     F            PA9                               KRENAMEPA9L
+     E*---------------------------------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      201 2080$A8YMD
+     I                                      500 500 $DATA
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+     I                                      501 502 DPI01
+     I                                      503 504 DPI02
+     I                                      505 5080DPI03
+     I                                      509 5140DPI04S
+     I                                      509 5100DPI4SM
+     I                                      511 5120DPI4SD
+     I                                      515 5200DPI04E
+     I                                      515 5160DPI4EM
+     I                                      517 5180DPI4ED
+     I                                      521 5260DPIYM
+     I                                      527 5340DZA03S
+     I                                      535 5420DZA03E
+     I           IDS
+     I                                        1   80WZA03
+     I                                        1   60WZA3YM
+     I                                        1   40WZA03Y
+     I                                        5   60WZA03M
+     I                                        7   80WZA03D
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYA9     KLIST
+     C                     KFLD           TC01             公司別
+     C                     KFLD           TC02             通路代號
+     C                     KFLD           TC04             出貨分店
+     C           KEYA91    KLIST
+     C                     KFLD           TC01             公司別
+     C                     KFLD           TC02             通路代號
+     C                     KFLD           TC07             收貨分店
+     C           KEYA9W    KLIST
+     C                     KFLD           P901             公司別
+     C                     KFLD           P902             通路代號
+     C                     KFLD           P903             分店代號
+     C                     KFLD           P905             盤點日期
+     C                     KFLD           TD02             產品代號
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C*
+     C                     EXSR R1000                      出貨分店調撥數量
+     C                     EXSR R2000                      收貨分店調撥數量
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R1000 ....出貨分店調撥數量
+     C*==============================================================*
+     C           R1000     BEGSR
+     C*
+     C                     Z-ADDDPIYM     WZA3YM
+     C                     Z-ADD25        WZA03D           以25日為基準日
+     C                     READ TC0                      40
+  01-C           *IN40     DOWEQ'0'
+     C*
+     C                     MOVEL*BLANK    ATC04   1
+     C           KEYA9     SETLLPA9L
+     C           KEYA9     CHAINPA9L                 41
+  02-C           *IN41     IFEQ '0'
+     C*
+     C*盤點日在25日，不異動調撥數量
+  03-C           P905      IFEQ WZA03
+    C                     GOTO NEXT
+  03-C                     END
+     C*
+     C*盤點日在25日前，以盤點日+1為調撥起日、25日為迄日
+  04-C           P905      IFLT WZA03
+    C                     Z-ADDP905      KZA03S  80
+    C                     ADD  1         KZA03S
+    C                     Z-ADDWZA03     KZA03E  80
+    C                     MOVEL'S'       ATC04            出貨分店減項
+    C*                    MOVEL'A'       ATC06            收貨分店加項
+  04-C                     END
+     C*
+     C*盤點日在25日後，以26日為調撥起日、盤點日為迄日
+  05-C           P905      IFGT WZA03
+    C                     Z-ADDWZA03     KZA03S
+    C                     ADD  1         KZA03S
+    C                     Z-ADDP905      KZA03E
+    C                     MOVEL'A'       ATC04            出貨分店加項
+    C*                    MOVEL'S'       ATC06            收貨分店減項
+  05-C                     END
+     C*
+     C*挑選調出日期落在起迄區間之資料
+  06-C           TC03      IFGE KZA03S
+    C           TC03      ANDLEKZA03E
+    C*
+    C           TC05      SETLLTD0
+    C           TC05      CHAINTD0                  42
+  07-C           *IN42     DOWEQ'0'
+    C*計算調出數量
+    C           KEYA9W    SETLLPA9
+    C           KEYA9W    CHAINPA9                  43
+  08-C           *IN43     IFEQ '0'
+    C           ATC04     IFEQ 'A'
+    C                     ADD  TD03      P914             異動數量
+    C                     END
+    C           ATC04     IFEQ 'S'
+    C                     SUB  TD03      P914             異動數量
+    C                     END
+    C                     MOVEL'PIA094O' P9WW      P
+    C                     Z-ADD$A8YMD    P9XX
+    C                     TIME           P9YY
+    C                     UPDATPA9
+  08-C                     END
+    C*
+    C           TC05      READETD0                      42
+  07-C                     END
+    C*
+  06-C                     END
+  02-C                     END
+    C*
+    C           NEXT      TAG
+    C                     READ TC0                      40
+  01-C                     ENDDO
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R2000 ....收貨分店調撥數量
+     C*==============================================================*
+     C           R2000     BEGSR
+     C*
+     C                     Z-ADDDPIYM     WZA3YM
+     C                     Z-ADD25        WZA03D           以25日為基準日
+     C           *LOVAL    SETLLTCL
+     C                     READ TCL                      40
+  01-C           *IN40     DOWEQ'0'
+     C*
+     C                     MOVEL*BLANK    ATC06   1
+     C           KEYA91    SETLLPA9L
+     C           KEYA91    CHAINPA9L                 41
+  02-C           *IN41     IFEQ '0'
+     C*
+     C*盤點日在25日，不異動調撥數量
+  03-C           P905      IFEQ WZA03
+    C                     GOTO NEXT1
+  03-C                     END
+     C*
+     C*盤點日在25日前，以盤點日+1為調撥起日、25日為迄日
+  04-C           P905      IFLT WZA03
+    C                     Z-ADDP905      KZA03S  80
+    C                     ADD  1         KZA03S
+    C                     Z-ADDWZA03     KZA03E  80
+    C                     MOVEL'A'       ATC06   1        收貨分店加項
+  04-C                     END
+     C*
+     C*盤點日在25日後，以26日為調撥起日、盤點日為迄日
+  05-C           P905      IFGT WZA03
+    C                     Z-ADDWZA03     KZA03S
+    C                     ADD  1         KZA03S
+    C                     Z-ADDP905      KZA03E
+    C                     MOVEL'S'       ATC06            收貨分店減項
+  05-C                     END
+     C*
+     C*挑選調入日期落在起迄區間之資料
+  06-C           TC06      IFGE KZA03S
+    C           TC06      ANDLEKZA03E
+    C*
+    C           TC05      SETLLTD0
+    C           TC05      CHAINTD0                  42
+  07-C           *IN42     DOWEQ'0'
+    C*計算調入數量
+    C           KEYA9W    SETLLPA9
+    C           KEYA9W    CHAINPA9                  43
+  08-C           *IN42     IFEQ '0'
+    C           ATC06     IFEQ 'A'
+    C                     ADD  TD04      P914             異動數量
+    C                     END
+    C           ATC06     IFEQ 'S'
+    C                     SUB  TD04      P914             異動數量
+    C                     END
+    C                     MOVEL'PIA094I' P9WW      P
+    C                     Z-ADD$A8YMD    P9XX
+    C                     TIME           P9YY
+    C                     UPDATPA9
+  08-C                     END
+    C*
+    C           TC05      READETD0                      42
+  07-C                     END
+    C*
+  06-C                     END
+  02-C                     END
+    C*
+    C           NEXT1     TAG
+    C                     READ TCL                      40
+  01-C                     ENDDO
+     C*
+01===C                     ENDSR
+     C*==============================================================*
+

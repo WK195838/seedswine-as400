@@ -1,0 +1,137 @@
+     /**************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250  */
+     /*                                                            */
+     /*    PROGRAM ID   : JLB051                                   */
+     /*    PROGRAM NAME : 庫存異動傳票批次                       */
+     /*    AUTHOR       : D910121 CHARLES                          */
+     /*    CREATE DATE  : 1993.05.22                               */
+     /*    UPDATE DATE  :                                          */
+     /*    SYSTEM       : 進銷存收TO總帳                       */
+     /**************************************************************/
+             PGM
+
+             DCL        VAR(&D01)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&D02)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&F01)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&F02)   TYPE(*CHAR) LEN(8)
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             CHGVAR     VAR(&D01)   VALUE(%SST(*LDA 625 1))
+             CHGVAR     VAR(&D02)   VALUE(%SST(*LDA 626 1))
+             CHGVAR     VAR(&F01)   VALUE(%SST(*LDA 601 8))
+             CHGVAR     VAR(&F02)   VALUE(%SST(*LDA 609 8))
+     /**** WF#GPF   ****/
+             CPYF       FROMFILE(WF#GPF) TOFILE(QTEMP/WF#GPF) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WF#GPF))
+             OVRDBF     FILE(WF#GPF) TOFILE(QTEMP/WF#GPF) SHARE(*YES)
+
+     /**** WF#GPF01 ****/
+             CPYF       FROMFILE(WF#GPF01) TOFILE(QTEMP/WF#GPF01) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM +
+                          FILE(QTEMP/WF#GPF01))
+             OVRDBF     FILE(WF#GPF01) TOFILE(QTEMP/WF#GPF01) +
+                          SHARE(*YES)
+
+     /**** WFJL10PF ****/
+             CPYF       FROMFILE(WFJL10PF) TOFILE(QTEMP/WFJL10PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL10PF))
+             OVRDBF   FILE(WFJL10PF) TOFILE(QTEMP/WFJL10PF) SHARE(*YES)
+
+     /**** WFJL10LF ****/
+             CRTDUPOBJ  OBJ(WFJL10LF) FROMLIB(REFLIB) OBJTYPE(*ALL) +
+                          TOLIB(QTEMP)
+             MONMSG     MSGID(CPD2104 CPF2130)
+             OVRDBF   FILE(WFJL10LF) TOFILE(QTEMP/WFJL10LF) SHARE(*YES)
+     /**** WFJL20PF ****/
+             CPYF       FROMFILE(WFJL20PF) TOFILE(QTEMP/WFJL20PF) +
+                          CRTFILE(*YES)
+             MONMSG   MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/WFJL20PF))
+             OVRDBF   FILE(WFJL20PF) TOFILE(QTEMP/WFJL20PF) SHARE(*YES)
+ /*成本調整  */
+             OVRDBF     FILE(IMIBPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIBPF)) QRYSLT('IB02L *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") +
+                          &  IB04 *EQ %RANGE(' *CAT &F01 *CAT ' ' +
+                          *CAT &F02 *CAT ')') KEYFLD(*FILE) +
+                          MAPFLD((IB02L '%SST(IB02 1 1)' *CHAR 1))
+
+ /*良壞轉換  */
+             OVRDBF     FILE(IMICPF) SHARE(*YES)
+             OPNQRYF    FILE((IMICPF)) QRYSLT('IC01L *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") +
+                          &  IC05 *EQ %RANGE(' *CAT &F01 *CAT ' ' +
+                          *CAT &F02 *CAT ')') KEYFLD(*FILE) +
+                          MAPFLD((IC01L '%SST(IC01 1 1)' *CHAR 1))
+
+ /*產品報廢  */
+             OVRDBF     FILE(IMIEPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIEPF)) QRYSLT('IE01L *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") +
+                          &  IE05 *EQ %RANGE(' *CAT &F01 *CAT ' ' +
+                          *CAT &F02 *CAT ')') KEYFLD(*FILE) +
+                          MAPFLD((IE01L '%SST(IE01 1 1)' *CHAR 1))
+
+ /*存貨調整  */
+             OVRDBF     FILE(IMIGPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIGPF)) QRYSLT('IG01L *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") +
+                          &  IG05 *EQ %RANGE(' *CAT &F01 *CAT ' ' +
+                          *CAT &F02 *CAT ') & IG04 *EQ "1" ') +
+                          KEYFLD(*FILE) MAPFLD((IG01L '%SST(IG01 1 +
+                          1)' *CHAR 1))
+
+ /*盤點  */
+             OVRDBF     FILE(IMIUPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIUPF)) QRYSLT('IU01 *EQ %RANGE("' +
+                          *CAT &D01 *CAT '" "' *CAT &D02 *CAT '") +
+                          &  IU04 *EQ %RANGE(' *CAT &F01 *CAT ' ' +
+                          *CAT &F02 *CAT ')') KEYFLD(*FILE)
+   /*產生暫存檔及傳票*/
+             CALL       JLB0512
+
+   /*介面處理單據*/
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CALL       LOG
+             CHGVAR     VAR(&P6601I) VALUE('LOGP')
+             CHGVAR     VAR(&P6602I) VALUE('2')
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE('00')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+   /*介面未處理單據*/
+             CALL       LOG01
+             CHGVAR     VAR(&P6601I) VALUE('LOG01P')
+             CHGVAR     VAR(&P6602I) VALUE('2')
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE('00')
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             CLOF       OPNID(IMIBPF)
+             CLOF       OPNID(IMICPF)
+             CLOF       OPNID(IMIEPF)
+             CLOF       OPNID(IMIGPF)
+             CLOF       OPNID(IMIUPF)
+   /*庫存異動成本報表*/
+             OVRPRTF    FILE(JLB0513P) PAGESIZE(*N 198) CPI(15)  +
+                        USRDTA('庫存異動')
+             CALL       JLB0513
+             CHGVAR     VAR(&P6601I) VALUE('JLB0513P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+             DLTOVR     FILE(*ALL)
+
+             ENDPGM
+

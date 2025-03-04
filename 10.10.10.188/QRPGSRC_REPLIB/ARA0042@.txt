@@ -1,0 +1,279 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : ARA0042                                    *
+     A*    AUTHOR       : A1139  JANE                                *
+     A*    DATE WRITTEN : 81/03/25                                   *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :人頭馬匯東                                *
+     A*    SUBSYSTEM    :應收系統                                  *
+     A*    PROCEDURE    :發票明細查詢                              *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.09 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     A* M004      | 00.05.04 |菸酒稅實施，修改應稅
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FSOSEPF  IF  E           K        DISK
+     FSOSFPF  IF  E           K        DISK
+M004AFSOSIPF  IF  E           K        DISK
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#DPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FARA0042DCF  E                    WORKSTN
+     F                                        RRN   KSFILE SFLSR
+   @ I*(FIELD-NAME RENAME)
+     ISC0
+     I              SC01                            SE01
+     I              SC04                            SE04
+     I              SC05                            SE05
+     I              SC02                            SE02
+     I              SC31                            SE34
+     I              SC07                            SE06
+     ISD0
+     I              SD03                            SF03
+     I              SD04                            SF19
+     I              SD05                            SF20
+     I              SD06                            SF06
+     I              SD07                            SF07
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     IA042I1      DS
+     I                                        1  12 W
+     I                                        3   3 A04213
+     C*==============================================================*
+     C*                    PLIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           A042I1 12
+B2MODC                     PARM           A042I2  60
+     C                     PARM *IN03     IN03    1
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN RRN       WPRCD
+     C           *LIKE     DEFN RRN       DSPRCD
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYSE     KLIST
+     C                     KFLD           SE04
+     C                     KFLD           SE05
+M004AC           KEYSI     KLIST
+M004AC                     KFLD           WSI01
+M004AC                     KFLD           WSI02
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *GET HEAD
+     C                     EXSR RTN400
+     C*
+     C                     EXSR RTN500                     *EXFMTSFL
+     C*
+     C   03                MOVE '1'       IN03
+     C*
+     C   03
+     COR 12                SETON                     LR
+     C*=============================================================*
+     C*          RTN010....GET HEADING
+     C*=============================================================*
+01===C           RTN010    BEGSR
+|    C*
+     C                     SETOF                     48
+| 01-C           A04213    IFEQ 'D'
+|   C           A042I1    CHAINSE0                  40
+     C  N40      SE09      IFEQ 'V'
+     C                     SETON                     48
+     C                     END
+| 01-C                     END
+|    C*
+| 02-C           A04213    IFEQ 'S'
+|   C           A042I1    CHAINSC0                  40
+     C  N40      SC13      IFEQ 'V'
+     C                     SETON                     48
+     C                     END
+| 02-C                     END
+|    C*
+|    C*發票日期
+B2TRCC                     Z-ADDA042I2    YDATE
+|    C*公司簡稱
+|    C           SE01      CHAIN#B0                  41
+| 03-C           *IN41     IFEQ '1'
+|   C                     MOVE *BLANK    D#B03
+| 03*C                     ELSE
+|   C                     MOVEL#B03      D#B03
+| 03-C                     END
+|    C*地區說明
+|    C           SE34      CHAIN#D0                  42
+| 04-C           *IN42     IFEQ '1'
+|   C                     MOVE *BLANK    #D02
+| 04-C                     END
+|    C*交貨日期
+M001AC                     Z-ADDSE06      WSE06   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM WSE06     S001I2  60
+B2MODC           DSE06     PARM           S001O1  60
+|    C*
+|    C*分店代號＆客戶簡稱
+|    C           KEYSE     CHAINME0                  43
+| 05-C           *IN43     IFEQ '1'
+|   C                     MOVE *BLANK    ME04
+| 05-C                     END
+M004AC*發票稅額
+M004AC                     MOVELSE01      WSI01   2
+M004AC           A04213    IFEQ 'D'
+M004AC                     MOVELSE30      WSI02  10
+M004AC                     END
+M004AC*
+M004AC           A04213    IFEQ 'S'
+M004AC                     MOVELSC30      WSI02  10
+M004AC                     END
+M004AC           KEYSI     CHAINSI0                  40
+M004AC           *IN40     IFEQ '1'
+M004AC                     Z-ADD0         SI24
+M004AC                     END
+01===C                     ENDSR
+     C*=============================================================*
+     C*          RTN400....SFL MAIN RUTINE (START KEY)
+     C*=============================================================*
+02===C           RTN400    BEGSR
+|    C                     EXSR RTN405                     *INIT SFL
+|    C                     EXSR RTN810                     *ADD SFL DTA
+02===C                     ENDSR
+     C*=============================================================*
+     C*          RTN405....SFL INITIAL
+     C*=============================================================*
+03===C           RTN405    BEGSR
+|    C*
+|    C                     Z-ADD0         DRRN
+|    C                     Z-ADD0         RRN
+|    C                     Z-ADD0         DSPRCD
+|    C                     Z-ADD8         WPRCD            *PAG RCD
+|    C*
+|    C                     SETON                     52    *SFLCLR
+|    C                     WRITESFLCR
+|    C                     SETOF                     52
+|    C                     SETON                     51    *SFLDSPCTL
+|    C***
+| 01-C           A04213    IFEQ 'D'
+|   C           A042I1    SETLLSF0
+| 01-C                     END
+|    C*
+| 02-C           A04213    IFEQ 'S'
+|   C           A042I1    SETLLSD0
+| 02-C                     END
+|    C*
+03===C                     ENDSR
+     C*=============================================================*
+     C*          RTN500....EXFMT DSPF
+     C*=============================================================*
+04===C           RTN500    BEGSR
+|    C*
+| 01-C           RRN       IFGT 0
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NO DTA
+| 01-C                     END
+|    C*
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR
+|    C                     SETOF                     50
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+04===C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA--SOSFPF
+     C*=============================================================*
+05===C           RTN810    BEGSR
+|    C*
+|    C                     ADD  WPRCD     DSPRCD
+| 01-C           RRN       DOWLTDSPRCD
+|   C*
+| 02-C           A04213    IFEQ 'D'
+|   C           A042I1    READESF0                      46
+| 02*C                     ELSE
+|   C           A042I1    READESD0                      46
+| 02-C                     END
+|   C**
+| 03-C           *IN46     IFEQ '0'
+      *IN48已送貨確認
+     C           *IN48     IFEQ '1'
+|   C                     EXSR RTN811                     DTA->SFL
+| 04-C*          QTY       IFNE 0
+|   C*          DISC      ANDNE0
+|   C                     ADD  1         RRN
+|   C                     WRITESFLSR
+| 04-C*                    END
+     C                     END
+| 03*C                     ELSE
+|   C                     Z-ADDRRN       DSPRCD
+| 03-C                     END
+|   C*
+| 01-C                     END
+|    C*
+|    C                     Z-ADDRRN       DRRN
+05===C                     ENDSR
+     C*=============================================================*
+     C*          RTN811....MOVE DTA TO SFL
+     C*=============================================================*
+06===C           RTN811    BEGSR
+|    C*
+|    C*產品簡稱
+|    C           SF03      CHAINMA0                  44
+| 01-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANKS   MA03
+| 01-C                     END
+|    C*計算數量
+|    C           SF19      ADD  SF20      QTY
+|    C*
+|    C*發票日期---CHANGE
+B2MODC                     Z-ADD0         TEMDT   60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2MODC                     PARM A042I2    S001I2  60
+B2MODC           TEMDT     PARM           S001O1  60
+|    C*
+|    C*                    Z-ADDA042I2    TEMDT   60
+|    C*單價
+|    C           SE01      CHAIN#B0                  45
+| 02-C           #B06      IFEQ 'A'
+|   C           SF03      CHAINMA0                  44
+M001AC                     MOVE TEMDT     HB2@F6  6
+M001AC                     EXSR HB@68L
+M001AC                     MOVE HB2@T8    WTM     80
+B2000C           WTM       IFGE MA39
+|   C                     Z-ADDMA45      DSF06
+| 03*C                     ELSE
+|   C                     Z-ADDMA40      DSF06
+| 03-C                     END
+| 02*C                     ELSE
+B2000C           WTM       IFGE MA39
+|   C                     Z-ADDMA46      DSF06
+| 04*C                     ELSE
+|   C                     Z-ADDMA41      DSF06
+| 04-C                     END
+| 02-C                     END
+|    C**
+|    C*計算金額
+|    C           SF06      MULT SF19      TOT
+|    C*****      DSF06     MULT QTY       TOT
+|    C*
+|    C*計算折扣
+|    C           QTY       MULT DSF06     DISC
+|    C                     SUB  TOT       DISC
+|    C*
+|    C*****      SF19      MULT SF06      WDISC   90
+|    C*****      TOT       SUB  WDISC     DISC
+|    C*
+06===C                     ENDSR
+M001AC/COPY HBP2CVTR
+

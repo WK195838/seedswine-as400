@@ -1,0 +1,182 @@
+      ****************************************************************
+      *   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266    *
+      *                                                              *
+      * PROGRAM NAME : SOR080                                        *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 12/31/93                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :專櫃銷售系統                                 *
+      * REMARK       :專櫃結帳表                                   *
+      ****************************************************************
+     FSOR080D CF  E                    WORKSTN
+     F                                              KINFDS DSPFDS
+     ILDA        UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*
+     I                                      601 6040DST02
+     I                                      601 6020DST02M
+     I                                      603 6040DST02Y
+     I*
+     I                                      605 6080ST02E
+     I                                      605 6060ST02EY
+     I                                      607 6080ST02EM
+     I*
+     I                                      620 624 DST01S
+     I                                      620 620 MST01S
+     I                                      630 634 DST01E
+     I                                      630 630 MST01E
+M001AI*(YYYY/MM/DD)
+M001AI                                      850 855 YMD8S
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN98     PARM *IN98     IN98    1
+     C           *IN97     PARM *IN97     IN97    1
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N97N98             EXSR RTN010                     .INIT SCREEN
+  01-C           *IN03     DOUEQ'1'
+    C           *IN99     OREQ '0'
+    C                     EXFMTDSPD1
+    C                     MOVEA*ALL'0'   *IN,60
+  02-C           *IN03     IFEQ '0'
+  03-C           *IN04     IFEQ '1'
+    C**********************
+    C*  F4 PROMPT PROCESS *
+    C**********************
+    C                     EXSR RTNF4
+  03*C                     ELSE
+    C                     EXSR RTN100                     .CHECK      ?
+  03-C                     END
+  02-C                     END
+  01-C                     END
+     C*
+     C                     EXSR OUTLDA
+     C*
+     C   03                SETON                     LR
+     C                     RETRN
+      *===============================================================*
+      *          RTN010....INIT SCREEN
+      *===============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE *BLANK    DST01S
+|    C                     MOVE *BLANK    DST01E
+|    C                     Z-ADD0         DST02
+|    C                     Z-ADD0         ST02EM
+|    C                     Z-ADD0         ST02EY
+|    C                     MOVEL'SCR001'  APPSCR  6
+|    C*
+01===C                     ENDSR
+      *===============================================================*
+      *          RTN100....CHECK SCREEN
+      *===============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C*專櫃名稱
+| 01-C           DST01S    IFEQ *BLANK
+|   C                     MOVE 'B    '   DST01S
+| 01-C                     END
+|    C*
+| 02-C           DST01E    IFEQ *BLANK
+|   C                     MOVE 'B9999'   DST01E
+| 02-C                     END
+|    C*
+| 03-C           MST01S    IFNE 'B'
+|   C                     SETON                     608799
+| 03-C                     END
+|    C   99                GOTO END100
+|    C*
+| 03-C           MST01E    IFNE 'B'
+|   C                     SETON                     618799
+| 03-C                     END
+|    C   99                GOTO END100
+|    C*
+| 03-C           DST01S    IFGT DST01E
+|   C                     SETON                     6061
+|   C                     SETON                     9299
+| 03-C                     END
+|    C   99                GOTO END100
+|    C*結帳年月
+| 04-C           DST02M    IFGT 12
+|   C           DST02M    ORLT 1
+|   C                     SETON                     629399
+| 04-C                     END
+|    C                     Z-ADDDST02Y    ST02EY
+|    C                     Z-ADDDST02M    ST02EM
+|    C   99                GOTO END100
+|    C*
+M001AC*                    MOVE ST02E     YMD8S
+M001AC                     MOVE '004N7'   HB2@FA
+M001AC                     MOVE ST02E     HB2@F
+M001AC                     MOVE '006N7'   HB2@TA
+M001AC                     EXSR HB@ADD                     ADD CENTURY
+M001AC                     MOVE HB2@T     YMD8S
+02===C           END100    ENDSR
+      *===============================================================*
+      *          RTNF4 ....F4 HELP
+      *===============================================================*
+03===C           RTNF4     BEGSR
+|    C*
+|    C********************
+|    C*  GET ROW,COL     *
+|    C********************
+|    C           #CSR      DIV  256       D#ROW            *ROW
+|    C                     MVR            D#COL            *COL
+|    C** 游標位置即為(D#ROW,D#COL)
+| 01-C           APPSCR    IFEQ 'SCR001'
+|   C*專櫃代號
+| 02-C           D#ROW     IFEQ 6
+| 03-C           D#COL     IFGE 40
+|   C           D#COL     ANDLE44
+|   C                     CALL 'WDS003'
+|   C                     PARM           DST01S
+|   C                     GOTO ENDF4
+| 03-C                     END
+|   C*
+| 04-C           D#COL     IFGE 48
+|   C           D#COL     ANDLE52
+|   C                     CALL 'WDS003'
+|   C                     PARM           DST01E
+|   C                     GOTO ENDF4
+| 04-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 05-C           D#ROW     IFEQ 18
+|   C           D#COL     ANDGE41
+|   C           D#COL     ANDLE42
+|   C                     CALL 'WDS011'
+|   C           $PRTID    PARM $PRTID    S011O1  20
+|   C                     GOTO ENDF4
+| 05-C                     END
+|   C*
+| 01-C                     END
+|    C                     SETON                     99
+|    C*
+03===C           ENDF4     ENDSR
+      *===============================================================*
+      *          OUTLDA....OUT LDA
+      *===============================================================*
+04===C           OUTLDA    BEGSR
+|    C*
+|    C           *NAMVAR   DEFN *LDA      LDA
+|    C                     OUT  *NAMVAR
+|    C*
+04===C           ENDLDA    ENDSR
+M001AC/COPY HBP2CVTR
+

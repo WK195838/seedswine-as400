@@ -1,0 +1,110 @@
+     /***************************************************************/
+     /*   人頭馬匯東洋酒股份有限公司－版權所有      TEL:5042266   */
+     /*                                                             */
+     /* PROGRAM NAME : IMR067                                       */
+     /* AUTHER       : TINA WHANG                                   */
+     /* CREATE DATE  : 82/03/17                                     */
+     /* UPDATE DATE  :                                              */
+     /* SYSTEM       :人頭馬匯東                                  */
+     /* SUBSYSTEM    :庫存作業系統                                */
+     /* REMARK       :車輛／車次送貨明細表                        */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DSE07S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSE07E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DSE22S) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DSE22E) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DSE23S) TYPE(*CHAR) LEN(3)
+             DCL        VAR(&DSE23E) TYPE(*CHAR) LEN(3)
+ /*M001M     DCL        VAR(&YMDS) TYPE(*CHAR) LEN(6) */
+ /*M001M     DCL        VAR(&YMDE) TYPE(*CHAR) LEN(6) */
+ /*M001M*/   DCL        VAR(&YMDS) TYPE(*CHAR) LEN(8)
+ /*M001M*/   DCL        VAR(&YMDE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&DATA) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&NO)     TYPE(*CHAR) LEN(6)
+             DCL        VAR(&MBR)    TYPE(*CHAR) LEN(10)
+
+             CHGVAR     VAR(&DSE07S) VALUE(%SST(*LDA 603 5))
+             CHGVAR     VAR(&DSE07E) VALUE(%SST(*LDA 608 5))
+             CHGVAR     VAR(&DSE22S) VALUE(%SST(*LDA 625 8))
+             CHGVAR     VAR(&DSE22E) VALUE(%SST(*LDA 633 8))
+             CHGVAR     VAR(&DSE23S) VALUE(%SST(*LDA 641 3))
+             CHGVAR     VAR(&DSE23E) VALUE(%SST(*LDA 644 3))
+ /*M001M     CHGVAR     VAR(&YMDS) VALUE(%SST(*LDA 613 6)) */
+ /*M001M     CHGVAR     VAR(&YMDE) VALUE(%SST(*LDA 619 6)) */
+ /*M001M*/   CHGVAR     VAR(&YMDS) VALUE(%SST(*LDA 651 8))
+ /*M001M*/   CHGVAR     VAR(&YMDE) VALUE(%SST(*LDA 661 8))
+             CHGVAR     VAR(&DATA) VALUE(%SST(*LDA 647 1))
+
+             RTVJOBA    NBR(&NO)
+             CHGVAR     VAR(&MBR)    VALUE('IM' *TCAT &NO)
+
+             IF         COND(&DATA *EQ '1') THEN(DO)
+
+             OVRPRTF    FILE(IMR067AP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('車送貨明')
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+
+             OPNQRYF    FILE((SOSEPF)) QRYSLT('SE07 *EQ %RANGE("' +
+                          *CAT &DSE07S *CAT '" "' *CAT &DSE07E *CAT +
+                          '") & MSE06 *EQ %RANGE("' *CAT &YMDS *CAT +
+                          '" "' *CAT &YMDE *CAT '") &  SE22 *EQ +
+                          %RANGE("' *CAT &DSE22S *CAT '" "' *CAT +
+                          &DSE22E *CAT '") & (SE36 *NE "T") & MSE23 +
+                          *EQ %RANGE("' *CAT &DSE23S *CAT '" "' +
+                          *CAT &DSE23E *CAT '")') KEYFLD((SE07) +
+                          (SE06) (SE22) (SE23) (SE02)) +
+                          MAPFLD((MSE06 SE06 *CHAR 8) (ZSE23 SE23 +
+                          *ZONED 3) (MSE23 ZSE23 *CHAR 3)) /*M001M*/
+
+             CALL       IMR0671
+             CHGVAR     VAR(&P6601I) VALUE('IMR067AP')
+             ENDDO
+
+             ELSE       CMD(DO)
+
+             OVRPRTF    FILE(IMR067BP) PAGESIZE(*N 198) CPI(15) +
+                        USRDTA('車送貨明')
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+
+             OPNQRYF    FILE((SOSEPF)) QRYSLT('SE07 *EQ %RANGE("' +
+                          *CAT &DSE07S *CAT '" "' *CAT &DSE07E *CAT +
+                          '") & MSE06 *EQ %RANGE("' *CAT &YMDS *CAT +
+                          '" "' *CAT &YMDE *CAT '") &  SE22 *EQ +
+                          %RANGE("' *CAT &DSE22S *CAT '" "' *CAT +
+                          &DSE22E *CAT '") & MSE23 *EQ %RANGE("' +
+                          *CAT &DSE23S *CAT '" "' *CAT &DSE23E *CAT +
+                          '") & (SE36 *NE "T")  ') KEYFLD((SE07) +
+                          (SE22) (SE06) (SE23) (SE02)) +
+                          MAPFLD((MSE06 SE06 *CHAR 8) (ZSE23 SE23 +
+                          *ZONED 6) (MSE23 ZSE23 *CHAR 6)) /*M001M*/
+             CHGVAR     VAR(&P6601I) VALUE('IMR067BP')
+             ENDDO
+
+
+
+             CALL       IMR0672
+
+             CLOF       OPNID(SOSEPF)
+             DLTOVR     FILE(*ALL)
+
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+
+
+             ENDPGM
+

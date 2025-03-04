@@ -1,0 +1,256 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     H*                                                              *
+     H* PROGRAM NAME : INR100                                        *
+     H* AUTHER       : DEREK                                         *
+     H* CREATE DATE  : 2012/12/07                                    *
+     H* UPDATE DATE  :                                               *
+     H* SYSTEM       :                                             *
+     H* SUBSYSTEM    :庫存系統                                     *
+     H* REMARK       :產品異動報表                                 *
+     H****************************************************************
+     FINTOLF10IF  E           K        DISK
+     F                                              KINFDS TORCDN
+     FINTBPF  IF  E           K        DISK
+     FUTL2PF  IF  E           K        DISK
+     E*---------------------------------------------------------------*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      135 135 $ADD
+     I                                      598 5990$PRTID
+     I                                      600 600 DOWNL
+     I                                      601 602 DTO01
+     I                                      603 604 DDOC
+     I                                      605 606 DTO02S
+     I                                      607 608 DTO02E
+     I                                      609 613 DTO03S
+     I                                      614 618 DTO03E
+     I                                      619 6190DATA
+     I                                      621 629 DTO04S
+     I                                      631 639 DTO04E
+     I                                      641 6460DTO05S
+     I                                      651 6560DTO05E
+     I                                      661 6680DATES
+     I                                      661 6660DYMS
+     I                                      671 6780DATEE
+     I* FOR F4 HELP -- GET CURSOR POSITION
+     IDSPFDS      DS
+     I                                    B 370 3710#CSR
+     ITORCDN      DS
+     I                                     *RECORD  RCDR
+     I            DS
+     I                                        1   2 TO06
+     I                                        1   1 TO06F
+     I*
+     I            DS
+     I                                        1  32 L203
+     I                                        1   1 L203F
+     I            DS
+     I                                        1   80WYMDS
+     I                                        1   60WYMS
+     I                                        1   40WYS
+     I                                        5   60WMS
+     I                                        7   80WDS
+     I            DS
+     I                                        1   80WYMDE
+     I                                        1   60WYME
+     I                                        7   80WDE
+     I            DS
+     I                                        1   80PYMDS
+     I                                        1   60PYMS
+     I                                        1   40PYS
+     I                                        5   60PMS
+     I                                        7   80PDS
+     I            DS
+     I                                        1   60KTB02
+     I                                        1   40KTB02Y
+     I                                        5   60KTB02M
+     C*==============================================================*
+     C*                    PARAMETER
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C           KTO01     PARM           P001    2        公司別
+     C           KTO02     PARM           P002    2        通路別
+     C           KTO03     PARM           P003    5        分店代號
+     C           KTO04     PARM           P004    9        產品代號
+     C                     PARM WQTY      P005    90       期初數量
+     C*==============================================================*
+     C*                    DEFINE
+     C*==============================================================*
+     C           *LIKE     DEFN TO01      KTO01            公司別
+     C           *LIKE     DEFN TO02      KTO02            通路別
+     C           *LIKE     DEFN TO03      KTO03            分店代號
+     C           *LIKE     DEFN TO04      KTO04            產品代號
+     C           *LIKE     DEFN TO05      KTO05            進出日期
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYTB     KLIST
+     C                     KFLD           KTO01            公司別
+     C                     KFLD           KTB02            年月
+     C                     KFLD           KTO02            通路別
+     C                     KFLD           KTO03            分店代號
+     C                     KFLD           KTO04            產品代號
+     C           KEYTO     KLIST
+     C                     KFLD           KTO01            公司別
+     C                     KFLD           KTO02            通路別
+     C                     KFLD           KTO03            分店代號
+     C                     KFLD           KTO04            產品代號
+     C                     KFLD           KTO05            進出日期
+     C           KEYTO1    KLIST
+     C                     KFLD           KTO01            公司別
+     C                     KFLD           KTO02            通路別
+     C                     KFLD           KTO03            分店代號
+     C                     KFLD           KTO04            產品代號
+     C           KEYNC     KLIST
+     C                     KFLD           TO01             公司別
+     C                     KFLD           TO04             產品代號
+     C           KEYNE     KLIST
+     C                     KFLD           TO01             公司別
+     C                     KFLD           TO02             通路別
+     C                     KFLD           TO03             分店代號
+     C           KEYL2     KLIST
+     C                     KFLD           L201             代碼欄位
+     C                     KFLD           L202             代碼內容
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR R0100
+     C*
+     C           KEYTB     CHAINTB0                  40
+     C           *IN40     IFEQ '0'
+     C                     Z-ADDTB06      WTB06   90
+     C                     EXSR R1000
+     C                     ELSE
+     C                     EXSR R2000
+     C                     EXSR R1000
+     C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          R0100 ... INITIAL
+     C*==============================================================*
+     C           R0100     BEGSR
+     C*
+     C*西祺之帳款日期為上月之26日至本月25日(此區間屬本月)
+     C*所以若起日＞＝26日將起始年月+ 1讀取INTBPF取得期初數量
+     C*所以若起日＜26日以起始年月讀取INTBPF取得期初數量
+     C*
+     C                     Z-ADDDATES     PYMDS
+     C                     Z-ADDPYMS      KTB02
+     C           PDS       IFGE 26
+     C                     ADD  1         KTB02M
+     C           KTB02M    IFGT 12
+     C                     Z-ADD1         KTB02M
+     C                     ADD  1         KTB02Y
+     C                     END
+     C                     END
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R1000 ... READ INTOLF10
+     C*==============================================================*
+     C           R1000     BEGSR
+     C*
+     C*INTBPF之期初數量為該月之期初數量(該月為讀取INTBPF之年月)
+     C*所以若起日＞＝26日，要加總起始年月之26日至起始日期前一日
+     C*之進出數量，再加上該月之期初數量，才是起始日期之期初數量
+     C*所以若起日＜26日，要加總起始年月-1之26日至起始日期前一日
+     C*之進出數量，再加上該月之期初數量，才是起始日期之期初數量
+     C*
+     C           PDS       IFGE 26
+     C                     Z-ADDDYMS      WYMS
+     C                     Z-ADD26        WDS
+     C                     ELSE
+     C                     Z-ADDDYMS      WYMS
+     C                     Z-ADD26        WDS
+     C                     SUB  1         WMS
+     C           WMS       IFLE 0
+     C                     Z-ADD12        WMS
+     C                     SUB  1         WYS
+     C                     END
+     C                     END
+     C* 始日期前一日
+     C                     CALL 'P37'
+     C                     PARM DATES     P3701I  80       日期
+     C                     PARM '2'       P3702I  1        日期格式
+     C                     PARM '1'       P3703I  1        曆別
+     C                     PARM -1        P3704I  40       距離天數
+     C           WYMDE     PARM           P3711O  80       轉換後日期
+     C*
+     C                     Z-ADDWYMDS     KTO05            進出日期
+     C*
+     C*WQTY-進出數量總計
+     C                     Z-ADD0         WQTY    90
+     C           KEYTO     SETLLINTOLF10
+     C           KEYTO1    READEINTOLF10                 46
+     C           *IN46     DOWEQ'0'
+     C           TO05      ANDLEWYMDE
+     C                     EXSR R1100
+     C           KEYTO1    READEINTOLF10                 46
+     C                     END
+     C*
+     C           WTB06     ADD  WQTY      WQTY
+     C*
+     C                     ENDSR
+     C*==============================================================*
+     C*          R1100 ...加總進出數量
+     C*==============================================================*
+     C           R1100     BEGSR
+     C*
+     C*進出數量
+     C                     Z-ADD0         WK01    90
+     C                     MOVEL'INTOLF ' L201      P
+     C                     MOVELRCDR      L202      P
+     C           KEYL2     CHAINL20                  40
+     C           *IN40     IFEQ '0'
+     C                     SELEC
+     C           L203F     WHEQ '-'
+     C           TO121     MULT -1        WK01
+     C           L203F     WHEQ '@'
+     C           TO121     MULT -1        WK01
+     C                     OTHER
+     C                     Z-ADDTO121     WK01
+     C                     ENDSL
+     C                     ENDIF
+     C*
+     C                     ADD  WK01      WQTY
+     C*
+     C           E1100     ENDSR
+     C*==============================================================*
+     C*          R2000 ... READ INTBPF
+     C*==============================================================*
+     C           R2000     BEGSR
+     C*
+     C*INTBPF若無該該月資料(該月為讀取INTBPF之年月)
+     C*讀取前一月INTBPF資料，計算期初數量
+     C*
+     C                     Z-ADD0         WTB06
+     C                     SUB  1         KTB02M
+     C           KTB02M    IFLE 0
+     C                     Z-ADD12        KTB02M
+     C                     SUB  1         KTB02Y
+     C                     END
+     C*計算次月之期初數量
+     C*
+     C           KEYTB     CHAINTB0                  40
+| 03-C           *IN40     IFEQ '0'
+|   C           TB06      ADD  TB08      WTB06
+|   C                     SUB  TB09      WTB06
+|   C                     ADD  TB10      WTB06
+|   C                     SUB  TB11      WTB06
+|   C                     ADD  TB12      WTB06
+|   C                     SUB  TB13      WTB06
+|   C                     ADD  TB14      WTB06
+|   C                     SUB  TB15      WTB06
+|   C                     ADD  TB16      WTB06
+|   C                     ADD  TB17      WTB06
+     C                     SUB  TB18      WTB06
+| 03-C                     END
+     C*
+     C           E2000     ENDSR
+     C*===============================================================*
+

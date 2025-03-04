@@ -1,0 +1,265 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SAR0431                                       *
+      * AUTHER       :                                               *
+      * CREATE DATE  : 81/05/15                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款作業                                 *
+      * REMARK       :業務員業績報表                               *
+      ****************************************************************
+     FSOSCPF  IF  E           K        DISK
+     FSOSDPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FRES18WF IF  E           K        DISK                           UC
+     FREWF12  UF  E           K        DISK                      A
+     F*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 604 DSC28S
+     I                                      605 608 DSC28E
+     I                                      611 616 DSC27S
+     I                                      617 622 DSC27E
+     I                                      631 6360DSC07
+     I                                      641 641 DATA
+B2MODI                                      642 6490DATES
+B2MODI                                      703 7080DSC39
+B2MODI                                      752 752 IN20
+     I*
+     I            DS
+     I                                        1   9 RSD03
+     I                                        1   2 RSD031
+     I                                        3   9 RSD032
+      *辦事處
+     I                                      670 670 COMP
+     I                                      671 671 COMPS
+     I                                      672 672 COMPE
+     I*
+     I*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           WFKEY     KLIST
+     C                     KFLD           SC28
+     C                     KFLD           SC27
+     C                     KFLD           RSD031
+     C                     KFLD           SD03
+      *==============================================================*
+      *                    DEFINE FIELD
+      *==============================================================*
+     C           *LIKE     DEFN SD04      WSD04
+     C           *LIKE     DEFN SD07      WSD07
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     READ SC0                      40
+     C*
+  01-C           *IN40     DOWEQ'0'
+    C*
+    C                     EXSR RTN100                     *READE SD0
+    C*
+    C                     READ SC0                      40
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C                     RETRN
+      *==============================================================*
+      *          RTN100....READE SD0
+      *==============================================================*
+01===C           RTN100    BEGSR
+|    C*
+|    C           SC02      CHAINSD0                  45
+|    C*
+| 02-C           *IN45     DOWEQ'0'
+|   C*
+| 03-C           DATA      CASEQ'A'       RTN200           *GIFT-BOX
+|   C           DATA      CASEQ'B'       RTN300           *BOTTLE
+|   C                     ENDCS
+|   C*
+|   C           SC02      READESD0                      45
+| 03-C                     END
+|   C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN200....PROC GIFT-BOX
+      *==============================================================*
+02===C           RTN200    BEGSR
+|   C*
+|   C                     MOVE SD03      RSD03
+|   C                     Z-ADDSD04      WSD04
+|   C                     Z-ADDSD07      WSD07
+|   C*
+| 01-C           IN20      IFEQ '0'
+B2MODC                     Z-ADDSC08      SC0839  80
+| 01*C                     ELSE
+B2MODC                     Z-ADDSC39      SC0839  80
+| 01-C                     END
+|   C                     EXSR RTN900                     *CHAIN WF
+|   C*
+02===C                     ENDSR
+    C*==============================================================*
+    C*          RTN300....DSEL1 ='B'禮盒拆單瓶
+    C*==============================================================*
+03===C           RTN300    BEGSR
+|   C*
+|   C           SD03      CHAINMA0                  40
+| 01-C           MA54      IFEQ 'Y'
+      *禮盒單瓶成本
+|   C                     EXSR RTN500
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN600
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 01*C                     ELSE
+|   C                     EXSR RTN200
+| 01-C                     END
+|   C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN500....禮盒單瓶成本
+      *==============================================================*
+04===C           RTN500    BEGSR
+      *禮盒拆解為產品
+|   C                     CALL 'RES018'
+|   C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|   C                     PARM SD02      S08I2  12        訂單號碼
+B2MODC                     PARM SC07      S08I3   80       牌價判斷日
+|   C                     PARM SD04      S08I4   60       禮盒訂購數量
+|   C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|   C                     PARM SD06      S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|   C                     PARM SD10      S08I7   82       禮盒成本FOB
+|   C                     PARM SD11      S08I8   82       禮盒成本FHI
+|   C                     PARM SD12      S08I9   82       禮盒成本DUTY
+      *部份－單位成本－中間
+|   C                     PARM SD22      S08IA   82       禮盒轉帳成本FOB
+|   C                     PARM SD23      S08IB   82       禮盒轉帳成本FHI
+|   C                     PARM SD24      S08IC   82       禮盒轉帳成本DUTY
+|   C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE OR UPDATE REWF69
+      *==============================================================*
+05===C           RTN600    BEGSR
+|   C*
+|   C           *LOVAL    SETLLRE18R
+|   C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVELR181      SD03
+|   C                     MOVELR181      RSD03
+|   C                     Z-ADDR182      WSD04
+|   C                     Z-ADDR184      WSD07
+|   C                     EXSR RTN900
+|   C*
+|   C                     READ RE18R                    46
+| 01-C                     END
+|   C           *LOVAL    SETLLRE18R
+|   C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN900....CAHIN WF
+      *==============================================================*
+06===C           RTN900    BEGSR
+|   C*
+|   C           WFKEY     CHAINWF120                53
+      *
+| 01-C           *IN53     IFEQ '0'
+|   C*
+B2000C           SC0839    IFEQ DATES
+| 03-C           SC03      IFNE 'S4'
+|   C                     ADD  WSD04     WF1205
+|   C                     ADD  WSD07     WF1206
+|   C                     ADD  WSD04     WF1207
+|   C                     ADD  WSD07     WF1208
+|   C                     ADD  SD05      WF1209
+|   C                     ADD  SD05      WF1211
+| 03*C                     ELSE
+|   C                     ADD  WSD04     WF1210
+|   C                     ADD  WSD04     WF1212
+| 03-C                     END
+|   C                     UPDATWF120
+      *
+| 02*C                     ELSE
+| 04-C           SC03      IFNE 'S4'
+|   C                     ADD  WSD04     WF1207
+|   C                     ADD  WSD07     WF1208
+|   C                     ADD  SD05      WF1211
+| 04*C                     ELSE
+|   C                     ADD  WSD04     WF1212
+| 04-C                     END
+|   C                     UPDATWF120
+| 02-C                     END
+|   C*
+| 01*C                     ELSE
+|   C*
+B2000C           SC0839    IFEQ DATES
+| 06-C           SC03      IFNE 'S4'
+|   C                     MOVE SC28      WF1201
+|   C                     MOVE SC27      WF1202
+|   C                     MOVE RSD031    WF1203
+|   C                     MOVE SD03      WF1204
+|   C                     Z-ADDWSD04     WF1205
+|   C                     Z-ADDWSD07     WF1206
+|   C                     Z-ADDWSD04     WF1207
+|   C                     Z-ADDWSD07     WF1208
+|   C                     Z-ADDSD05      WF1209
+|   C                     Z-ADD0         WF1210
+|   C                     Z-ADDSD05      WF1211
+|   C                     Z-ADD0         WF1212
+| 06*C                     ELSE
+|   C                     MOVE SC28      WF1201
+|   C                     MOVE SC27      WF1202
+|   C                     MOVE RSD031    WF1203
+|   C                     MOVE SD03      WF1204
+|   C                     Z-ADD0         WF1205
+|   C                     Z-ADD0         WF1206
+|   C                     Z-ADD0         WF1207
+|   C                     Z-ADD0         WF1208
+|   C                     Z-ADD0         WF1209
+|   C                     Z-ADDWSD04     WF1210
+|   C                     Z-ADD0         WF1211
+|   C                     Z-ADDWSD04     WF1212
+| 06-C                     END
+|   C                     WRITEWF120
+| 05*C                     ELSE
+| 07-C           SC03      IFNE 'S4'
+|   C                     MOVE SC28      WF1201
+|   C                     MOVE SC27      WF1202
+|   C                     MOVE RSD031    WF1203
+|   C                     MOVE SD03      WF1204
+|   C                     Z-ADD0         WF1205
+|   C                     Z-ADD0         WF1206
+|   C                     Z-ADDWSD04     WF1207
+|   C                     Z-ADDWSD07     WF1208
+|   C                     Z-ADD0         WF1209
+|   C                     Z-ADD0         WF1210
+|   C                     Z-ADDSD05      WF1211
+|   C                     Z-ADD0         WF1212
+| 07*C                     ELSE
+|   C                     MOVE SC28      WF1201
+|   C                     MOVE SC27      WF1202
+|   C                     MOVE RSD031    WF1203
+|   C                     MOVE SD03      WF1204
+|   C                     Z-ADD0         WF1205
+|   C                     Z-ADD0         WF1206
+|   C                     Z-ADD0         WF1207
+|   C                     Z-ADD0         WF1208
+|   C                     Z-ADD0         WF1209
+|   C                     Z-ADD0         WF1210
+|   C                     Z-ADD0         WF1211
+|   C                     Z-ADDWSD04     WF1212
+| 07-C                     END
+|   C                     WRITEWF120
+| 05-C                     END
+|   C*
+| 01-C                     END
+|   C*
+06===C                     ENDSR
+

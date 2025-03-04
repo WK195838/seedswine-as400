@@ -1,0 +1,769 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : CT0001                                     *
+     A*    AUTHOR       : A1010  JOHN                                *
+     A*    CREATE DATE  : 2010/10/01                                 *
+     A*    UPDATE DATE  :                                            *
+     A*    SYSTEM       :西祺進銷存                                *
+     A*    SUBSYSTEM    :庫存管理系統                              *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A****************************************************************
+     FC#EHPF  IF  E           K        DISK
+     FINTXPF  O   E           K        DISK                      A
+     F*採購驗收
+     FPOCMLF91IF  E           K        DISK
+     F*調撥
+     FINTDLF90IF  E           K        DISK
+     F*進貨退出
+     FINTFLF90IF  E           K        DISK
+     F*陳列轉進貨
+     FINTHLF90IF  E           K        DISK
+     FINTGPF  IF  E           K        DISK
+     F*存貨調整
+     FINTJLF90IF  E           K        DISK
+     F*陳列品退出
+     FINTLLF90IF  E           K        DISK
+     F*銷售
+     FSEHALF02IF  E           K        DISK
+     F*INTPPF  IF  E           K        DISK
+     F*INTQPF  IF  E           K        DISK
+     F*成本調整
+     FINTMLF90IF  E           K        DISK
+     F*上期結轉
+     FINTBPF  IF  E           K        DISK
+     F*陳列調整
+     FINTPLF90IF  E           K        DISK
+     FINTNLF04IF  E           K        DISK
+     FINTNLF08IF  E           K        DISK
+     I*----------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+     I                                      135 135 $ADD
+     I                                      136 136 $UPD
+     I                                      137 137 $DLT
+     I                                      138 138 $INQ
+     I                                      201 2080DATE
+     I                                      187 1920DATES
+     I            DS
+     I                                        1   80SDATE
+     I                                        1   60SYYMM
+     I                                        1   40SYY
+     I                                        5   60SMM
+     I                                        7   80SDD
+     I            DS
+     I                                        1   80EDATE
+     I                                        1   60EYYMM
+     I                                        1   40EYY
+     I                                        5   60EMM
+     I                                        7   80EDD
+     I            DS
+     I                                        1  13 DOCNO
+     I                                        3   4 TRXCD
+     IDA02        DS
+     I                                        1   43DUTY
+      *==============================================================*
+      *                    DEFINE ROUTINE
+     C*==============================================================*
+     C*          IDENTIFY A PARAMETER LIST
+     C*==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           INCOMP  2
+     C*==============================================================*
+     C*                    KLIST
+     C*==============================================================*
+     C           KEYTX     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           SDATE
+     C           KEYTX1    KLIST
+     C                     KFLD           INCOMP
+     C*
+     C           KEYTB     KLIST
+     C                     KFLD           INCOMP
+     C                     KFLD           EH02
+     C*
+     C           KEYTN     KLIST
+     C                     KFLD           TH06
+     C                     KFLD           TH07
+     C                     KFLD           TH08
+     C                     KFLD           TH03
+     C*
+     C           KEYTN4    KLIST
+     C                     KFLD           TH05
+     C                     KFLD           TH02
+     C           KEYTN8    KLIST
+     C                     KFLD           TD05
+     C                     KFLD           TD01
+     C                     KFLD           TD02
+     C           KEYTG     KLIST
+     C                     KFLD           TH01
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     EXSR RTN010                     *INIT RTN
+     C                     EXSR RTN100                     POCM 採購驗收
+     C                     EXSR RTN110                     INTD 調撥
+     C                     EXSR RTN120                     INTF 進貨退出
+     C                     EXSR RTN130                     INTH 陳列轉進貨
+     C                     EXSR RTN140                     INTJ 存貨調整
+     C                     EXSR RTN150                     INTL 陳列品退出
+     C*                    EXSR RTN160                     INTB 上期結轉
+     C                     EXSR RTN170                     INTD 成本調整
+     C                     EXSR RTN180                     SEHA 銷售退回
+     C                     EXSR RTN190                     INTP 陳列調整
+     C                     SETON                     LR
+     C*
+     C*==============================================================*
+     C*          RTN010....INITIAL RTN
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C           INCOMP    CHAINEH0                  40
+| 01-C           *IN40     IFEQ '1'
+|   C                     SETON                     LR
+| 01-C                     ENDIF
+|    C*
+|    C                     Z-ADDEH07      SDATE
+|    C                     Z-ADDEH08      EDATE
+|    C*
+|    C           *NAMVAR   DEFN           DA02             稅率REFLIB
+|    C                     IN   DA02
+|    C*
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....PROC POCM    進貨
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C           KEYTX     SETLLCM0
+|    C           KEYTX1    READECM0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           CM16      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN500
+|   C*
+|   C           KEYTX1    READECM0                      41
+| 01-C                     ENDDO
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN110....PROC INTD    調撥
+     C*==============================================================*
+03===C           RTN110    BEGSR
+|    C           KEYTX     SETLLTD0
+|    C           KEYTX1    READETD0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TD10      ANDLEEDATE
+|   C*
+|   C                     Z-ADD0         W1QTY   60
+|   C           KEYTN8    SETLLTN1
+|   C           KEYTN8    READETN1                      42
+| 02-C           *IN42     DOWEQ'0'
+|   C                     ADD  TN14      W1QTY
+|   C           KEYTN8    READETN1                      42
+| 02-C                     ENDDO
+|   C*
+|   C                     EXSR RTN51A                     調入
+|   C                     EXSR RTN51B                     調出
+|   C*
+|   C           KEYTX1    READETD0                      41
+| 01-C                     ENDDO
+|    C*
+03===C                     ENDSR
+     C*==============================================================*
+     C*          RTN120....PROC INTF    進貨退出
+     C*==============================================================*
+04===C           RTN120    BEGSR
+|    C           KEYTX     SETLLTF0
+|    C           KEYTX1    READETF0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TF08      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN520                     進貨退出
+|   C*
+|   C           KEYTX1    READETF0                      41
+| 01-C                     ENDDO
+|    C*
+04===C                     ENDSR
+     C*==============================================================*
+     C*          RTN130....PROC INTH    陳列轉進貨
+     C*==============================================================*
+05===C           RTN130    BEGSR
+|    C           KEYTX     SETLLTH0
+|    C           KEYTX1    READETH0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TH09      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN530                     陳列轉進貨
+|   C*
+|   C           KEYTX1    READETH0                      41
+| 01-C                     ENDDO
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN140....PROC INTJ    存貨調整
+     C*==============================================================*
+06===C           RTN140    BEGSR
+|    C           KEYTX     SETLLTJ0X
+|    C           KEYTX1    READETJ0X                     41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TJ07      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN540                     存貨調整
+|   C*
+|   C           KEYTX1    READETJ0X                     41
+| 01-C                     ENDDO
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN150....PROC INTL    陳列品退出
+     C*==============================================================*
+07===C           RTN150    BEGSR
+|    C           KEYTX     SETLLTL0
+|    C           KEYTX1    READETL0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TL08      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN550                     陳列品退出
+|   C*
+|   C           KEYTX1    READETL0                      41
+| 01-C                     ENDDO
+|    C*
+07===C                     ENDSR
+     C*==============================================================*
+     C*          RTN160....PROC INTB    上期結轉
+     C*==============================================================*
+08===C           RTN160    BEGSR
+|    C           KEYTB     SETLLTB0
+|    C           KEYTB     READETB0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C*
+|   C                     EXSR RTN560                     上期結轉
+|   C*
+|   C           KEYTB     READETB0                      41
+| 01-C                     ENDDO
+|    C*
+08===C                     ENDSR
+     C*==============================================================*
+     C*          RTN170....PROC INTM    成本調整
+     C*==============================================================*
+09===C           RTN170    BEGSR
+|    C           KEYTX     SETLLTM0
+|    C           KEYTX1    READETM0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TM02      ANDLEEDATE
+|   C*
+|   C                     EXSR RTN570                     存貨調整
+|   C*
+|   C           KEYTX1    READETM0                      41
+| 01-C                     ENDDO
+|    C*
+09===C                     ENDSR
+     C*==============================================================*
+     C*          RTN180....PROC SEHA    銷售退回
+     C*==============================================================*
+10===C           RTN180    BEGSR
+|    C           KEYTX     SETLLHA0
+|    C           KEYTX1    READEHA0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           HA03      ANDLEEDATE
+|   C*
+| 02-C           HA06      IFLE 0
+|   C                     EXSR RTN580                     銷售退回
+| 02-C                     ENDIF
+|   C*
+|   C           KEYTX1    READEHA0                      41
+| 01-C                     ENDDO
+|    C*
+10===C                     ENDSR
+     C*==============================================================*
+     C*          RTN190....PROC INTP    陳列調整
+     C*==============================================================*
+11===C           RTN190    BEGSR
+|    C           KEYTX     SETLLTP0
+|    C           KEYTX1    READETP0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C           TP03      ANDLEEDATE
+|   C*
+| 02-C           TP15      IFEQ 'A'
+|   C                     EXSR RTN590                     陳列調整
+| 02-C                     ENDIF
+|   C*
+|   C           KEYTX1    READETP0                      41
+| 01-C                     ENDDO
+|    C*
+11===C                     ENDSR
+     C*==============================================================*
+     C*          RTN500....WRITE INTX FOR POCM驗收(C1 C2 C3)
+     C*==============================================================*
+12===C           RTN500    BEGSR
+|    C                     MOVELCM01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELCM11      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVELCM01      TX05             單據號碼
+|    C                     Z-ADDCM16      TX06             單據日期
+|    C                     Z-ADDCM14      TX06A            進貨到店日
+|    C                     MOVELCM02      TX07             對象別
+|    C                     MOVELCM10      TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELCM03      TX11             產品代號
+|    C                     MOVELCM13      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDCM04      TX14             原始數量
+|    C                     Z-ADDCM06      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADDCM07      TX18             單價
+|    C                     Z-ADDCM08      TX19             金額
+|    C                     Z-ADDCM09      TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'CM'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADDEH02      TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELCM12      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+12===C                     ENDSR
+     C*==============================================================*
+     C*          RTN51A ...WRITE INTX FOR INTD 調撥入
+     C*==============================================================*
+13===C           RTN51A    BEGSR
+|    C                     MOVELTD01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELTD05      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVELTD01      TX05             單據號碼
+|    C                     Z-ADDTD10      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVELTD07      TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTD02      TX11             產品代號
+|    C                     MOVELTD08      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTD04      TX14             原始數量
+|    C                     Z-ADDTD04      TX15             數量
+|    C                     SUB  W1QTY     TX15             數量
+|    C                     Z-ADDW1QTY     TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADD0         TX18             單價
+|    C                     Z-ADD0         TX19             金額
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TD'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELTD06      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+13===C                     ENDSR
+     C*==============================================================*
+     C*          RTN51B ...WRITE INTX FOR INTD調撥入
+     C*==============================================================*
+14===C           RTN51B    BEGSR
+|    C                     MOVELTD01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELTD05      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD-1        TX04             加減別
+|    C                     MOVELTD01      TX05             單據號碼
+|    C                     Z-ADDTD10      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVELTD08      TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTD02      TX11             產品代號
+|    C                     MOVELTD07      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTD04      TX14             原始數量
+|    C                     Z-ADDTD04      TX15             數量
+|    C                     SUB  W1QTY     TX15             數量
+|    C                     Z-ADDW1QTY     TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADD0         TX18             單價
+|    C                     Z-ADD0         TX19             金額
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TD'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELTD06      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+14===C                     ENDSR
+     C*==============================================================*
+     C*          RTN520 ...WRITE INTX FOR INTF 進貨退出
+     C*==============================================================*
+15===C           RTN520    BEGSR
+|    C                     CALL 'MCC0021'
+|    C                     PARM           TF05             公司別
+|    C                     PARM           TF06             通路別
+|    C                     PARM           TF03             產品代號
+|    C                     PARM           TF08             單據日期
+|    C                     PARM           WTX18   82       單價
+|    C*
+|    C                     MOVELTF01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELTF05      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD-1        TX04             加減別
+|    C                     MOVELTF01      TX05             單據號碼
+|    C                     Z-ADDTF08      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVELTF02      TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTF03      TX11             產品代號
+|    C                     MOVELTF07      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTF04      TX14             原始數量
+|    C                     Z-ADDTF04      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADDWTX18     TX18             單價
+|    C           TX15      MULT TX18      WAMT      H      金額
+|    C                     Z-ADDWAMT      TX19             金額
+|    C           TX19      MULT DUTY      WTAX    90H      稅額
+|    C                     Z-ADDWTAX      TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TF'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELTF06      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+15===C                     ENDSR
+     C*==============================================================*
+     C*          RTN530 ...WRITE INTX FOR INTH 陳列轉進貨
+     C*==============================================================*
+16===C           RTN530    BEGSR
+|    C                     MOVELTH01      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELTH06      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVELTH01      TX05             單據號碼
+|    C                     Z-ADDTH09      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C           KEYTG     CHAINTG0                  41
+| 01-C           *IN41     IFEQ '0'
+|   C                     MOVELTG06      TX07             對象別
+| 01*C                     ELSE
+|   C                     MOVEL*BLANK    TX07             對象別
+| 01-C                     ENDIF
+|    C*
+|    C                     MOVELTH05      TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTH02      TX11             產品代號
+|    C                     MOVELTH08      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTH03      TX14             原始數量
+|    C                     Z-ADDTH03      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C* GET 進價
+|    C           KEYTN4    CHAINTN0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     Z-ADDTN06      TX18             單價
+|   C           TX18      MULT TX15      WAMT   110H      金額
+|   C                     Z-ADDWAMT      TX19             金額
+|   C           TX19      MULT DUTY      WTAX      H      稅額
+|   C                     Z-ADDWTAX      TX19A            稅額
+| 02*C                     ELSE
+|   C                     Z-ADD0         TX18             單價
+|   C                     Z-ADD0         TX19             金額
+|   C                     Z-ADD0         TX19A            稅額
+| 02-C                     ENDIF
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TH'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELTH07      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+16===C                     ENDSR
+     C*==============================================================*
+     C*          RTN540 ...WRITE INTX FOR INTJ  存貨調整
+     C*==============================================================*
+17===C           RTN540    BEGSR
+|    C                     MOVELTJ01      DOCNO
+|    C                     CLEARTX0
+|    C*
+|    C                     MOVELTJ04      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD9         TX04             加減別
+|    C                     MOVELTJ01      TX05             單據號碼
+|    C                     Z-ADDTJ07      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVEL*BLANK    TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTJ02      TX11             產品代號
+|    C                     MOVELTJ06      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTJ03      TX14             原始數量
+|    C                     Z-ADDTJ03      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADD0         TX18             單價
+| 01-C           TX03      IFEQ 'A4'
+|   C                     Z-ADDTJ10      TX19             金額
+| 01*C                     ELSE
+|   C                     Z-ADD0         TX19
+| 01-C                     END
+|    C*
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TJ'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVELTI06      TX26             原因代碼
+|    C                     MOVELTJ05      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+17===C                     ENDSR
+     C*==============================================================*
+     C*          RTN550 ...WRITE INTX FOR INTL  陳列品退出
+     C*==============================================================*
+18===C           RTN550    BEGSR
+|    C                     MOVELTL01      DOCNO
+|    C                     CLEARTX0
+|    C*
+|    C                     MOVELTL05      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD-1        TX04             加減別
+|    C                     MOVELTL01      TX05             單據號碼
+|    C                     Z-ADDTL08      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVEL*BLANK    TX07             對象別
+|    C                     MOVELTL04      TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTL02      TX11             產品代號
+|    C                     MOVELTL07      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTL03      TX14             原始數量
+|    C                     Z-ADDTL03      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADD0         TX18             單價
+|    C                     Z-ADD0         TX19             金額
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TL'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANKS   TX26             原因代碼
+|    C                     MOVELTL06      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+18===C                     ENDSR
+     C*==============================================================*
+     C*          RTN560 ...WRITE INTX FOR INTB  上期結轉
+     C*==============================================================*
+19===C           RTN560    BEGSR
+|    C                     CLEARTX0
+|    C*
+|    C                     MOVELTB01      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVEL'LB'      TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVEL*BLANK    TX05             單據號碼
+|    C                     Z-ADDSDATE     TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVEL*BLANK    TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTB05      TX11             產品代號
+|    C                     MOVELTB04      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTB06      TX14             原始數量
+|    C                     Z-ADDTB06      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADD0         TX18             單價
+|    C                     Z-ADD0         TX19             金額
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TB'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANKS   TX26             原因代碼
+|    C                     MOVELTB03      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+19===C                     ENDSR
+     C*==============================================================*
+     C*          RTN570 ...WRITE INTX FOR INTM  成本調整
+     C*==============================================================*
+20===C           RTN570    BEGSR
+|    C                     MOVELTM08      DOCNO
+|    C                     CLEARTX0
+|    C*
+|    C                     MOVELTM01      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD9         TX04             加減別
+|    C                     MOVELTM08      TX05             單據號碼
+|    C                     Z-ADDTM02      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVEL*BLANKS   TX07             對象別
+|    C                     MOVEL*BLANKS   TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTM03      TX11             產品代號
+|    C                     MOVEL*BLANKS   TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADD0         TX14             原始數量
+|    C                     Z-ADD0         TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADD0         TX18             單價
+|    C                     Z-ADDTM05      TX19             金額
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'TM'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANKS   TX26             原因代碼
+|    C                     MOVEL*BLANKS   TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+20===C                     ENDSR
+     C*==============================================================*
+     C*          RTN580 ...WRITE INTX FOR SEHA 銷售退回
+     C*==============================================================*
+21===C           RTN580    BEGSR
+|    C                     MOVELHA09      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELHA01      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVELHA09      TX05             單據號碼
+|    C                     Z-ADDHA03      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVEL*BLANK    TX07             對象別
+|    C                     MOVEL*BLANK    TX08             對應單據 1
+|    C                     MOVEL*BLANKS   TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELHA05      TX11             產品代號
+|    C                     MOVELHA04      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDHA06      TX14             原始數量
+|    C                     Z-ADDHA06      TX15             數量
+|    C                     Z-ADD0         TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+| 01-C           HA06      IFNE 0
+|   C           HA07      DIV  HA06      TX18             單價
+| 01*C                     ELSE
+|   C                     Z-ADD0         TX18             單價
+| 01-C                     ENDIF
+|    C*
+|    C                     Z-ADDHA07      TX19             金額
+|    C           HA08      SUB  HA07      TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'SE'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELHA02      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+21===C                     ENDSR
+     C*==============================================================*
+     C*          RTN590 ...WRITE INTX FOR INTP 陳列調整
+     C*==============================================================*
+22===C           RTN590    BEGSR
+|    C                     MOVELTP10      DOCNO
+|    C                     CLEARTX0
+|    C                     MOVELTP01      TX01             公司
+|    C                     Z-ADDEH02      TX02             年月
+|    C                     MOVELTRXCD     TX03             異動別
+|    C                     Z-ADD1         TX04             加減別
+|    C                     MOVELTP10      TX05             單據號碼
+|    C                     Z-ADDTP03      TX06             單據日期
+|    C                     Z-ADD0         TX06A            進貨到店日
+|    C                     MOVELTP13      TX07             對象別
+|    C                     MOVELTP11      TX08             對應單據 1
+|    C                     MOVELTP12      TX09             對應單據 2
+|    C                     MOVEL*BLANKS   TX10             對應單據 3
+|    C                     MOVELTP05      TX11             產品代號
+|    C                     MOVELTP04      TX12             分店
+|    C                     MOVEL*BLANKS   TX13             分店對應碼
+|    C                     Z-ADDTP06      TX14             原始數量
+|    C                     Z-ADDTP06      TX15             數量
+|    C                     Z-ADDTP06      TX16             借貨銷售數量
+|    C                     Z-ADD0         TX17             盤盈銷售數量
+|    C                     Z-ADDTP07      TX18             單價
+|    C                     Z-ADDHA08      TX19             金額
+|    C                     Z-ADD0         TX19A            稅額
+|    C                     Z-ADD0         TX20             單位成本
+|    C                     Z-ADD0         TX21             成本金額
+|    C                     MOVEL'AJ'      TX22             資料來源
+|    C                     Z-ADDDATE      TX23             月結日期
+|    C                     Z-ADD0         TX24             月結年月
+|    C                     Z-ADD0         TX25             產生傳票日期
+|    C                     MOVEL*BLANK    TX26             原因代碼
+|    C                     MOVELTP02      TX27             通路
+|    C*
+|    C                     WRITETX0
+|    C*
+22===C                     ENDSR
+     C*==============================================================*
+

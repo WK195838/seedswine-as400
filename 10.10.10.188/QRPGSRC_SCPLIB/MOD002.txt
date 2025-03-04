@@ -1,0 +1,132 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : MOD002                                        *
+      * AUTHER       : VINCENT HO                                    *
+      * CREATE DATE  : 2009/09/22                                    *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :                                               *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :維護程式－依分庫檔帳列期初值更新總庫檔       *
+      ****************************************************************
+     FINTBPF  IF  E           K        DISK
+     FINTBLF02IF  E           K        DISK
+     F            TB0                               KRENAMETB0L
+     FINTAPF  UF  E           K        DISK                      A
+     FMANCPF  IF  E           K        DISK
+     C*==============================================================*
+     C*                    DEFINE ROUTINE
+     C*==============================================================*
+     C           *LIKE     DEFN TB01      WTB01
+     C           *LIKE     DEFN TB05      WTB05
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYTA     KLIST
+     C                     KFLD           WTB01
+     C                     KFLD           WYM
+     C                     KFLD           WTB05
+     C           KEYNC     KLIST
+     C                     KFLD           TB01
+     C                     KFLD           TB05
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C* CHECK MANCPF
+     C                     EXSR RTN100
+     C*
+     C* CLEAR INTAPF
+     C***                  EXSR RTN200
+     C*
+     C* 依INTBPF 更新INTAPF
+     C***                  EXSR RTN300
+      *
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN100....CHECK MANCPF
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C           *LOVAL    SETLLTB0
+|    C                     READ TB0                      40
+| 01-C           *IN40     DOWEQ'0'
+      * CHECK MANCPF
+|    C           KEYNC     CHAINNC0                  42
+| 01-C           *IN42     IFEQ '1'
+|   C                     SETON                     99
+| 02-C                     ENDIF
+|   C                     READ TB0                      40
+| 01-C                     ENDDO
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....CLEAR INTAPF
+      *==============================================================*
+01===C           RTN200    BEGSR
+|    C*
+|    C           *LOVAL    SETLLTA0
+|    C                     READ TA0                      40
+| 01-C           *IN40     DOWEQ'0'
+|   C                     Z-ADD0         TA06
+|   C                     UPDATTA0
+|   C                     READ TA0                      40
+| 01-C                     ENDDO
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN300....
+      *==============================================================*
+03===C           RTN300    BEGSR
+      *
+      * 目前程式限定只能有指定年月份資料200909
+|    C                     Z-ADD200909    WYM     60
+|    C                     Z-ADD0         TQ      60
+|    C                     Z-ADD0         CNTA    60
+|    C                     MOVEL*BLANKS   WTB01
+|    C                     MOVEL*BLANKS   WTB05
+|    C                     SETOF                     10
+|    C*
+|    C           *LOVAL    SETLLTB0L
+|    C                     READ TB0L                     40
+| 01-C           *IN40     DOWEQ'0'
+|    * INTAPF
+| 02-C   10      TB01      IFNE WTB01
+|   C           TB05      ORNE WTB05
+|   C                     EXSR RTN310
+| 02-C                     ENDIF
+      *
+|   C                     ADD  TB06      TQ
+|   C                     MOVELTB01      WTB01
+|   C                     MOVELTB05      WTB05
+|   C                     SETON                     10
+|   C*
+|   C                     READ TB0L                     40
+| 01-C                     ENDDO
+|     * LAST RECORD
+|   C   10                EXSR RTN310
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN310....
+      *==============================================================*
+04===C           RTN310    BEGSR
+|    C*
+      * INTAPF
+|    C           KEYTA     CHAINTA0                  42
+| 01-C           *IN42     IFEQ '0'
+|   C                     Z-ADDTQ        TA06
+|   C                     UPDATTA0
+| 01*C                     ELSE
+|   C                     CLEARTA0
+|   C                     MOVELWTB01     TA01
+|   C                     Z-ADDWYM       TA02
+|   C                     MOVELWTB05     TA03
+|   C                     Z-ADDTQ        TA06
+|   C                     WRITETA0
+     C                     ADD  1         CNTA
+| 01-C                     ENDIF
+     C                     Z-ADD0         TQ
+|    C*
+04===C                     ENDSR
+

@@ -1,0 +1,95 @@
+             PGM        PARM(&DATE)
+             DCL        VAR(&DATE) TYPE(*CHAR) LEN(8)
+             DCL        VAR(&JOB)    TYPE(*CHAR) LEN(10)
+             DCL        VAR(&W#PROC) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&LCK)    TYPE(*CHAR) LEN(1)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN14)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN94)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN96)   TYPE(*LGL)  LEN(1)
+
+             CALL       PGM(P63)
+             CHGDTAARA  DTAARA(*LDA (201 8)) VALUE(&DATE)
+
+             RTVJOBA    JOB(&JOB)
+
+            /* &W#PROC --> 0 =未處理, 1 =處理中*/
+
+            RTVDTAARA  DTAARA(SCDA01 (1   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('日結作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+            RTVDTAARA  DTAARA(SCDA01 (2   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('月結作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+            RTVDTAARA  DTAARA(SCDA01 (3   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('採購批次作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+            RTVDTAARA  DTAARA(SCDA01 (4   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('運費月結作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+            RTVDTAARA  DTAARA(SCDA01 (7   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('採購單寄出作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+            RTVDTAARA  DTAARA(SCDA01 (8   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('應到貨箱數表寄出作業目前正在處理中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+            RTVDTAARA  DTAARA(SCDA01 (9   1)) RTNVAR(&W#PROC)
+            IF         COND(&W#PROC *EQ '1') THEN(DO)
+            SNDBRKMSG  MSG('貨運實際箱數維護目前正在使用中，請稍待！+
+                       ') TOMSGQ(&JOB)
+            RETURN
+            ENDDO
+
+ START:      CALL       PGM(PUC023) PARM(&IN03 &IN14 &IN94 &IN96 )
+             IF         COND(&IN03) THEN(DO)
+                        CHGVAR VAR(%SST(*LDA 601 100)) VALUE(' ')
+             RETURN
+             ENDDO
+
+             IF         COND(&IN14) THEN(DO)
+
+             /* LOCK CHECK */
+             ALCOBJ     OBJ((*LIBL/POCKPF *FILE *EXCL)) WAIT(0)
+             MONMSG     MSGID(CPF1002) EXEC(DO)
+             CHGVAR     VAR(&IN96) VALUE('1')
+             GOTO       CMDLBL(START)
+             ENDDO
+             /* DEALLOCATE OBJECT    */
+             DLCOBJ     OBJ((*LIBL/POCKPF *FILE *EXCL))
+
+             SBMJOB     JOB(PUC023C1) RQSDTA('CALL PUC023C1')
+
+         /* 變更狀態碼                             */
+             CHGDTAARA  DTAARA(SCDA01 (8   1)) VALUE('1')
+             CHGVAR     VAR(&IN94)  VALUE('1')
+
+             ENDDO   /* &IN14 */
+
+             GOTO       CMDLBL(START)
+
+             ENDPGM
+

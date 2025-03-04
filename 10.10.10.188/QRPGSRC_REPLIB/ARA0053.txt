@@ -1,0 +1,146 @@
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.10 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     FSOSIPF  IF  E           K        DISK
+     FARADLF01IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARA0053DCF  E                    WORKSTN
+     F                                        RRN1  KSFILE SFLSR1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      152 161 $USERN
+     I                                      111 1160$CHYMD
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+      *==============================================================*
+      *                    KLIST
+      *==============================================================*
+      *客戶明細
+     C           KEYME     KLIST
+     C                     KFLD           AD02
+     C                     KFLD           AD03
+     C           KEYSI     KLIST
+     C                     KFLD           SI01
+     C                     KFLD           SI02
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C           SI01      PARM           SI01I   2
+     C           SI02      PARM           SI02I  10
+     C           *IN03     PARM *IN03     IN03    1
+     C           *IN12     PARM *IN12     IN12    1
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRMENT
+     C                     EXSR RTN110                     *INIT SFL
+     C                     EXSR RTN120                     *READ NEXT PAGE
+     C                     EXSR RTN140                     *EXFMT
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*
+|    C                     Z-ADD0         DATE    60
+|    C                     CALL 'RES001'
+|    C                     PARM 'MDY'     S001I1  3
+B2???C                     PARM $EGMDY    S001I2  60
+B2INF *CVR5008 sev.50 The converter tool cannot handle op-code PARM
+B2INF *   involving not-expanded and expanded date fields requiring
+B2INF *   add/remove century. Code must be adjusted manually
+|    C           DATE      PARM           S001O1  60
+|    C*
+     C           KEYSI     CHAINSI0                  40
+     C           SI01      CHAIN#B0                  40
+|    C*
+01===C                     ENDSR
+      *=========================================================*
+      *          RTN110....INITIAL                              *
+      *=========================================================*
+02===C           RTN110    BEGSR
+|    C*
+|    C                     Z-ADD1         DRRN1
+|    C                     Z-ADD0         RRN1
+|    C                     SETOF                     5354
+|    C                     SETON                     52
+|    C                     WRITESFLCR1
+|    C                     SETOF                     52
+|    C           KEYSI     SETLLAD0
+|    C*
+02===C                     ENDSR
+      *=========================================================*
+      *          RTN120 .. ADD SUBFILE DATA
+      *=========================================================*
+03===C           RTN120    BEGSR
+|    C*
+|   C           KEYSI     READEAD0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C***  日期轉換
+M001AC                     Z-ADDAD12      WAD12   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM WAD12     S001I2  60
+|   C           DAD12     PARM           S001O1  60
+      *客戶
+|   C                     MOVEL*BLANKS   ME04
+|   C           KEYME     CHAINME0                  40
+     C           *IN40     IFEQ '0'
+     C                     MOVELME04      ME04D
+     C                     END
+      *
+     C                     MOVELAD06      AD06D
+|   C***  日期轉換
+M001AC                     Z-ADDAD04      WAD04   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM WAD04     S001I2  60
+|   C           DAD04     PARM           S001O1  60
+|   C*
+     C                     MOVEL*BLANKS   AD05C
+|   C                     MOVEL'COLLECT' #A01
+|   C                     MOVELAD05      #A02
+     C           KEY#A     CHAIN#A0                  40
+     C           *IN40     IFEQ '0'
+     C                     MOVEL#A03      AD05C
+     C                     END
+|   C*
+|   C                     ADD  1         RRN1
+|   C                     WRITESFLSR1
+|   C*
+|   C           KEYSI     READEAD0                      46
+| 01-C                     END
+|    C           *LOVAL    SETLLSI0
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN140... EXFMT SFL                                 *
+      *==============================================================*
+05===C           RTN140    BEGSR
+|    C*
+| 01-C           RRN1      IFGT *ZEROS
+|   C                     SETON                     50    *SFLDSP
+| 01*C                     ELSE
+|   C                     SETON                     96    *NODATA
+| 01-C                     END
+|    C*
+|    C                     SETON                     51    *SFLDSPCTL
+|    C                     WRITEDSPC1
+|    C                     EXFMTSFLCR1
+|    C                     SETOF                     5051
+|    C                     MOVEA*ALL'0'   *IN,60
+|    C*
+05===C                     ENDSR
+

@@ -1,0 +1,221 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : ARR0721                                       *
+      * AUTHER       : AN MING HSIA                                  *
+      * CREATE DATE  : 08/02/03                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收系統                                     *
+      * REMARK       :逾開發票明細表　　                           *
+     A*===============================================================
+     A* CODE |  AUTHOR  |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M004 | MICHELLE | 00.06.08 |新增稅額欄
+     A*---------------------------------------------------------------
+     A* M005 | MICHELLE | 03.03.19 | NEW COLUMN:INVOICE DATE
+     A*================================================================
+      ****************************************************************
+     FSOSSPF  IP  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FARR072P O   E             39     PRINTER
+     ISS0
+     I                                              SS08  L1
+     I                                              SS01  L2
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I*公司別
+     I                                      601 602 DSS01S
+     I                                      603 604 DSS01E
+     I*(MM/YY)
+     I                                      605 6100DSS06S
+     I                                      611 6160DSS06E
+     I*(MM/YY)
+     I                                      641 6460DSS35S
+     I                                      651 6560DSS35E
+     I*(YY/MM)
+     I                                      620 6250YDATES
+     I                                      626 6310YDATEE
+     I                                      732 732 IN20
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYME     KLIST
+     C                     KFLD           SS08
+     C                     KFLD           SS09
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+|    C                     SETON                     10
+  01*C                     ELSE
+    C   39                EXSR RTN900
+  02-C           *INL2     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010
+  02-C                     END
+  01-C                     END
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200
+     CL2 10                EXSR RTN300
+     CLR                   EXSR RTN400
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C*公司簡稱
+|    C           SS01      CHAIN#B0                  40
+|    C   40                MOVE *BLANK    #B03
+|    C                     SETON                     30
+|    C                     SETON                     36
+     C*
+     C                     SETOF                     20
+     C           IN20      IFEQ '1'
+     C                     SETON                     20
+     C                     END
+|    C                     WRITEPH1
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*
+|    C                     ADD  SS27      T1T27
+|    C                     ADD  SS25      T1T25
+|    C           SS27      SUB  SS25      TOT1
+|    C                     ADD  TOT1      T1T1
+|    C                     ADD  SS28      T1T28
+|    C                     ADD  SS26      T1T26
+|    C           SS28      SUB  SS26      TOT2
+|    C                     ADD  TOT2      T1T2
+     C*
+M004AC           SS32      IFEQ 0
+M004AC           SS27      SUB  SS30      SS32
+M004AC                     END
+M004AC           SS31      IFEQ 0
+M004AC           SS25      SUB  SS29      SS31
+M004AC                     END
+M004AC                     ADD  SS30      T130
+M004AC                     ADD  SS32      T132
+M004AC                     ADD  SS29      T129
+M004AC                     ADD  SS31      T131
+M004AC           SS30      SUB  SS29      DIFTAX
+M004AC           SS32      SUB  SS31      DIFSAL
+M004AC                     ADD  DIFTAX    T1TAX
+M004AC                     ADD  DIFSAL    T1SAL
+|    C*客戶代號／名稱
+|    C**
+|    C           KEYME     CHAINME0                  41
+|    C   41                MOVE *BLANK    ME04
+|    C   39                EXSR RTN900
+     C*日期轉換
+M001AC                     Z-ADDSS06      YSS06   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC*                    PARM SS06      S001I2  80
+M001AC                     PARM YSS06     S001I2  60
+|   C           YSS06     PARM           S001O1  60
+|    C*原發票日期
+M005AC                     Z-ADDSS21      YSS21   60
+"    C                     CALL 'RES001'
+"    C                     PARM 'YMD'     S001I1  3
+"    C*                    PARM SS21      S001I2  80
+"    C                     PARM YSS21     S001I2  60
+M005AC           YSS21     PARM           S001O1  60
+|    C*
+M001AC                     Z-ADDSS35      YSS35   60
+|   C                     CALL 'RES001'
+|   C                     PARM 'YMD'     S001I1  3
+B2MODC*                    PARM SS35      S001I2  80
+M001AC                     PARM YSS35     S001I2  60
+|   C           YSS35     PARM           S001O1  60
+|    C*
+|    C                     WRITEPD1
+|    C*
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....PROC SKIP
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN200....
+      *==============================================================*
+04===C           RTN200    BEGSR
+|    C*
+|    C                     WRITEPT1
+|    C                     ADD  T1T25     T2T25
+|    C                     ADD  T1T27     T2T27
+|    C                     ADD  T1T1      T2T1
+|    C                     ADD  T1T26     T2T26
+|    C                     ADD  T1T28     T2T28
+|    C                     ADD  T1T2      T2T2
+M004AC                     ADD  T129      T229
+M004AC                     ADD  T130      T230
+M004AC                     ADD  T131      T231
+M004AC                     ADD  T132      T232
+M004AC                     ADD  T1TAX     T2TAX
+M004AC                     ADD  T1SAL     T2SAL
+|    C                     Z-ADD0         T1T25
+|    C                     Z-ADD0         T1T27
+|    C                     Z-ADD0         T1T1
+|    C                     Z-ADD0         T1T28
+|    C                     Z-ADD0         T1T26
+|    C                     Z-ADD0         T1T2
+M004AC                     Z-ADD0         T1TAX
+M004AC                     Z-ADD0         T1SAL
+M004AC                     Z-ADD0         T129
+M004AC                     Z-ADD0         T130
+M004AC                     Z-ADD0         T131
+M004AC                     Z-ADD0         T132
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN300....
+      *==============================================================*
+05===C           RTN300    BEGSR
+|    C*
+|    C                     WRITEPT2
+|    C                     Z-ADD0         T2T25
+|    C                     Z-ADD0         T2T27
+|    C                     Z-ADD0         T2T1
+|    C                     Z-ADD0         T2T26
+|    C                     Z-ADD0         T2T28
+|    C                     Z-ADD0         T2T2
+M004AC                     Z-ADD0         T2TAX
+M004AC                     Z-ADD0         T2SAL
+M004AC                     Z-ADD0         T229
+M004AC                     Z-ADD0         T230
+M004AC                     Z-ADD0         T231
+M004AC                     Z-ADD0         T232
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN400....ENDPGM
+      *==============================================================*
+06===C           RTN400    BEGSR
+|    C*
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE3
+| 01-C                     END
+|    C                     WRITEPE2
+|    C*
+06===C                     ENDSR
+

@@ -1,0 +1,126 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1087  JOYCE                              */
+     /*    CREATE DATE  : 81/04/21                                  */
+     /*    UPDATE DATE  :                                           */
+     /*    PROGRAM NAME : SOR043C1                                  */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :銷售訂單系統                             */
+     /*    REMARK       :客戶報價單                               */
+     /***************************************************************/
+             PGM
+             DCL        VAR(&$EVR)   TYPE(*CHAR) LEN(1)
+             DCL        VAR(&$CPY)   TYPE(*CHAR) LEN(3)
+             DCL        VAR(&$PRTID) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&P6601I) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&P6602I) TYPE(*DEC)  LEN(1 0)
+             DCL        VAR(&P6603I) TYPE(*DEC)  LEN(3 0)
+             DCL        VAR(&P6604I) TYPE(*DEC)  LEN(2 0)
+
+             DCL        VAR(&DME07S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DME07E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DMD07S) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DMD07E) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DMD08S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DMD08E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DMD01S) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DMD01E) TYPE(*CHAR) LEN(5)
+             DCL        VAR(&DATE)   TYPE(*CHAR) LEN(6)
+             DCL        VAR(&RTCD)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&DSA01LS) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&DSA01E) TYPE(*CHAR) LEN(9)
+/*M001A*/    DCL        VAR(&YMD8S)  TYPE(*CHAR) LEN(8)
+
+/*M001A*/    CHGVAR     VAR(&YMD8S)  VALUE(%SST(*LDA 850 8))
+
+             CPYF       FROMFILE(REWF031) TOFILE(QTEMP/REWF031) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF031))
+
+             OVRDBF     FILE(REWF031) TOFILE(QTEMP/REWF031) SHARE(*YES)
+
+             CALL       PGM(SOR0431) PARM(&RTCD)
+             IF         COND(&RTCD = '1') THEN(GOTO CMDLBL(ENDSR))
+
+             CPYF       FROMFILE(REWF04) TOFILE(QTEMP/REWF04) +
+                          CRTFILE(*YES)
+             MONMSG     MSGID(CPF2817) EXEC(CLRPFM FILE(QTEMP/REWF04))
+
+             OVRDBF     FILE(REWF04) TOFILE(QTEMP/REWF04) SHARE(*YES)
+
+             CHGVAR     VAR(&DMD07S) VALUE(%SST(*LDA 601 1))
+             CHGVAR     VAR(&DMD07E) VALUE(%SST(*LDA 602 1))
+             CHGVAR     VAR(&DMD08S) VALUE(%SST(*LDA 603 2))
+             CHGVAR     VAR(&DMD08E) VALUE(%SST(*LDA 605 2))
+             CHGVAR     VAR(&DMD01S) VALUE(%SST(*LDA 607 5))
+             CHGVAR     VAR(&DMD01E) VALUE(%SST(*LDA 612 5))
+             CHGVAR     VAR(&DATE)   VALUE(%SST(*LDA 621 +
+                          2) || %SST(*LDA 617 4))
+             CHGVAR     VAR(&DME07S) VALUE(%SST(*LDA 629 2))
+             CHGVAR     VAR(&DME07E) VALUE(%SST(*LDA 631 2))
+             CHGVAR     VAR(&DSA01LS) VALUE(%SST(*LDA 661 4))
+             CHGVAR     VAR(&DSA01E) VALUE(%SST(*LDA 671 9))
+
+
+             OVRPRTF    FILE(SOR043P) PAGESIZE(*N 198) LPI(6) +
+                        CPI(15) OVRFLW(52) USRDTA('客報價單')
+
+             OVRDBF     FILE(MTMDPF) SHARE(*YES)
+             OPNQRYF    FILE((MTMDPF) (MTMEPF)) FORMAT(MTMDPF) +
+                          QRYSLT('(MD07 *EQ %RANGE("' *CAT &DMD07S +
+                          *CAT '" "' *CAT &DMD07E *CAT '" )) & +
+                          (MD08 *EQ %RANGE("' *CAT &DMD08S *CAT '" +
+                          "' *CAT &DMD08E *CAT '")) & (MD01 *EQ +
+                          %RANGE("' *CAT &DMD01S *CAT '" "' *CAT +
+                          &DMD01E *CAT '")) & (ME07 *EQ %RANGE("' +
+                          *CAT &DME07S *CAT '" "' *CAT &DME07E *CAT +
+                          '")) ') KEYFLD((MD01)) JFLD((MTMDPF/MD01 +
+                          MTMEPF/ME01))
+             OVRDBF     FILE(SOSBPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSBPF)) QRYSLT('(SB01 *EQ %RANGE("' +
+                          *CAT &DMD01S *CAT '" "' *CAT &DMD01E *CAT +
+                          '")) & (SB05 *LE (' *CAT &YMD8S *CAT ')) & +
+                          (SB13 *GE (' *CAT &YMD8S *CAT ')) & ((SB04 +
+                          *EQ "N") *OR (SB04 *EQ "S")) & (SB14 *EQ +
+                          " ") & SB02L *GE "' *CAT &DSA01LS *CAT '" +
+                          & SB02 *LE "' *CAT &DSA01E *CAT '" ') +
+                          KEYFLD((SB01) (SB02) (SB04)) +
+                          MAPFLD((SB02L '%SST(SB02 1 4)' *CHAR 4))
+/*M001D                   '")) & (SB05 *LE (' *CAT &DATE *CAT ')) & +
+                        (SB13 *GE (' *CAT &DATE *CAT ')) & ((SB04 + */
+             OVRDBF     FILE(REWF03) TOFILE(SOSAPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSAPF)) FORMAT(REWF03) QRYSLT('(SA02 +
+                          *EQ %RANGE("' *CAT &DMD07S *CAT '" "' +
+                          *CAT &DMD07E *CAT '")) & (SA03 *EQ +
+                          %RANGE("' *CAT &DMD08S *CAT '" "' *CAT +
+                          &DMD08E *CAT '")) & (SA05 *LE (' *CAT +
+                          &YMD8S *CAT ')) & (SA13 *GE (' *CAT &YMD8S +
+                          *CAT ')) & ((SA04 *EQ "N") *OR (SA04 *EQ +
+                          "S")) & (SA14 *EQ " ") & SA01L *GE "' +
+                          *CAT &DSA01LS *CAT '" & SA01 *LE "' *CAT +
+                          &DSA01E *CAT '"  ') KEYFLD((SA02) (SA03) +
+                          (SA01) (SA04)) MAPFLD((SA01L '%SST(SA01 1 +
+                          4)' *CHAR 4))
+/*M001D                   &DATE *CAT ')) & (SA13 *GE (' *CAT &DATE +
+                        *CAT ')) & ((SA04 *EQ "N") *OR (SA04 *EQ +  */
+
+             CALL       SOR0432
+
+             CALL       SOR0433
+             CLOF       OPNID(MTMDPF)
+             CLOF       OPNID(SOSBPF)
+             CLOF       OPNID(SOSAPF)
+
+             RTVDTAARA  DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+             RTVDTAARA  DTAARA(*LDA (125 3)) RTNVAR(&$CPY)
+             RTVDTAARA  DTAARA(*LDA (598 2)) RTNVAR(&$PRTID)
+
+             CHGVAR     VAR(&P6601I) VALUE('SOR043P')
+             CHGVAR     VAR(&P6602I) VALUE(&$EVR)
+             CHGVAR     VAR(&P6603I) VALUE(&$CPY)
+             CHGVAR     VAR(&P6604I) VALUE(&$PRTID)
+             CALL       PGM(P66) PARM(&P6601I &P6602I &P6603I &P6604I)
+  ENDSR:     DLTOVR     FILE(*ALL)
+             ENDPGM
+

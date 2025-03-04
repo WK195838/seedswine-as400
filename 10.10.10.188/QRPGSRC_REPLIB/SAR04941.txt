@@ -1,0 +1,224 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SAR0491                                       *
+      * AUTHER       :                                               *
+      * CREATE DATE  : 81/05/18                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :應收帳款作業                                 *
+      * REMARK       :試飲分析表                                   *
+      ****************************************************************
+     FREWF19  IF  E           K        DISK
+     FREWF96  UF  E           K        DISK                      A
+     FRES18WF IF  E           K        DISK                           UC
+     F*TMAPF  IF  E           K        DISK
+     F*           MA0                               KRENAMEMA0L
+     I*A0L
+     I*             MA01                            MA01L
+     I*             MA07                            MA07L
+     I*             MA10                            MA10L
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      125 1270$CPY
+     I                                      139 139 $RMK01
+     I                                      162 1620$EVR
+     I                                      598 5990$PRTID
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           WF9601
+     C                     KFLD           WF9602
+     C                     KFLD           WF9603
+     C                     KFLD           WF9604
+     C*==============================================================*
+     C*                    DEFINE FIELD
+     C*==============================================================*
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     READ SD0                      45
+  01-C           *IN45     DOWEQ'0'
+     C                     Z-ADD0         W9307
+     C                     Z-ADD0         W9308
+     C                     Z-ADD0         W9309
+     C                     Z-ADD0         W9310
+     C                     Z-ADD0         W9311
+     C                     Z-ADD0         WORK01
+    C*
+|    C                     MOVELSC04      WF9601
+|    C                     MOVELSC05      WF9602
+|    C                     MOVELSC10      WF9603
+    C           SD04      ADD  SD05      W9307   50       *AMOUNT
+    C           SD10      ADD  SD11      WORK01 112
+    C                     ADD  SD12      WORK01           *UNIT
+    C           W9307     MULT WORK01    W9308  112       *間接成本
+    C           W9307     MULT SD22      W9309  112
+    C           W9307     MULT SD23      W9310  112
+    C           W9307     MULT SD24      W9311  112
+    C*
+  02-C           MA54      IFEQ 'Y'
+    C                     EXSR RTN300
+  02*C                     ELSE
+    C                     EXSR RTN200
+  02-C                     END
+    C*
+    C                     READ SD0                      45
+  01-C                     END
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN200....DETAIL
+     C*==============================================================*
+01===C           RTN200    BEGSR
+      *
+|    C                     MOVELSD03      WF9604
+|    C                     MOVELMA10      WF9605
+|    C*
+|    C*計算產品成本
+|    C*
+|    C           KEYWF     CHAINWF960                40
+| 03-C           *IN40     IFEQ '1'
+|   C                     EXSR RTN210
+| 03*C                     ELSE
+|   C                     EXSR RTN220
+| 03-C                     END
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN210....WRITE WF960
+     C*==============================================================*
+05===C           RTN210    BEGSR
+|    C*
+|    C                     Z-ADD0         WF9607
+|    C                     Z-ADD0         WF9608
+|    C                     Z-ADD0         WF9609
+|    C                     Z-ADD0         WF9610
+|    C                     Z-ADD0         WF9611
+|    C*
+|    C                     Z-ADDW9307     WF9607
+|    C                     Z-ADDW9308     WF9608
+|    C                     Z-ADDW9309     WF9609
+|    C                     Z-ADDW9310     WF9610
+|    C                     Z-ADDW9311     WF9611
+|    C                     WRITEWF960
+|    C*
+05===C                     ENDSR
+     C*==============================================================*
+     C*          RTN220....UPDATE WF960
+     C*==============================================================*
+06===C           RTN220    BEGSR
+|    C*
+|    C                     ADD  W9307     WF9607
+|    C                     ADD  W9308     WF9608
+|    C                     ADD  W9309     WF9609
+|    C                     ADD  W9310     WF9610
+|    C                     ADD  W9311     WF9611
+|    C                     UPDATWF960
+|    C*
+06===C                     ENDSR
+     C*==============================================================*
+     C*          RTN300....DSEL1 ='B'禮盒拆單瓶
+     C*==============================================================*
+02===C           RTN300    BEGSR
+|    C*
+| 01-C           MA54      IFEQ 'Y'
+      *禮盒單瓶成本
+|   C                     EXSR RTN500
+|   C                     OPEN RES18WF
+|   C                     EXSR RTN600
+|   C                     CLOSERES18WF
+      *ELSE非禮盒處理同禮盒處禮DSEL1='A'
+| 01*C                     ELSE
+|   C                     EXSR RTN200
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN500....DSEL1 ='B'禮盒拆單瓶
+     C*==============================================================*
+03===C           RTN500    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SD02      S08I2  12        訂單號碼
+|    C                     PARM SC07      S08I3   60       牌價判斷日
+|    C                     PARM SD04      S08I4   60       禮盒訂購數量
+|    C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|    C                     PARM SD06      S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM SD10      S08I7   92       禮盒成本FOB
+|    C                     PARM SD11      S08I8   92       禮盒成本FHI
+|    C                     PARM SD12      S08I9   92       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM SD22      S08IA   92       禮盒轉帳成本FOB
+|    C                     PARM SD23      S08IB   92       禮盒轉帳成本FHI
+|    C                     PARM SD24      S08IC   92       禮盒轉帳成本DUTY
+|    C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN600....WRITE OR UPDATE REWF96
+      *==============================================================*
+06===C           RTN600    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    46
+| 01-C           *IN46     DOWEQ'0'
+|    C*
+|    C                     MOVELR181      WF9604
+|   C*TOTAL FOB,FHI,DUTY
+|   C           KEYWF     CHAINWF960                40
+| 02-C           *IN40     IFEQ '1'                          新增
+|   C                     EXSR RTN700
+| 02*C                     ELSE                              修改
+|   C                     EXSR RTN800
+| 02-C                     END
+|   C                     READ RE18R                    46
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+06===C                     ENDSR
+      *==============================================================*
+      *          RTN700....WRITE OR UPDATE REWF96
+      *==============================================================*
+07===C           RTN700    BEGSR
+|    C                     Z-ADDR182      WF9607
+|    C                     Z-ADDR18B      WF9608
+|    C                     ADD  R18C      WF9608
+|    C                     ADD  R18D      WF9608
+|    C                     ADD  R18E      WF9608
+|    C                     ADD  R18F      WF9608
+|    C                     ADD  R18G      WF9608
+|    C                     Z-ADDR185      WF9609
+|    C                     ADD  R188      WF9609
+|    C                     Z-ADDR186      WF9610
+|    C                     ADD  R189      WF9610
+|    C                     Z-ADDR187      WF9611
+|    C                     ADD  R18A      WF9611
+|    C                     WRITEWF960
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN800....UPDAT OR UPDATE REWF96
+      *==============================================================*
+08===C           RTN800    BEGSR
+|    C*
+|    C                     ADD  R182      WF9607
+|    C                     ADD  R18B      WF9608
+|    C                     ADD  R18C      WF9608
+|    C                     ADD  R18D      WF9608
+|    C                     ADD  R18E      WF9608
+|    C                     ADD  R18F      WF9608
+|    C                     ADD  R18G      WF9608
+|    C                     ADD  R185      WF9609
+|    C                     ADD  R188      WF9609
+|    C                     ADD  R186      WF9610
+|    C                     ADD  R189      WF9610
+|    C                     ADD  R187      WF9611
+|    C                     ADD  R18A      WF9611
+|    C                     UPDATWF960
+|    C*
+04===C                     ENDSR
+

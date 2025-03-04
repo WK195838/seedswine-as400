@@ -1,0 +1,200 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : POR0631                                       *
+      * AUTHER       :                                               *
+      * CREATE DATE  : 03/21/97                                      *
+      * UPDATE DATE  :                                               *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :採購系統                                     *
+      * REMARK       :匯東進貨成本一覽表　　                       *
+      ****************************************************************
+     FMTMAPF  IF  E           K        DISK
+     FPOPELF02IF  E           K        DISK
+     FREW064  UF  E           K        DISK                      A
+     FPOR064P O   E             39     PRINTER
+     I*
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      119 1200$MM
+     I                                      123 1240$YY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      128 1280$PRTID
+     I            DS
+B2MODI                                        1   80PE05
+B2MODI                                        1   60YYMM
+B2MODI                                        1   40YY
+B2MODI                                        5   60MM
+     I            DS
+     I                                        1   40CYYMM
+     I                                        1   20CYY
+     I                                        3   40CMM
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+B2CHKC                     Z-ADD9711      CYYMM
+     C                     WRITEPH1
+     C                     MOVE ' '       DATA    1
+     C*                    Z-ADD$YY       CYY
+     C*                    Z-ADD$MM       CMM
+     C*                    SUB  1         CMM
+     C*          CMM       IFEQ 0
+     C*                    SUB  1         CYY
+     C*                    Z-ADD12        CMM
+     C*                    END
+     C                     EXSR RTN100
+     C                     EXSR WRITED
+     C                     SETON                     LR
+     CLR                   EXSR RTNLR
+     C*
+      *==============================================================*
+      *          RTN100....CHECK HEADING
+      *==============================================================*
+     C*
+01===C           RTN100    BEGSR
+|    C*
+     C           *HIVAL    SETGTPE0
+     C                     READPPE0                      55
+     C                     MOVE PE04      OPROD   9
+     C                     MOVE 'Y'       FIRST   1
+     C*          '3'       DSPLY
+     C           *IN55     DOWEQ'0'
+     C                     Z-ADD0         TEMP    82
+     C                     Z-ADD0         TEMPX
+     C                     Z-ADD0         TEMPY
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2OLDC*          YYMM      IFEQ CYYMM
+B2NEWC                     MOVE '004N7'   HB2@FA
+B2NEWC                     MOVE CYYMM     HB2@F
+B2NEWC                     MOVE '006N7'   HB2@TA
+B2NEWC                     EXSR HB@ADD                     ADD CENTURY
+B2NEWC                     MOVE HB2@T     H@6N01  60
+B2NEWC           YYMM      IFEQ H@6N01
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+     C           PE04      IFEQ OPROD
+     C           HALF      IFEQ 'Y'
+     C                     ELSE
+     C           FIRST     IFEQ 'Y'
+     C                     EXSR PROCES
+     C                     Z-ADDTEMP      WF0643
+     C                     MOVE 'Y'       HALF
+     C                     MOVE ' '       FIRST
+     C                     ELSE
+     C                     END
+     C                     END
+     C                     ELSE
+     C           HALF      IFEQ 'Y'
+     C                     Z-ADD0         WF0644
+     C                     Z-ADD0         WF0645
+     C                     Z-ADD0         WF0646
+     C                     WRITEWF064
+     C                     EXSR PROCES
+     C                     Z-ADDTEMP      WF0643
+     C                     ELSE
+     C                     EXSR PROCES
+     C                     Z-ADDTEMP      WF0643
+     C                     MOVE 'Y'       HALF    1
+     C                     END
+     C                     END
+     C                     ELSE
+     C           PE04      IFEQ OPROD
+     C           HALF      IFEQ 'Y'
+     C                     EXSR PROCES
+     C                     Z-ADDTEMP      WF0644
+     C           WF0643    SUB  WF0644    WF0645
+     C           WF0645    DIV  WF0644    WF0646    H
+     C                     WRITEWF064
+     C                     MOVE ' '       HALF
+     C                     ELSE
+     C                     END
+     C                     ELSE
+     C           HALF      IFEQ 'Y'
+     C                     Z-ADD0         WF0644
+     C                     Z-ADD0         WF0645
+     C                     Z-ADD0         WF0646
+     C                     WRITEWF064
+     C                     MOVE ' '       HALF
+     C                     ELSE
+     C                     END
+     C                     END
+     C                     END
+     C                     MOVE PE04      OPROD
+     C  N55                READPPE0                      55
+| 04-C                     END
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN0110....GET 　　　
+     C*==============================================================*
+02===C           WRITED    BEGSR
+     C                     READ WF064                    55
+     C           *IN55     DOWEQ'0'
+     C   39                EXSR RTN900
+     C                     WRITEPD1
+     C                     MOVE 'Y'       DATA
+     C                     READ WF064                    55
+     C                     END
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN0110....GET 　　　
+     C*==============================================================*
+02===C           RTN110    BEGSR
+|    C*
+|    C*數量*單位轉換
+|    C           PE06      MULT MA16      TEMPX   80
+|    C*
+|    C* F.O.B + FREIGHT +HANDLE =成本
+|    C                     ADD  PE08      PE07
+|    C                     ADD  PE09      PE07
+|    C*
+|    C* 成本 / 總數量=F.O.B 單位成本
+|    C           PE07      DIV  TEMPX     TEMPY   92
+|    C           TEMPY     ADD  MA25      TEMP
+     C                     MULT 1.1       TEMP
+|    C*
+     C           ENDTAG    TAG
+02===C                     ENDSR
+     C*==============================================================*
+     C*          PROCES  ...GET 　　　
+     C*==============================================================*
+02===C           PROCES    BEGSR
+     C           PE04      CHAINMA0                  56
+     C                     EXSR RTN110
+     C                     MOVE PE04      WF0641
+     C                     MOVE MA03      WF0642
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+04===C           RTNLR     BEGSR
+| 01-C           DATA      IFEQ ' '
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01*C                     ELSE
+|   C                     WRITEPE2
+|   C                     END
+04===C                     ENDSR
+B2REM ***************************
+B2REM ****  CONVERSION START  ***
+B2REM ***************************
+B2NEWC/COPY HBP2CVTR
+B2REM ***************************
+B2REM *****  CONVERSION END  ****
+B2REM ***************************
+

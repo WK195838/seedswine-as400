@@ -1,0 +1,375 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      * PROGRAM NAME : SAR0781                                       *
+      * AUTHER       : A1084  CHARLES                                *
+      * CREATE DATE  : 81/05/04                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售分析系統                                 *
+      *  REMARK      :通路產品銷售週報表                           *
+     /*=============================================================*/
+     /* CODE   AUTHOR.     DATE    DESCRIPTION                   */
+     /*-------------------------------------------------------------*/
+     /* M001  MICHELLE   99.01.14  Y2K MODIFY                    */
+     /*=============================================================*/
+      ****************************************************************
+     FMTMALF1 IF  E           K        DISK
+     FSOSCLF4 IF  E           K        DISK
+     FSOSGLF3 IF  E           K        DISK
+     FREW107  UF  E           K        DISK                      A
+     FRES18WF IF  E           K        DISK                           UC
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *通路
+     I                                      600 600 DMD07S
+     I                                      601 601 DMD07E
+      *類別
+     I                                      602 602 DMA11
+     I*產品代號
+     I                                      721 729 DMA01S
+     I                                      731 739 DMA01E
+      *單瓶
+     I                                      604 604 DSEL2
+      *YY/MM/DD
+     I                                      631 6360YMDS
+     I                                      641 6460YMDE
+M001AI                                      850 8570YMD8S
+M001AI                                      858 8650YMD8E
+     I            DS
+     I                                        1   2 MA11
+     I                                        1   1 MA11L
+     I            DS
+     I                                        1   9 SD03
+     I                                        3   4 SD03A
+     I            DS
+     I                                        1   9 SH03
+     I                                        3   4 SH03A
+     I            DS
+     I                                        1   5 SC04
+     I                                        1   1 SC04A
+     I            DS
+     I                                        1   5 SG04
+     I                                        1   1 SG04A
+     I            DS
+     I                                        1   9 R181
+     I                                        3   4 R181A
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN W10704    WORK01
+     C           *LIKE     DEFN W10704    WORK02
+     C           *LIKE     DEFN W10704    WORK03
+     C           *LIKE     DEFN W10704    WORK04
+     C           *LIKE     DEFN W10704    WORK05
+     C           *LIKE     DEFN W10704    WORK06
+     C           *LIKE     DEFN W10704    WORK07
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYWF     KLIST
+     C                     KFLD           W10701
+     C                     KFLD           W10702
+     C                     KFLD           W10709
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+     C                     EXSR RTN10A                     *SOSCPF
+     C                     EXSR RTN20A                     *SOSGPF
+     C*
+     C                     SETON                     LR
+      *==============================================================*
+      *          RTN10A    SOSCPF
+      *==============================================================*
+01===C           RTN10A    BEGSR
+|    C*
+|    C                     READ SC0                      46
+| 02-C           *IN46     DOWEQ'0'
+|   C                     MOVELSD03A     W10701
+| 01-C           SD03A     IFEQ 'RM'
+|   C                     MOVELSD03      W10702
+| 01-C                     ELSE
+|   C                     MOVEL*BLANK    W10702
+|   C                     MOVELSD03A     W10702
+| 01-C                     END
+|   C                     MOVELSD03      W10703
+| 01-C           SC04A     IFEQ 'A'
+|   C                     MOVELSC04      W10709
+| 01-C                     ELSE
+|   C                     MOVEL*BLANK    W10709
+|   C                     MOVELSC04A     W10709
+| 01-C                     END
+|   C*不拆
+| 04-C           MA54      IFNE 'Y'
+|   C           MA54      OREQ 'Y'
+|   C           DSEL2     ANDEQ'A'
+|   C                     EXSR RTN10B
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+| 04*C                     ELSE
+|   C                     EXSR RTN10X
+| 04-C                     END
+      *
+|   C                     READ SC0                      46
+| 02-C                     END
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN10B    PEROID JUDGE
+      *==============================================================*
+02===C           RTN10B    BEGSR
+|    C*
+B2000C*M001M     SC39      IFGE YMDS
+|   C*M001M     SC39      ANDLEYMDE
+M001MC           SC39      IFGE YMD8S
+M001MC           SC39      ANDLEYMD8E
+|   C                     EXSR RTN100
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN10C....GET LITER
+      *==============================================================*
+03===C           RTN10C    BEGSR
+|    C*GET單位容積
+|    C           W10703    CHAINMA0L                 49
+|    C*容積數
+|    C           SD04      MULT MA15L     WORK01
+|    C           SD05      MULT MA15L     WORK02
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN100....WRITE OR UPDATE REW107
+      *==============================================================*
+04===C           RTN100    BEGSR
+|    C*
+|    C                     EXSR RTN10C
+|    C*
+|    C           KEYWF     CHAINW1070                40
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL*BLANK    W10703
+|   C                     ADD  WORK01    W10704
+|   C                     ADD  WORK02    W10705
+|   C                     UPDATW1070
+| 01*C                     ELSE
+|   C                     MOVEL*BLANK    W10703
+|   C                     Z-ADDWORK01    W10704
+|   C                     Z-ADDWORK02    W10705
+|   C                     Z-ADD0         W10706
+|   C                     Z-ADD0         W10707
+|   C                     Z-ADD0         W10708
+| 02-C           W10704    IFNE 0
+|   C           W10705    ORNE 0
+|   C                     WRITEW1070
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN10X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+07===C           RTN10X    BEGSR
+      *禮盒碼
+|    C                     EXSR RTN10Y
+|    C                     OPEN RES18WF
+|    C                     EXSR RTN10Z
+|    C                     CLOSERES18WF
+|    C*
+07===C                     ENDSR
+      *==============================================================*
+      *          RTN10Y....禮盒單瓶成本
+      *==============================================================*
+08===C           RTN10Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SD03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SD02      S08I2  12        訂單號碼
+|    C                     PARM 0         S08I3   60       牌價判斷日
+|    C                     PARM SD04      S08I4   60       禮盒訂購數量
+|    C                     PARM SD05      S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   82       禮盒成本FOB
+|    C                     PARM 0         S08I8   82       禮盒成本FHI
+|    C                     PARM 0         S08I9   82       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   82       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   82       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   82       禮盒轉帳成本DUTY
+|    C*
+08===C                     ENDSR
+      *==============================================================*
+      *          RTN10Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+09===C           RTN10Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181A     W10701
+| 01-C           R181A     IFEQ 'RM'
+|   C                     MOVELR181      W10702
+| 01-C                     ELSE
+|   C                     MOVEL*BLANK    W10702
+|   C                     MOVELR181A     W10702
+| 01-C                     END
+|   C                     MOVELR181      W10703
+|   C                     Z-ADDR182      SD04
+|   C                     Z-ADDR183      SD05
+|   C                     EXSR RTN10B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+09===C                     ENDSR
+      *==============================================================*
+      *          RTN20A    SOSGPF
+      *==============================================================*
+10===C           RTN20A    BEGSR
+|    C*銷退
+|    C                     READ SG0                      46
+| 01-C           *IN46     DOWEQ'0'
+|   C                     MOVELSH03A     W10701
+| 02-C           SH03A     IFEQ 'RM'
+|   C                     MOVELSH03      W10702
+| 02-C                     ELSE
+|   C                     MOVEL*BLANK    W10702
+|   C                     MOVELSH03A     W10702
+| 02-C                     END
+|   C                     MOVELSH03      W10703
+| 02-C           SG04A     IFEQ 'A'
+|   C                     MOVELSG04      W10709
+| 02-C                     ELSE
+|   C                     MOVEL*BLANK    W10709
+|   C                     MOVELSG04A     W10709
+| 02-C                     END
+|   C*不拆
+| 02-C           MA54      IFNE 'Y'
+|   C           MA54      OREQ 'Y'
+|   C           DSEL2     ANDEQ'A'
+|   C                     EXSR RTN20B
+      *分析方式－單瓶(B)需拆解禮盒為單瓶
+| 02*C                     ELSE
+|   C                     EXSR RTN20X
+| 02-C                     END
+|   C*
+|   C                     READ SG0                      46
+| 01-C                     END
+|    C*
+10===C                     ENDSR
+      *==============================================================*
+      *          RTN20B    SOSNPF
+      *==============================================================*
+11===C           RTN20B    BEGSR
+|    C*當期
+B2000C*M001M     SG26      IFGE YMDS
+|   C*M001M     SG26      ANDLEYMDE
+M001MC           SG26      IFGE YMD8S
+M001MC           SG26      ANDLEYMD8E
+|   C                     EXSR RTN200
+| 01-C                     END
+|    C*
+11===C                     ENDSR
+      *==============================================================*
+      *          RTN20C....GET LITER
+      *==============================================================*
+12===C           RTN20C    BEGSR
+|    C*容積
+|    C           W10703    CHAINMA0L                 49
+|    C*
+|    C           SH12      MULT MA15L     WORK01
+|    C           SH13      MULT MA15L     WORK02
+12===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE OR UPDATE REW107
+      *==============================================================*
+13===C           RTN200    BEGSR
+|    C*銷退
+|    C                     EXSR RTN20C
+|    C*
+|    C           KEYWF     CHAINW1070                40
+|    C*當期
+| 01-C           *IN40     IFEQ '0'
+|   C                     ADD  WORK01    W10706
+|   C                     ADD  WORK02    W10707
+|   C                     MOVEL*BLANK    W10703
+|   C*
+|   C                     UPDATW1070
+| 01*C                     ELSE
+|   C                     MOVEL*BLANK    W10703
+|   C                     Z-ADDWORK01    W10706
+|   C                     Z-ADDWORK02    W10707
+|   C                     Z-ADD0         W10704
+|   C                     Z-ADD0         W10705
+|   C                     Z-ADD0         W10708
+| 02-C           W10706    IFNE 0
+|   C           W10707    ORNE 0
+|   C                     WRITEW1070
+| 02-C                     END
+| 01-C                     END
+|    C*
+13===C                     ENDSR
+      *==============================================================*
+      *          RTN20X....禮盒單瓶售價計算數量及金額
+      *==============================================================*
+16===C           RTN20X    BEGSR
+      *禮盒碼
+|    C                     EXSR RTN20Y
+|    C                     OPEN RES18WF
+|    C                     EXSR RTN20Z
+|    C                     CLOSERES18WF
+|    C*
+16===C                     ENDSR
+      *==============================================================*
+      *          RTN20Y....禮盒單瓶成本
+      *==============================================================*
+17===C           RTN20Y    BEGSR
+      *禮盒拆解為產品
+|    C                     CALL 'RES018'
+|    C                     PARM SH03      S08I1   9        禮盒代號
+      *若不為訂單則為空白
+|    C                     PARM SG02      S08I2  12        訂單號碼
+|    C                     PARM 0         S08I3   60       牌價判斷日
+|    C                     PARM SH12      S08I4   60       禮盒訂購數量
+|    C                     PARM SH13      S08I5   60       禮盒搭贈數量
+|    C                     PARM 0         S08I6   90       禮盒金額
+      *部份－單位成本－中間
+|    C                     PARM 0         S08I7   82       禮盒成本FOB
+|    C                     PARM 0         S08I8   82       禮盒成本FHI
+|    C                     PARM 0         S08I9   82       禮盒成本DUTY
+      *部份－單位成本－中間
+|    C                     PARM 0         S08IA   82       禮盒轉帳成本FOB
+|    C                     PARM 0         S08IB   82       禮盒轉帳成本FHI
+|    C                     PARM 0         S08IC   82       禮盒轉帳成本DUTY
+|    C*
+17===C                     ENDSR
+      *==============================================================*
+      *          RTN20Z....WRITE OR UPDATE REWF69
+      *==============================================================*
+18===C           RTN20Z    BEGSR
+|    C*
+|    C           *LOVAL    SETLLRE18R
+|    C                     READ RE18R                    47
+| 01-C           *IN47     DOWEQ'0'
+|   C                     MOVELR181A     W10701
+| 01-C           R181A     IFEQ 'RM'
+|   C                     MOVELR181      W10702
+| 01-C                     ELSE
+|   C                     MOVEL*BLANK    W10702
+|   C                     MOVELR181A     W10702
+| 01-C                     END
+|   C                     MOVELR181      W10703
+|   C                     Z-ADDR182      SH12
+|   C                     Z-ADDR183      SH13
+|   C                     EXSR RTN20B
+|   C                     READ RE18R                    47
+| 01-C                     END
+|    C           *LOVAL    SETLLRE18R
+|    C*
+18===C                     ENDSR
+

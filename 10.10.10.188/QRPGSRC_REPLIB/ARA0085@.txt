@@ -1,0 +1,223 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : SOA008                                        *
+      * AUTHER       : A1118 PHILIP                                  *
+      * CREATE DATE  : 81/03/10                                      *
+      * UPDATE DATE  : 81/04/13 ERROR REPORT CREATE                  *
+      * UPDATE DATE  : 81/04/17 結帳註記 ADD FIELD                 *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :銷售訂單系統                                 *
+      * REMARK       :訂單批次處理                                 *
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M003      | 00.04.20 | FOR DUTY菸酒稅法實施
+     A*---------------------------------------------------------------
+     A* M004      | 02.01.23 |專櫃退貨要把轉帳單寫入SOSXPF/SOS2PF
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FMTMHPF  IF  E           K        DISK
+     FSOSGPF  UF  E           K        DISK                      A
+     FSOSHPF  UF  E           K        DISK                      A
+M003AFSOSXPF  UF  E           K        DISK                      A
+M003AFSOS2PF  UF  E           K        DISK                      A
+     I**********
+     I           UDS
+     I                                      101 110 $USER
+M001MI                                      201 2080$DATE
+     I            DS
+     I                                        1   2 SE01
+     I                                        1   1 SE01L
+     I                                        2   2 SE01R
+     I            DS
+     I                                        1   2 PH01
+     I                                        1   1 PH01L
+     I                                        2   2 PH01R
+     I            DS
+     I                                        1   60PH04
+     I                                        1   20PH04Y
+     I            DS
+     I                                        1   2 SG01
+     I                                        1   1 SG01K
+     I            DS
+     I                                        1   2 SH01
+     I                                        1   1 SH01K
+     I            DS
+     I                                        1  12 SG02
+     I                                        3   3 SG02K
+     I            DS
+     I                                        1  12 SH02
+     I                                        3   3 SH02K
+M003AI            DS
+M003AI                                        1   2 S201
+M003AI                                        1   1 S201K
+M003AI            DS
+M003AI                                        1  12 S202
+M003AI                                        3   3 S202K
+M003AI            DS
+M003AI                                        1   2 SX01
+M003AI                                        1   1 SX01K
+M003AI            DS
+M003AI                                        1  12 SX02
+M003AI                                        3   3 SX02K
+      *==============================================================*
+      *          IDENTIFY A PARAMETER LIST
+      *==============================================================*
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+M004AC           KEYS2     KLIST
+M004AC                     KFLD           PSG02
+M004AC                     KFLD           SH03
+      *==============================================================*
+      *                   *LIKE DEFN
+      *==============================================================*
+      *==============================================================*
+      *                    PARM LIST
+      *==============================================================*
+     C           *ENTRY    PLIST
+     C                     PARM           PSG02  12
+     C*
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C*
+|   C                     EXSR RTN002
+36===C                     SETON                     LR
+     C*
+      *==============================================================*
+      *          RTN002....SOSGPF
+      *==============================================================*
+02===C           RTN002    BEGSR
+|    C*
+     C                     Z-ADD0         AMT
+     C                     MOVELPSG02     SG02
+     C                     MOVEL'K'       SG02K
+     C           SG02      CHAINSG0                  40
+     C           *IN40     IFEQ '0'
+     C           SG02      SETLLSH0                  41
+     C           SG02      READESH0                      42
+     C           *IN42     DOWEQ'0'
+     C*
+M003AC           SG02      CHAINSX0                  50
+M003AC           *IN50     IFEQ '0'
+M003AC           SG02      SETLLS20                  43
+M003AC           SG02      READES20                      44
+M003AC           *IN44     DOWEQ'0'
+M003AC                     DELETS20
+M003AC           SG02      READES20                      44
+M003AC                     END
+M003AC                     DELETSX0
+M003AC                     END
+     C*
+     C                     DELETSH0
+     C           SG02      READESH0                      42
+     C                     END
+     C                     DELETSG0
+     C                     END
+     C*
+     C*
+     C           PSG02     CHAINSG0                  40
+     C           *IN40     IFEQ '0'
+     C           PSG02     SETLLSH0                  41
+     C           PSG02     READESH0                      42
+     C           *IN42     DOWEQ'0'
+     C                     EXSR RTN003
+M004AC           KEYS2     CHAINS20                  43
+M004AC           *IN43     IFEQ '0'
+M004AC                     Z-ADDS207      WS207   90
+M004AC                     ELSE
+M004AC                     Z-ADD0         WS207
+M004AC                     END
+M004AC                     EXSR RTN013
+     C           PSG02     READESH0                      42
+     C                     END
+     C                     EXSR RTN004
+M004AC           PSG02     CHAINSX0                  44
+M004AC           *IN44     IFEQ '0'
+M004AC                     Z-ADDSX10      WSX10   90
+M004AC                     ELSE
+M004AC                     Z-ADD0         WSX10
+M004AC                     END
+M004AC                     EXSR RTN014
+     C                     END
+|    C*
+02===C                     ENDSR
+|    C*
+    C*==============================================================*
+    C*          RTN003....SCREEN TO FILE --- DETAIL
+    C*==============================================================*
+36===C           RTN003    BEGSR
+|   C*** SOSHPF
+| 01-C           SH03      CHAINMA0                  40
+|   C                     MOVEL'K'       SH01K
+|   C                     MOVEL'K'       SH02K
+|   C                     Z-ADDMA31      SH14
+|   C                     Z-ADDMA32      SH15
+|   C                     Z-ADDMA33      SH16
+|   C           SH14      ADD  SH15      UNIT   112
+|   C                     ADD  SH16      UNIT
+     C           SH06      MULT UNIT      SH08
+|   C*
+|   C                     WRITESH0
+|   C*
+     C                     ADD  SH08      AMT    132
+|   C*
+36===C                     ENDSR
+    C*==============================================================*
+    C*          RTN004....HEADFILE
+    C*==============================================================*
+35===C           RTN004    BEGSR
+|   C*** SOSGPF
+|   C                     MOVEL'K'       SG01K
+|   C                     MOVEL'K'       SG02K
+|   C                     MOVEL'N'       SG14
+|   C                     Z-ADDAMT       SG13
+|   C                     Z-ADDAMT       SG19
+|   C                     Z-ADD0         SG20
+|   C                     Z-ADD0         SG21
+|   C                     WRITESG0
+|   C*
+35===C                     ENDSR
+    C*==============================================================*
+M003AC*          RTN013....SCREEN TO FILE --- DETAIL
+    C*==============================================================*
+36===C           RTN013    BEGSR
+|   C*** SOS2PF
+|   C                     MOVEL'K'       S201K
+|   C                     MOVEL'K'       S202K
+M004AC                     Z-ADDWS207     S207
+M004AC                     MOVEL*BLANKS   S203
+M004AC                     MOVEL*BLANKS   S2XX
+M004AC                     MOVEL*BLANKS   S2YY
+M004AC                     MOVEL*BLANKS   S2ZZ
+M004AC                     MOVELSH03      S203
+M004AC                     MOVELSHXX      S2XX
+M004AC                     MOVELSHYY      S2YY
+M004AC                     MOVELSHZZ      S2ZZ
+M004AC           S207      IFNE 0
+|   C                     WRITES20
+M004AC                     END
+36===C                     ENDSR
+    C*==============================================================*
+M003AC*          RTN014....HEADFILE
+    C*==============================================================*
+35===C           RTN014    BEGSR
+|   C*** SOSXPF
+|   C                     MOVEL'K'       SX01K
+|   C                     MOVEL'K'       SX02K
+M004AC                     Z-ADDWSX10     SX10
+M004AC                     MOVEL*BLANKS   SX09
+M004AC                     MOVEL*BLANKS   SXXX
+M004AC                     MOVEL*BLANKS   SXYY
+M004AC                     MOVEL*BLANKS   SXZZ
+M004AC                     MOVELSG09      SX09
+M004AC                     MOVELSGXX      SXXX
+M004AC                     MOVELSGYY      SXYY
+M004AC                     MOVELSGZZ      SXZZ
+M004AC           SX10      IFNE 0
+|   C                     WRITESX0
+M004AC                     END
+35===C                     ENDSR
+

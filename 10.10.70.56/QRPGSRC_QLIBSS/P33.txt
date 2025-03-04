@@ -1,0 +1,286 @@
+      ****************************************************************
+      * PROGRAM ID : P33                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :計算起日～迄日相距月數及日數                   *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3301I    I   *DEC    8 0  輸入年月起     *
+      *             01   P3302I    I   *DEC    8 0  輸入年月迄     *
+      *             01   P3303I    I   *CHAR   1    日期格式       *
+      *                                              '1'=00YYMMDD    *
+      *                                              '2'=YYYYMMDD    *
+      *                                              '3'=00MMDDYY    *
+      *                                              '4'=MMDDYYYY    *
+      *                                              '5'=00DDMMYY    *
+      *                                              '6'=DDMMYYYY    *
+      *             01   P3304I    I   *CHAR   1    曆別           *
+      *                                             '1':西曆       *
+      *                                             '2':國曆       *
+      *             02   P3311O    O   *DEC    7 0 相距月數...     *
+      *                                            負數表起月大於迄月
+      *             02   P3312O    O   *DEC    2 0 相距日數...     *
+      *                                            負數表起日大於迄日
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3301     N   *DEC    4 0 西元年          *
+      *             02   P3302     N   *CHAR   1   起小於迄(Y/N)   *
+      *             03   P3303     N   *CHAR   1   起日是月底(Y/N) *
+      *             04   P3304     N   *DEC    5 0 商數            *
+      *             05   P3305     N   *DEC    4 0 餘數            *
+      *             06   P3306     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P3307     N   *DEC    2 0 本月日數        *
+      *             08   P33DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P33DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P3306=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P3306=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P3306=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P3306=N  *
+      *                                                 (N)          *
+      ****************************************************************
+     E* P33DAY:每月日數
+     E* WFV   :日期格式VALUE
+     E                    P33DAY 12  12  2 0
+     E                    WFV     6   6  1
+     I            DS
+     I                                        1   80WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     I                                        7   80WD4
+     I            DS
+     I                                        1   80P3301C
+     I                                        1   40P3301Y
+     I                                        5   60P3301M
+     I                                        7   80P3301D
+     I            DS
+     I                                        1   80P3302C
+     I                                        1   40P3302Y
+     I                                        5   60P3302M
+     I                                        7   80P3302D
+     I            DS
+     I                                        1   80P33SML
+     I                                        1   40P33SYY
+     I                                        5   60P33SMM
+     I                                        7   80P33SDD
+     I            DS
+     I                                        1   80P33BIG
+     I                                        1   40P33BYY
+     I                                        5   60P33BMM
+     I                                        7   80P33BDD
+     I            DS
+     I                                        1   80PYMD
+     I                                        1   40PYY
+     I                                        5   60PMM
+     I                                        7   80PDD
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3301I  80
+     C                     PARM           P3302I  80
+     C                     PARM           P3303I  1
+     C                     PARM           P3304I  1
+     C                     PARM           P3311O  70
+     C                     PARM           P3312O  20
+      *最高機密
+     C                     CALL 'R@S005'
+     C                     PARM 'GIANT/PT'S0051I  8
+      *
+     C                     MOVE P3303I    @FMT    1
+     C                     MOVE P3304I    @CALD   1
+     C                     EXSR @@CHK                      *CHK中西曆
+      *
+  01-C           *IN99     IFEQ '1'
+    C                     Z-ADD0         WMONTH  70
+    C                     Z-ADD0         WDAYS   20
+    C                     GOTO QUIT
+  01-C                     END
+      *
+     C                     Z-ADDP3301I    @DATE   80
+     C                     EXSR @@YMD                      *GET起YMD
+     C                     Z-ADDWYYYY     P3301Y
+     C                     Z-ADDWMM       P3301M
+     C                     Z-ADDWDD       P3301D
+      *
+     C                     Z-ADDP3302I    @DATE   80
+     C                     EXSR @@YMD                      *GET迄YMD
+     C                     Z-ADDWYYYY     P3302Y
+     C                     Z-ADDWMM       P3302M
+     C                     Z-ADDWDD       P3302D
+      *
+     C                     EXSR P33CMP                     *SMALL&LARGE
+     C                     EXSR P33LST                     *IS LAST DAY
+     C                     EXSR P33CAL                     *CACULATION
+      *
+  02-C           P3302     IFEQ 'N'
+    C           0         SUB  WMONTH    WMONTH
+    C           0         SUB  WDAYS     WDAYS
+  02-C                     END
+      *
+     C           QUIT      TAG
+     C                     Z-ADDWMONTH    P3311O
+     C                     Z-ADDWDAYS     P3312O
+     C                     SETON                     LR
+     C/COPY QRPGSRC,@CHECK
+      *--------------------------------------------------------------*
+      *          P33CMP....COMPARE FROM DATE AND TO DATE WHICH LARGE *
+      *                    INPUT      P3301C                         *
+      *                    INPUT      P3302C                         *
+      *                    OUTPUT     P33SML                         *
+      *                    OUTPUT     P33BIG                         *
+      *                    OUTPUT     P3302  ( Y = P3301C <= P3302C )*
+      *--------------------------------------------------------------*
+01===C           P33CMP    BEGSR
+|    C*
+| 03-C           P3301C    IFLE P3302C
+|   C                     MOVE 'Y'       P3302   1        *CMP CHECK
+|   C                     Z-ADDP3301C    P33SML
+|   C                     Z-ADDP3302C    P33BIG
+| 03*C                     ELSE
+|   C                     MOVE 'N'       P3302
+|   C                     Z-ADDP3302C    P33SML
+|   C                     Z-ADDP3301C    P33BIG
+| 03-C                     END
+|    C*
+01===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P33LST....判斷起始日是否為月底日                  *
+      *                    INPUT      P33SML                         *
+      *                    OUTPUT                                    *
+      *--------------------------------------------------------------*
+02===C           P33LST    BEGSR
+|    C*
+|    C                     Z-ADDP33SML    PYMD
+|    C                     Z-ADDPYY       P3301   40
+|    C*
+|    C                     EXSR P33LDT                     *求月底日
+|    C*
+| 01-C           P33SDD    IFEQ P3307
+|   C                     MOVE 'Y'       P3303   1
+| 01*C                     ELSE
+|   C                     MOVE 'N'       P3303
+| 01-C                     END
+|    C*
+02===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P33LDT....求本月份之最後一日                      *
+      *                    INPUT      PYMD                           *
+      *                    OUTPUT     P3307                          *
+      *--------------------------------------------------------------*
+03===C           P33LDT    BEGSR
+|    C*
+|    C                     EXSR P33LEP
+| 01-C           PMM       IFEQ 2
+|   C           P3306     ANDEQ'Y'
+|   C                     Z-ADD29        P3307   20
+| 01*C                     ELSE
+|   C                     Z-ADDP33DAY,PMMP3307
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P33CAL....累加起始日之月份直到大於迄日            *
+      *--------------------------------------------------------------*
+04===C           P33CAL    BEGSR
+|    C*
+| 01-C           P33SML    DOWLEP33BIG
+|   C                     ADD  1         WMONTH
+|   C                     ADD  1         P33SMM
+| 02-C           P33SMM    IFGT 12
+|   C                     ADD  1         P33SYY
+|   C                     Z-ADD1         P33SMM
+| 02-C                     END
+| 03-C           P3303     IFEQ 'Y'
+|   C                     EXSR P33ADJ                     月底日調整
+| 03-C                     END
+| 01-C                     END
+|    C*
+| 04-C           P33SML    IFNE P33BIG
+|   C                     SUB  1         WMONTH
+|   C                     SUB  1         P33SMM
+| 05-C           P33SMM    IFLT 1
+|   C                     SUB  1         P33SYY
+|   C                     Z-ADD12        P33SMM
+| 05-C                     END
+|   C*
+| 06-C           P3303     IFEQ 'Y'
+|   C                     EXSR P33ADJ                     月底日調整
+| 06-C                     END
+|   C*
+| 07-C           P33SMM    IFEQ P33BMM
+|   C                     Z-ADDP33BDD    WDAYS
+|   C                     SUB  P33SDD    WDAYS
+| 07*C                     ELSE
+|   C                     Z-ADDP33SML    PYMD
+|   C                     EXSR P33LDT                     *求月底日
+|   C                     Z-ADDP3307     WDAYS
+|   C                     SUB  P33SDD    WDAYS
+|   C                     ADD  P33BDD    WDAYS
+| 07-C                     END
+| 04-C                     END
+|    C*
+04===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P33ADJ....月底日調整                              *
+      *                    INPUT      P33SML                         *
+      *                    OUTPUT     P33SML                         *
+      *--------------------------------------------------------------*
+05===C           P33ADJ    BEGSR
+      *
+|    C                     Z-ADDP33SMM    PMM
+      *
+|    C                     Z-ADDP33SYY    P3301
+|    C                     EXSR P33LEP
+| 01-C           P33SMM    IFEQ 2
+|   C           P3306     ANDEQ'Y'
+|   C                     Z-ADD29        P33SDD
+| 01*C                     ELSE
+|   C                     Z-ADDP33DAY,PMMP33SDD
+| 01-C                     END
+      *
+05===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P33LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P3301 西元年                 *
+      *                    OUTPUT     P3306  (Y=潤年:N=平年)     *
+      *--------------------------------------------------------------*
+06===C           P33LEP    BEGSR
+|    C*
+|    C           P3301     DIV  400       P3304   50
+|    C                     MVR            P3305   40
+| 01-C           P3305     IFEQ 0
+|   C                     MOVE 'Y'       P3306   1
+| 01*C                     ELSE
+|   C           P3301     DIV  100       P3304
+|   C                     MVR            P3305
+| 02-C           P3305     IFEQ 0
+|   C                     MOVE 'N'       P3306
+| 02*C                     ELSE
+|   C           P3301     DIV  4         P3304
+|   C                     MVR            P3305
+| 03-C           P3305     IFEQ 0
+|   C                     MOVE 'Y'       P3306
+| 03*C                     ELSE
+|   C                     MOVE 'N'       P3306
+| 03-C                     END
+| 02-C                     END
+| 01-C                     END
+|    C*
+06===C                     ENDSR
+      *--------------------------------------------------------------*
+** <<每月日數>>
+312831303130313130313031
+** <<日期格式>>VALUE
+123456
+

@@ -1,0 +1,291 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : IMR0441                                       *
+      * AUTHER       : A1118  PHILIP                                 *
+      * CREATE DATE  : 81/04/22                                      *
+      * UPDATE DATE  : 81/04/30                                      *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :庫存系統                                     *
+      * REMARK       :送貨單列印                                   *
+     A*===============================================================
+     A* MODI CODE |   DATE   | AUTHOR | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.16 |MICHELLE| MANUAL MODIFY FOR Y2K
+     A*---------------------------------------------------------------
+     A* M002      | 01.03.28 |MICHELLE|將分車明細轉存檔案，供物流公司
+     A*           |          |        |使用
+     A*---------------------------------------------------------------
+     A* M004      | 01.05.18 |MICHELLE|菸酒稅改制
+     A*---------------------------------------------------------------
+     A****************************************************************
+     FSOSEPF  UP  E           K        DISK
+     FSOSCPF  IF  E           K        DISK
+     FSOSFPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FMTMCPF  IF  E           K        DISK
+     FMTMDPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FPA#2PF  IF  E           K        DISK
+     FIMR044P O   E             39     PRINTER
+M002AFIMR044F O   E           K        DISK                      A
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+M001AI                                      201 2080DATE
+     I                                      598 5990$LPRT
+     I*                                     601 601 DPATH
+     I                                      602 602 DSEL
+     I                                      603 6040DPNO
+     I                                      617 628 DSE02S
+     I                                      636 647 DSE02E
+     I                                      659 663 DSE07
+     I                                      659 659 DSE07L
+     I*(MM/DD/YY)
+     I                                      671 6760DSE06
+     I*(YY/MM/DD)
+M001MI                                      681 688 WSE06
+M002AI                                      690 690 NEW
+     I*
+     I            DS
+     I                                        1   5 SE10
+     I                                        1   5 SE101
+M002AI            DS
+M002AI                                        1   8 SE22
+M002AI                                        2   2 SE221
+     I*
+M004AIDA02        DS
+M004AI                                        1   43DUTY
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+     C           KEY#2     KLIST
+     C                     KFLD           #201
+     C                     KFLD           SE03
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010                     *HEADING
+     C*
+     C                     EXSR RTN100                     WRITE HEAD
+     C                     EXSR RTN200                     WRITE DETAILL
+     C                     EXSR RTN300                     WRITE TOTAL L
+     C*
+     CLR 10                EXSR RTN400
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C                     SETON                         10
+M004AC           *NAMVAR   DEFN           DA02
+M004AC                     IN   *NAMVAR
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....WRITE HEADING
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*公司別劃記
+|    C                     MOVELSE01      CHK     1
+|    C                     MOVE *BLANK    PC1
+|    C                     MOVE *BLANK    PC2
+|    C                     MOVE *BLANK    PC3
+|    C                     MOVE *BLANK    PC4
+|    C                     SELEC
+|    C           CHK       WHEQ 'R'
+|    C                     MOVE 'V'       PC1
+|    C           CHK       WHEQ 'C'
+|    C                     MOVE 'V'       PC4
+|    C           SE01      WHEQ 'W1'
+|    C           SE01      OREQ 'W2'
+|    C                     MOVE 'V'       PC2
+|    C           SE01      WHEQ 'W3'
+|    C                     MOVE 'V'       PC3
+|    C                     ENDSL
+|    C*送貨單表頭文字
+|    C                     MOVE 'D'       #201
+|    C           KEY#2     CHAIN#20                  40
+| 01-C           *IN40     IFEQ '0'
+|   C                     MOVEL#203      P6501I
+|   C                     CALL 'P65'
+|   C                     PARM           P6501I 80
+|   C                     PARM 5         P6502I  30
+|   C           PHD       PARM           P6511O 80
+|   C                     PARM           P6512O 80
+| 01*C                     ELSE
+|   C                     MOVE *BLANK    PHD
+| 01-C                     END
+|    C*送貨日期
+M001AC                     Z-ADDSE06      W6      60
+|    C                     CALL 'RES001'
+|    C                     PARM 'YMD'     S001I1  3
+B2MODC                     PARM W6        S001I2  60
+|    C           PSE06     PARM           S001OI  60
+|    C*讀取客戶檔資料
+|    C                     MOVE SE41      ME01
+|    C                     MOVE *BLANK    ME02
+|    C           KEYME     CHAINME0                  40
+| 02-C           *IN40     IFEQ '0'
+|   C                     MOVE ME04      PME041
+|   C                     MOVE ME05      PME051
+|   C                     MOVE ME06      PME061
+|   C                     MOVE ME10      PME10
+|   C                     MOVE ME12      PME12
+| 02*C                     ELSE
+|   C                     MOVE *BLANK    PME041
+|   C                     MOVE *BLANK    PME051
+|   C                     MOVE *BLANK    PME061
+|   C                     MOVE *BLANK    PME10
+|   C                     MOVE *BLANK    PME12
+| 02-C                     END
+|    C*付款條件
+|    C           SE04      CHAINMD0                  40
+| 03-C           *IN40     IFEQ '0'
+| 04-C           MD23      IFEQ 'C'
+|   C                     MOVE '收現'  PMD23
+|   C                     SETON                     30
+| 04*C                     ELSE
+|   C                     MOVELMD23      PMD231
+|   C                     SETOF                     30
+| 04-C                     END
+| 03*C                     ELSE
+|   C                     MOVE *BLANK    PMD23
+| 03-C                     END
+|    C*送貨地址
+|    C                     MOVE SE10      ME01
+|    C                     MOVE SE11      ME02
+|    C           KEYME     CHAINME0                  40
+| 05-C           *IN40     IFEQ '0'
+|   C                     MOVE ME04      PME042
+|   C                     MOVE ME05      PME052
+|   C                     MOVE ME06      PME062
+|   C                     MOVE ME11      PME11
+|   C                     MOVE ME12      PME13
+| 05*C                     ELSE
+|   C                     MOVE *BLANK    PME042
+|   C                     MOVE *BLANK    PME052
+|   C                     MOVE *BLANK    PME062
+|   C                     MOVE *BLANK    PME11
+|   C                     MOVE *BLANK    PME13
+| 05-C                     END
+|    C*客戶訂單單號
+|    C           SE29      CHAINSC0                  40
+| 06-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    SC06
+| 06-C                     END
+|    C*業務員
+|    C           SE32      CHAINMC0                  40
+| 07-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MC02
+| 07-C                     END
+|    C*物流點
+|    C                     MOVE *BLANK    #A01
+|    C                     MOVE *BLANK    #A02
+|    C                     MOVEL'STORAGE' #A01
+|    C                     MOVELSE07      #A02
+|    C*
+|    C           KEY#A     CHAIN#A0                  40
+| 08-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    #A03
+| 08-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C*更新主檔資料
+B2MODC*M001D               Z-ADD0         DATE    80
+|    C*                    CALL 'RES001'
+|    C*                    PARM 'MDY'     S001I1  3
+B2MODC*                    PARM $EGMDY    S001I2  60
+B2MODC*M001D     DATE      PARM           S001O1  60
+|    C*
+|    C                     ADD  1         SE20
+B2000C                     Z-ADDDATE      SEXX
+B2000C                     TIME           SEYY
+|    C                     MOVE $USER     SEZZ
+|    C                     UPDATSE0
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE DETAIL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*送貨單明細資料列印
+|    C           SE02      SETLLSF0
+|    C           SE02      READESF0                      41
+| 01-C           *IN41     DOWEQ'0'
+|   C*產品主檔資料
+|   C           SF03      CHAINMA0                  40
+| 02-C           *IN40     IFEQ '1'
+|   C                     MOVE *BLANK    MA03
+|   C                     MOVE *BLANK    MA17
+|   C                     MOVE *BLANK    MA13
+| 02-C                     END
+|   C*總數量
+|   C           SF04      ADD  SF05      SF045
+M002AC                     MOVE SF045     WSF045
+|   C*
+| 03-C           SE03      IFEQ 'D4'
+|   C           SE03      OREQ 'D6'
+|   C                     Z-ADD0         SF06
+|   C                     Z-ADD0         SF07
+| 03-C                     END
+|   C*客戶代號為"B0000"時，單價清為"0"
+| 04-C           SE04      IFEQ 'B0000'
+|   C                     Z-ADD0         SF06
+|   C                     Z-ADD0         SF07
+| 04-C                     END
+      *
+|   C                     WRITEPD1
+M002AC           SE221     IFEQ 'A'
+M002AC           SE221     OREQ 'B'
+M002AC           NEW       IFEQ 'Y'
+M002AC                     WRITERIMR44
+M002AC                     END
+M002AC                     END
+|   C           SE02      READESF0                      41
+| 01-C                     END
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE TOTAL AND FOOT
+      *==============================================================*
+04===C           RTN300    BEGSR
+M004AC           SE38      IFEQ 'D'
+M004AC           SE37      MULT DUTY      WTAX      H
+M004AC                     ELSE
+M004AC                     Z-ADD0         WTAX
+M004AC                     END
+M004AC           SE37      ADD  WTAX      WSE37
+| 01-C           SE03      IFEQ 'D4'
+|   C           SE03      OREQ 'D6'
+|   C                     Z-ADD0         SE37
+M004AC                     Z-ADD0         WTAX
+M004AC                     Z-ADD0         WSE37
+| 01-C                     END
+|    C*客戶代號為"B0000"時，總金額清為"0"
+| 02-C           SE04      IFEQ 'B0000'
+|   C                     Z-ADD0         SE37
+M004AC                     Z-ADD0         WTAX
+M004AC                     Z-ADD0         WSE37
+| 02-C                     END
+|    C                     WRITEPE1
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN400....WRITE REPORT END
+      *==============================================================*
+05===C           RTN400    BEGSR
+|    C*
+| 01-C           DSE07     IFEQ 'W0001'
+|   C           DSE07     OREQ 'W0005'
+|   C*                    WRITEPE3
+| 01-C                     END
+05===C                     ENDSR
+

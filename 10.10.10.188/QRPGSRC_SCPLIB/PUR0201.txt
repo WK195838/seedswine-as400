@@ -1,0 +1,365 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : PUR0201                                       *
+      * AUTHER       : A1491  EASON                                  *
+      * CREATE DATE  : 97/10/30                                      *
+      * UPDATE DATE  :101/02/14  NANCY (0214A) SCPGMR                *
+      *                       當有退貨,報表顯示  :退貨&退貨  *
+      *                       若無退貨,報表僅顯示:合計         *
+      * SUBSYSTEM    :採購系統                                     *
+      * REMARK       :驗收明細表                                   *
+     A*---------------------------------------------------------------
+     A* 00A 101/03/29 DEREK 增加（產品歸屬）選項                   *
+     A* 00B 101/11/26 DEREK 增加（分店代號）選項                   *
+     A* 00C 需求單號 : 1081472
+     A* 00C  108/12/10 ABBY 產出的報表，對應的產品顯示對應的產品歸屬
+      ****************************************************************
+ 00A-F*INTXPF  IP  E           K        DISK
+ 00A+FSCWK051 IP  E           K        DISK
+     FMANBPF  IF  E           K        DISK
+     FMANCPF  IF  E           K        DISK
+     FMANDPF  IF  E           K        DISK
+     FMANEPF  IF  E           K        DISK
+     FPA#BPF  IF  E           K        DISK
+ 00A+FUTL2PF  IF  E           K        DISK
+     FSCWK13  O   E           K        DISK
+     FPUR020P O   E             39     PRINTER
+      *
+     ITX0
+     I                                              TX07  L3
+     I                                              TX06  L2
+     I                                              TX11  L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 602 DCL01
+     I                                      603 604 DCL02
+     I                                      605 609 DCM02S
+     I                                      610 614 DCM02E
+     I                                      620 6250DCL07S
+     I                                      626 6310DCL07E
+     I                                      640 648 DCM03S
+     I                                      650 658 DCM03E
+     I                                      661 6680DATES
+     I                                      671 6780DATEE
+     I                                      679 679 DOPT
+ 00A+I                                      680 681 DNC09
+ 00B+I                                      682 686 DCL04S
+ 00B+I                                      687 691 DCL04E
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYND     KLIST
+     C                     KFLD           DCL01
+     C                     KFLD           DCL02
+     C           KEYNC     KLIST
+     C                     KFLD           DCL01
+     C                     KFLD           TX11
+     C           KEYNE     KLIST
+     C                     KFLD           DCL01
+     C                     KFLD           DCL02
+     C                     KFLD           TX12
+ 00A+C           KEYL2     KLIST
+ 00A+C                     KFLD           #L201   8
+ 00A+C                     KFLD           #L202  10
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C  N10                EXSR RTN010
+     C*
+     C   39                EXSR RTN900
+      *
+     C                     EXSR RTN100
+      *
+     C*
+     CL1 10                EXSR RTNL1
+     CL2 10                EXSR RTNL2
+     CL3 10                EXSR RTNL3
+     CLR                   EXSR RTNLR
+     C*==============================================================*
+     C*          RTN010....GET HEADING
+     C*==============================================================*
+01===C           RTN010    BEGSR
+| 01-C           DOPT      IFEQ '1'
+|   C                     SETON                     71
+|   C                     SETOF                     72
+|   C                     SETOF                     73
+| 01-C                     ENDIF
+|     *
+| 02-C           DOPT      IFEQ '2'
+|   C                     SETOF                     71
+|   C                     SETON                     72
+|   C                     SETOF                     73
+| 02-C                     ENDIF
+|     *
+| 03-C           DOPT      IFEQ '3'
+|   C                     SETOF                     71
+|   C                     SETOF                     72
+|   C                     SETON                     73
+| 03-C                     ENDIF
+|     *
+|     * GET公司別
+|    C                     MOVELDCL01     W1301
+|    C           DCL01     CHAIN#B0                  40
+|    C   40                MOVEL*BLANK    D#B03
+|    C  N40                MOVEL#B03      D#B03
+|     * GET通路
+|    C                     MOVELDCL02     W1302
+|    C           KEYND     CHAINND0                  40
+|    C   40                MOVE *BLANK    DND04
+|    C  N40                MOVE ND04      DND04
+|     *
+|    C*00A+START**GET產品歸屬
+| 04-C           DNC09     IFNE *BLANK
+|   C                     MOVEL'GUISHU  '#L201     P
+|   C                     MOVELDNC09     #L202     P
+|   C           KEYL2     CHAINL20                  40
+| 05-C           *IN40     IFEQ '0'
+|   C                     MOVELL203      NC09D
+| 05*C                     ELSE
+|   C                     MOVEL*BLANK    NC09D
+| 05-C                     ENDIF
+| 04-C                     ENDIF
+|    C*00A+END
+|    C                     WRITEPH1
+|     *
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C                     SETON                     303132
+|     *
+|    C                     Z-ADD0         Q1
+|    C                     Z-ADD0         Q2
+     C                     Z-ADD0         Q3
+0214AC*供應商進貨合計-----------------------------------------------*
+ +   C                     Z-ADD0         Q0T2I            驗收數量
+ +   C                     Z-ADD0         Q3I              未稅金額
+ +   C                     Z-ADD0         Q4I              含稅金額
+ +   C                     Z-ADD0         Q3
+ +   C*供應商退貨合計-----------------------------------------------*
+ +   C                     Z-ADD0         Q0T2R            驗收數量
+ +   C                     Z-ADD0         Q3R              未稅金額
+ +   C                     Z-ADD0         Q4R              含稅金額
+ +   C*合計
+ +   C                     Z-ADD0         Q0T2             驗收數量
+ +   C                     Z-ADD0         Q3               未稅金額
+ +   C                     Z-ADD0         Q4               含稅金額
+ +   C*進貨總計----------------------------------------------------*
+ +   C                     Z-ADD0         Q0T3I            驗收數量
+ +   C                     Z-ADD0         Q5I              未稅金額
+ +   C                     Z-ADD0         Q6I              含稅金額
+ +   C*退貨總計
+ +   C                     Z-ADD0         Q0T3R            驗收數量
+ +   C                     Z-ADD0         Q5R              未稅金額
+ +   C                     Z-ADD0         Q6R              含稅金額
+ +   C*總計
+ +   C                     Z-ADD0         Q0T3             驗收數量
+ +   C                     Z-ADD0         Q5               未稅金額
+ +---C                     Z-ADD0         Q6               含稅金額
+     C*--------------------------------------------------------------*
+     C                     Z-ADD0         Q4
+     C                     Z-ADD0         Q5
+     C                     Z-ADD0         Q6
+     C                     Z-ADD0         Q7
+     C                     Z-ADD0         Q8
+     C                     Z-ADD0         Q0T1
+     C                     Z-ADD0         Q0T2
+     C                     Z-ADD0         Q0T3
+|    C                     Z-ADD0         Q0T4
+|     *
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|     *
+|    C           TX07      CHAINNB0                  40
+|    C   40                MOVE *BLANK    NB03
+|    C                     MOVELTX07      W1303
+|    C                     MOVELNB03      W1304
+|    C                     Z-ADDTX06      W1305
+|     *
+|    C                     CALL 'P31'
+|    C                     PARM TX06      P31I1   80
+|    C                     PARM '2'       P3112   1
+|    C                     PARM '1'       P31I3   1
+|    C                     PARM '3'       P31I4   1
+|    C                     PARM '1'       P31I5   1
+|    C           LCL07     PARM           P31IO   80
+|     *
+|    C           KEYNC     CHAINNC0                  40
+|    C   40                MOVE *BLANK    NC05
+|    C                     MOVELTX11      W1306
+|    C                     MOVELNC05      W1307
+|00C+C                     MOVELNC09      W1316
+|     *
+|    C           KEYNE     CHAINNE0                  40
+|    C   40                MOVE *BLANK    NE05
+|    C                     MOVELTX12      W1308
+|    C                     MOVELNE05      W1309
+|     *
+|    C                     Z-ADDTX18      W1311
+|     *
+| 02-C           TX03      IFEQ 'B1'
+|   C                     Z-SUBTX15      W1310
+|   C                     Z-SUBTX19      W1312
+|   C                     Z-SUBTX19      W1313
+|   C                     SUB  TX19A     W1313
+| 02*C                     ELSE
+|   C                     Z-ADDTX15      W1310
+|   C                     Z-ADDTX19      W1312
+|   C                     Z-ADDTX19      W1313
+|   C                     ADD  TX19A     W1313
+| 02-C                     ENDIF
+|     *
+     C                     Z-ADDW1310     PTX15
+     C                     Z-ADDW1312     PTX19
+     C                     Z-ADDW1313     PTX19X
+|     *
+|    C                     MOVELTX05      W1314
+|    C                     MOVELTX08      W1315
+|    C                     WRITEW13
+|     *
+|    C                     WRITEPD1
+|    C                     SETOF                     303132
+|     *交貨日
+|    C                     ADD  W1310     Q0T1
+|    C                     ADD  W1312     Q1
+     C                     ADD  W1313     Q2
+0214AC*供應商合計---------------------------------------------------*
+ +   C                     SELEC
+ +   C*<進貨>
+ +   C           PTX15     WHGT *ZERO
+ +   C                     ADD  W1310     Q0T2I            驗收量
+ +   C                     ADD  W1312     Q3I              未稅金額
+ +   C                     ADD  W1313     Q4I              含稅金額
+ +   C*進貨總計
+ +   C                     ADD  W1310     Q0T3I            驗收量
+ +   C                     ADD  W1312     Q5I              未稅金額
+ +   C                     ADD  W1313     Q6I              含稅金額
+ +   C*<退貨>
+ +   C           PTX15     WHLT *ZERO
+ +   C                     ADD  W1310     Q0T2R            驗收量
+ +   C                     ADD  W1312     Q3R              未稅金額
+ +   C                     ADD  W1313     Q4R              含稅金額
+ +   C*退貨總計
+ +   C                     ADD  W1310     Q0T3R            驗收量
+ +   C                     ADD  W1312     Q5R              未稅金額
+ +   C                     ADD  W1313     Q6R              含稅金額
+ +   C                     SETON                     8182
+ +   C                     ENDSL
+ +   C*供應商合計
+ +   C                     ADD  W1310     Q0T2             驗收量
+ +   C                     ADD  W1312     Q3               未稅金額
+ +   C                     ADD  W1313     Q4               含稅金額
+ +   C*總計
+ +   C                     ADD  W1310     Q0T3             驗收量
+ +   C                     ADD  W1312     Q5               未稅金額
+ +   C                     ADD  W1313     Q6               含稅金額
+ +---C*---------------------------------------------------------------*
+     C*產品
+     C                     ADD  W1310     Q0T4
+     C                     ADD  W1312     Q7
+     C                     ADD  W1313     Q8
+     C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+03===C           RTN900    BEGSR
+|    C*
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETON                     303132
+|    C                     SETOF                     39
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTNL1 ...產品改變
+      *==============================================================*
+04===C           RTNL1     BEGSR
+|     *
+|    C                     SETON                     32
+|    C                     WRITEPD5
+|     *
+|    C                     Z-ADD0         Q0T4
+|    C                     Z-ADD0         Q7
+|    C                     Z-ADD0         Q8
+|     *
+04===C                     ENDSR
+      *==============================================================*
+      *          RTNL2 ...到貨運日改變
+      *==============================================================*
+05===C           RTNL2     BEGSR
+|     *
+|    C                     SETON                     3132
+|    C                     WRITEPD2
+|     *
+|    C                     Z-ADD0         Q0T1
+|    C                     Z-ADD0         Q1
+|    C                     Z-ADD0         Q2
+|     *
+05===C                     ENDSR
+      *==============================================================*
+      *          RTNL3 ...供應商改變
+      *==============================================================*
+06===C           RTNL3     BEGSR
+|    C*
+     C                     SETON                     313032
+0214AC           *IN81     IFEQ *ON
+ +   C                     WRITEPE4
+ +   C                     WRITEPD3I                       進貨合計
+ +   C                     WRITEPD3R                       退貨合計
+ +---C                     END
+     C*
+     C                     WRITEPD3
+0214AC                     SETOF                     81
+ +   C*進貨合計
+ +   C                     Z-ADD0         Q0T2I
+ +   C                     Z-ADD0         Q3I
+ +   C                     Z-ADD0         Q4I
+ +   C*退貨合計
+ +   C                     Z-ADD0         Q0T2R
+ +   C                     Z-ADD0         Q3R
+ +   C                     Z-ADD0         Q4R
+ +   C*合計
+ +   C                     Z-ADD0         Q0T2
+ +   C                     Z-ADD0         Q3
+ +   C                     Z-ADD0         Q4
+ +---C*
+     C                     ENDSR
+      *==============================================================*
+      *          RTNLR ....(NO DATA)
+      *==============================================================*
+     C           RTNLR     BEGSR
+     C           *IN10     IFEQ '0'
+     C                     WRITEPH1
+     C                     WRITEPE9
+     C                     END
+     C**
+0214AC           *IN82     IFEQ *ON
+ +   C                     WRITEPE4
+ +   C                     WRITEPD4I                       進貨合計
+ +   C                     WRITEPD4R                       退貨合計
+ +   C                     END
+ +   C                     WRITEPD4
+ +   C*進貨總計
+ +   C                     Z-ADD0         Q0T3I
+ +   C                     Z-ADD0         Q5I
+ +   C                     Z-ADD0         Q6I
+ +   C*退貨總計
+ +   C                     Z-ADD0         Q0T3R
+ +   C                     Z-ADD0         Q5R
+ +   C                     Z-ADD0         Q6R
+ +   C*總計
+ +   C                     Z-ADD0         Q0T3
+ +   C                     Z-ADD0         Q5
+ +   C                     Z-ADD0         Q6
+ +---C*
+     C                     WRITEPE2
+     C*
+07===C                     ENDSR
+

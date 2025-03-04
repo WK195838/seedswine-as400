@@ -1,0 +1,173 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250
+     H*
+     H*    PROGRAM ID   : JLB013
+     H*    PROGRAM NAME : 寄賣傳票批次
+     H*    AUTHOR       : D910121 CHARLES
+     H*    CREATE DATE  : 1993.05.27
+     H*    UPDATE DATE  :
+     H*    SYSTEM       : 進銷存收TO總帳
+     A*===============================================================
+     A* MODI CODE |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      | 98.11.17 | MANUAL MODIFY BY MICHELLE FOR Y2K
+     A*---------------------------------------------------------------
+     F****************************************************************
+     FWFJL14PFIP  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FJLB0133PO   E             39     PRINTER
+     IWFJL14R
+     I                                              JL1402L2
+     I                                              J1402$L2
+     I                                              JL1403L1
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$LPRT
+      *確認年月
+M001MI                                      617 6200D05
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYME     KLIST
+     C                     KFLD           ME01
+     C                     KFLD           ME02
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+  01-C           *IN10     IFEQ '0'
+    C                     EXSR RTN010                     *HEADING
+    C                     SETON                     10
+  01*C                     ELSE
+  02-C           *INL2     IFEQ '1'
+    C                     WRITEPE1
+    C                     EXSR RTN010                     *HEADING
+    C                     SETOF                     39
+  02-C                     END
+  01-C                     END
+     C*
+     C   39                EXSR RTN900
+     C                     EXSR RTN100                     *READE DETAIL
+     C*
+     CL1 10                EXSR RTN200
+     CL2 10                EXSR RTN300
+     CLR                   EXSR RTN999
+      *==============================================================*
+      *          RTN010....CHECK HEADING
+      *==============================================================*
+01===C           RTN010    BEGSR
+|    C*公司別
+|    C                     MOVEL*BLANKS   #A03
+|    C                     MOVEL'COMPANY' #A01
+|    C                     MOVELJL1402    #A01
+|    C           KEY#A     CHAIN#A0                  40
+|    C*辦事處
+| 03-C           J1402$    IFEQ '1'
+|   C                     MOVEL'台北'  DESC
+| 03*C                     ELSE
+| 04-C           J1402$    IFEQ '2'
+|   C                     MOVEL'台中'  DESC
+| 04*C                     ELSE
+| 05-C           J1402$    IFEQ '1'
+|   C                     MOVEL'高雄'  DESC
+| 05*C                     ELSE
+| 05-C                     END
+| 04-C                     END
+| 03-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C*
+01===C                     ENDSR
+      *==============================================================*
+      *          RTN100....READE DETAIL
+      *==============================================================*
+02===C           RTN100    BEGSR
+|    C*客戶
+|    C                     MOVEL*BLANKS   ME04
+|    C                     MOVELJL1403    ME01
+|    C                     MOVEL*BLANKS   ME02
+|    C           KEYME     CHAINME0                  40
+      *
+|    C                     MOVEL*BLANKS   MA03
+|    C           JL1404    CHAINMA0                  40
+      *
+|    C           JL1406    ADD  JL1407    TOT
+|    C                     ADD  JL1408    TOT
+      *
+|    C   39                EXSR RTN900
+|    C                     WRITEPD1
+|    C                     SETOF                     20
+|    C                     SETON                     30
+|    C                     ADD  JL1405    T11405
+|    C                     ADD  JL1406    T11406
+|    C                     ADD  JL1407    T11407
+|    C                     ADD  JL1408    T11408
+|    C                     ADD  TOT       T1TOT
+|    C*
+02===C                     ENDSR
+      *==============================================================*
+      *          RTN200....WRITE PT1   SUBTOTAL
+      *==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT1
+|    C                     SETON                     20
+|    C                     SETOF                     30
+|    C                     ADD  T11405    T21405
+|    C                     ADD  T11406    T21406
+|    C                     ADD  T11407    T21407
+|    C                     ADD  T11408    T21408
+|    C                     ADD  T1TOT     T2TOT
+|    C                     Z-ADD0         T11405
+|    C                     Z-ADD0         T11406
+|    C                     Z-ADD0         T11407
+|    C                     Z-ADD0         T11408
+|    C                     Z-ADD0         T1TOT
+|    C*
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN300....WRITE PT2   SUBTOTAL
+      *==============================================================*
+04===C           RTN300    BEGSR
+|    C*
+|    C   39                EXSR RTN900
+|    C                     WRITEPT2
+|    C                     Z-ADD0         T21405
+|    C                     Z-ADD0         T21406
+|    C                     Z-ADD0         T21407
+|    C                     Z-ADD0         T21408
+|    C                     Z-ADD0         T2TOT
+|    C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+05===C           RTN900    BEGSR
+      *
+|    C                     WRITEPE1
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETOF                     20
+      *
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN999....END
+      *==============================================================*
+06===C           RTN999    BEGSR
+      *
+| 01-C           *IN10     IFEQ '0'
+|   C                     WRITEPH1
+|   C                     WRITEPE9
+| 01-C                     END
+|    C                     WRITEPE2
+      *
+06===C                     ENDSR
+

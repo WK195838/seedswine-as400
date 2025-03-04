@@ -1,0 +1,301 @@
+      ****************************************************************
+      * PROGRAM ID : P37                                             *
+      * SYSTEM ID  : PTPLIB                                          *
+      * FUNTCTION  :已知日期前後幾天的日期                         *
+      *                                                              *
+      * PARAMETER : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3701I    I   *DEC    8 0 起日            *
+      *             02   P3702I    I   *CHAR   1   日期格式        *
+      *             02   P3703I    I   *CHAR   1   曆別            *
+      *             02   P3704I    I   *DEC    4 0 距離天數(+,-)   *
+      *             02   P3711O    O   *DEC    8 0 轉換後日期      *
+      *                                                              *
+      * W-VARABLE : SEQ  FIELD    I/O  TYPE   LEN   DESCRIPTION      *
+      *             ===  =======  ===  =====  ====  ===========      *
+      *             01   P3701     N   *DEC    4 0 西元年          *
+      *             02   P3702     N   *DEC    2 0 月份            *
+      *             03   P3703     N   *DEC    2 0 日期            *
+      *             04   P3704     N   *DEC    5 0 商數            *
+      *             05   P3705     N   *DEC    4 0 餘數            *
+      *             06   P3706     N   *CHAR   1   潤年(Y/N)       *
+      *             07   P3707     N   *CHAR   1   驗証(Y/N)       *
+      *             08   P37DAY,1  N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                            *
+      *             19   P37DAY,12 N   *DEC    2 0 DAYS PER MONTH    *
+      *                                                              *
+      *                                                              *
+      * LEAP YEAR CALCULATION RULE......                             *
+      *                        (Y)                                   *
+      *                         +- P3706=Y                           *
+      *             MVR 400 =0  |            (Y)                     *
+      *  LEAP YEAR -------------+             +- P3706=N             *
+      *                         | MVR 100 =0  |         (Y)          *
+      *                         +-------------+          +- P3706=Y  *
+      *                        (N)            | MVR 4 =0 |           *
+      *                                       +----------+           *
+      *                                      (N)         |           *
+      *                                                  +- P3706=N  *
+      *                                                 (N)          *
+      *                                                              *
+      ****************************************************************
+     E* P37DAY:每月日數
+     E* WFV   :日期格式VALUE
+     E                    P37DAY 12  12  2 0
+     E                    WFV     6   6  1
+     I            DS
+     I                                        1   80WDATE
+     I                                        1   20WD1
+     I                                        3   40WD2
+     I                                        5   60WD3
+     I                                        7   80WD4
+     I            DS
+     I                                        1   80P3701C
+     I                                        1   40P3701Y
+     I                                        5   60P3701M
+     I                                        7   80P3701D
+     I            DS
+     I                                        1   80P3711C
+     I                                        1   40P3711Y
+     I                                        5   60P3711M
+     I                                        7   80P3711D
+      *--------------------------------------------------------------*
+      *                    MAIN PROGRAM                              *
+      *--------------------------------------------------------------*
+     C           *ENTRY    PLIST
+     C                     PARM           P3701I  80
+     C                     PARM           P3702I  1
+     C                     PARM           P3703I  1
+     C                     PARM           P3704I  40
+     C                     PARM           P3711O  90
+      *
+     C****                 CALL 'R@S005'
+     C****                 PARM 'GIANT/PT'S0051I  8
+      *
+     C                     MOVE P3702I    @FMT    1
+     C                     MOVE P3703I    @CALD   1
+     C                     EXSR @@CHK                      *CHK中西曆
+      *
+  01-C           *IN99     IFEQ '1'
+    C                     Z-ADD0         P37LAT  80
+    C                     GOTO QUIT
+  01-C                     END
+      *
+     C                     Z-ADDP3701I    @DATE   80
+     C                     EXSR @@YMD                      *GET *YMD
+     C                     Z-ADDWYYYY     P3701Y
+     C                     Z-ADDWMM       P3701M
+     C                     Z-ADDWDD       P3701D
+      *
+     C                     EXSR P37COM
+     C                     EXSR P37CAL
+     C                     EXSR P37CMD
+     C                     EXSR P37CVD
+      *
+     C           QUIT      TAG
+     C                     Z-ADDP37LAT    P3711O
+     C                     SETON                     LR
+     C/COPY QRPGSRC,@CHECK
+      *--------------------------------------------------------------*
+      *          P37COM....計算該日為當年的第幾天＆求出總日數      *
+      *                    INPUT    P3701C ......                    *
+      *                                    P3701Y                    *
+      *                                    P3701M                    *
+      *                                    P3701D                    *
+      *                    OUTPUT   P37SDA (總日數)                *
+      *--------------------------------------------------------------*
+01===C           P37COM    BEGSR
+|    C*
+|    C                     Z-ADD0         P37SDA  90
+|    C                     Z-ADD1         PMM     20
+| 02-C           PMM       DOWLTP3701M
+|   C                     ADD  P37DAY,PMMP37SDA
+|   C                     ADD  1         PMM
+| 02-C                     END
+|    C                     ADD  P3701D    P37SDA
+|    C                     ADD  P3704I    P37SDA
+|    C*
+|    C                     Z-ADDP3701Y    P3701   40
+|    C                     EXSR P37LEP
+| 03-C           P3706     IFEQ 'Y'
+|   C           P3701M    ANDGT2
+|   C                     ADD  1         P37SDA
+| 03-C                     END
+01===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P37LEP....VERIFY LEAP YEAR                          *
+      *                    INPUT      P3701 西元年                 *
+      *                    OUTPUT     P3706  (Y=潤年:N=平年)     *
+      *--------------------------------------------------------------*
+02===C           P37LEP    BEGSR
+|    C           P3701     DIV  400       P3704   50
+|    C                     MVR            P3705   40
+| 01-C           P3705     IFEQ 0
+|   C                     MOVE 'Y'       P3706   1
+| 01*C                     ELSE
+|   C*
+|   C           P3701     DIV  100       P3704
+|   C                     MVR            P3705
+| 02-C           P3705     IFEQ 0
+|   C                     MOVE 'N'       P3706
+| 02*C                     ELSE
+|   C*
+|   C           P3701     DIV  4         P3704
+|   C                     MVR            P3705
+| 03-C           P3705     IFEQ 0
+|   C                     MOVE 'Y'       P3706
+| 03*C                     ELSE
+|   C                     MOVE 'N'       P3706
+| 03-C                     END
+|   C*
+| 02-C                     END
+|   C*
+| 01-C                     END
+02===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P37CAL ...COMPARE DAYS
+      *                    INPUT      P37SDA                         *
+      *                    OUTPUT     P3711Y
+      *--------------------------------------------------------------*
+03===C           P37CAL    BEGSR
+|    C*<< GREAT 0 >>
+|    C                     Z-ADDP3701Y    P3711Y
+| 01-C           P37SDA    IFGT 0
+|   C*
+| 02-C           P37SDA    DOWGT0
+|   C                     Z-ADDP3711Y    P3701
+|   C                     EXSR P37LEP
+| 03-C           P3706     IFEQ 'Y'
+|   C                     SUB  366       P37SDA
+| 03*C                     ELSE
+|   C                     SUB  365       P37SDA
+| 03-C                     END
+|   C*
+|   C                     ADD  1         P3711Y
+| 02-C                     END
+|   C*
+| 01-C                     END
+|    C*<< LESS 0  >>
+| 04-C           P37SDA    IFLT 0
+|   C*
+| 05-C           P37SDA    DOWLT0
+|   C                     SUB  1         P3711Y
+|   C                     Z-ADDP3711Y    P3701
+|   C                     EXSR P37LEP
+| 06-C           P3706     IFEQ 'Y'
+|   C                     ADD  366       P37SDA
+| 06*C                     ELSE
+|   C                     ADD  365       P37SDA
+| 06-C                     END
+|   C*
+| 05-C                     END
+| 04-C                     END
+03===C                     ENDSR
+      *--------------------------------------------------------------*
+      *          P37CMD ...COMPARE MONTH & DAY
+      *                    INPUT      P37SDA                         *
+      *                    OUTPUT     P3711M
+      *                    OUTPUT     P3711D
+      *--------------------------------------------------------------*
+04===C           P37CMD    BEGSR
+|    C*
+|    C                     Z-ADD1         PMM     20
+|    C*
+| 01-C           P37SDA    IFNE 0
+|   C*
+| 02-C           P37SDA    DOWGT0
+|   C                     Z-ADDP3711Y    P3701
+|   C                     EXSR P37LEP
+| 03-C           PMM       IFEQ 2
+|   C           P3706     ANDEQ'Y'
+|   C                     SUB  29        P37SDA
+| 03*C                     ELSE
+|   C                     SUB  P37DAY,PMMP37SDA
+| 03-C                     END
+|   C                     ADD  1         PMM
+| 02-C                     END
+|   C*
+|   C                     SUB  1         PMM
+|   C                     Z-ADDPMM       P3711M
+| 04-C           PMM       IFEQ 2
+|   C           P3706     ANDEQ'Y'
+|   C           P37SDA    ADD  29        P3711D
+| 04*C                     ELSE
+|   C           P37SDA    ADD  P37DAY,PMMP3711D
+| 04-C                     END
+|   C*
+| 01*C                     ELSE
+|   C                     SUB  1         P3711Y
+|   C                     Z-ADD12        P3711M
+|   C                     Z-ADD31        P3711D
+| 01-C                     END
+|    C*
+04===C                     ENDSR
+      *--------------------------------------------------------------*
+      *                 P37CVD....轉換日期
+      *--------------------------------------------------------------*
+05===C           P37CVD    BEGSR
+|    C*
+|    C                     Z-ADD0         WDATE
+| 01-C           P3703I    IFEQ '1'                        *西曆
+|   C*
+| 02-C           P3702I    IFEQ '1'                        *00YYMMDD
+|   C                     Z-ADD0         WD1
+|   C                     Z-ADDP3711Y    WD2
+|   C                     Z-ADDP3711M    WD3
+|   C                     Z-ADDP3711D    WD4
+| 02-C                     END
+|   C*
+| 03-C           P3702I    IFEQ '2'                        *YYYYMMDD
+|   C                     MOVELP3711Y    WD1
+|   C                     MOVE P3711Y    WD2
+|   C                     Z-ADDP3711M    WD3
+|   C                     Z-ADDP3711D    WD4
+| 03-C                     END
+|   C*
+| 04-C           P3702I    IFEQ '3'                        *00MMDDYY
+|   C                     Z-ADD0         WD1
+|   C                     Z-ADDP3711M    WD2
+|   C                     Z-ADDP3711D    WD3
+|   C                     Z-ADDP3711Y    WD4
+| 04-C                     END
+|   C*
+| 05-C           P3702I    IFEQ '4'                        *MMDDYYYY
+|   C                     Z-ADDP3711M    WD1
+|   C                     Z-ADDP3711D    WD2
+|   C                     MOVELP3711Y    WD3
+|   C                     MOVE P3711Y    WD4
+| 05-C                     END
+|   C*
+| 06-C           P3702I    IFEQ '5'                        *00DDMMYY
+|   C                     Z-ADD0         WD1
+|   C                     Z-ADDP3711D    WD2
+|   C                     Z-ADDP3711M    WD3
+|   C                     Z-ADDP3711Y    WD4
+| 06-C                     END
+|   C*
+| 07-C           P3702I    IFEQ '6'                        *DDMMYYYY
+|   C                     Z-ADDP3711D    WD1
+|   C                     Z-ADDP3711M    WD2
+|   C                     MOVELP3711Y    WD3
+|   C                     MOVE P3711Y    WD4
+| 07-C                     END
+|   C*
+| 01-C                     END
+|    C*
+| 08-C           P3703I    IFEQ '2'                        *中曆
+|   C           P3702I    ANDEQ'2'                        *YYYYMMDD
+|   C                     SUB  1911      P3711Y
+|   C                     MOVELP3711Y    WD1
+|   C                     MOVE P3711Y    WD2
+|   C                     Z-ADDP3711M    WD3
+|   C                     Z-ADDP3711D    WD4
+| 08-C                     END
+|    C*
+|    C                     Z-ADDWDATE     P37LAT
+05===C                     ENDSR
+** <<每月日數>>
+312831303130313130313031
+** <<日期格式>>VALUE
+123456
+

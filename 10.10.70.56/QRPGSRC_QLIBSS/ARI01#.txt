@@ -1,0 +1,435 @@
+     F****************************************************************
+     F*    PROGRAM NAME : ARI01#                                     *
+     F*    AUTHOR       : A1055 SUNNY CHEN                           *
+     F*    CREATE DATE  : 78/10/12                                   *
+     F*    UPDATE DATE  :                                            *
+     F*    SYSTEM       :財務系統                                  *
+     F*    SUBSYSTEM    :應收帳款系統                              *
+     F*    PROCEDURE    :                                            *
+     F*    PURPOSE      :客戶銷貨明細查詢                          *
+     F****************************************************************
+     F*  PROCESS RULE .............................................. *
+     F*  WBOTOM = SUBFILE BOTTOM (Y/N)                               *
+     F*                                                              *
+     F*  ROLLDOWN ------------------------------ SEND MESSAGE        *
+     F*                                                              *
+     F*                                    (Y)                       *
+     F*                                     +---- SEND MESSAGE       *
+     F*                   WBOTOM='Y'        |                        *
+     F*  ROLLUP    -------------------------+                        *
+     F*                                     |                        *
+     F*                                     +---- ADD SUBFILE DATA   *
+     F*                                    (N)                       *
+     F*                                                              *
+     F****************************************************************
+     FRXLF05  IF  E           K        DISK
+     FRCLF05  IF  E           K        DISK
+     FCUPF    IF  E           K        DISK
+     FPNPF    IF  E           K        DISK
+     FCMPF    IF  E           K        DISK
+     FARI01D# CF  E                    WORKSTN
+     F                                        RRN   KSFILE DSPC2S
+     F                                        RRN   KSFILE DSPC3S
+     I           UDS
+     I                                      101 110 USER
+     I                                      111 1160DDATE
+     C*==============================================================*
+     C*  KEY LIST FOR FILE RXLF05/RCLF05                             *
+     C*==============================================================*
+     C           KEYRX5    KLIST
+     C                     KFLD           DRC01
+     C                     KFLD           DRC07
+     C                     KFLD           DRC06A
+     C                     KFLD           DRC04  10
+     C                     KFLD           DRC03   2
+     C                     KFLD           DRC05   20
+     C           KEYRC5    KLIST
+     C                     KFLD           DRC01
+     C                     KFLD           DRC07
+     C                     KFLD           DRC06A
+     C                     KFLD           DRC04
+     C                     KFLD           DRC03
+     C                     KFLD           DRC05
+     C*==============================================================*
+     C*                    MAIN ROURINE                              *
+     C*==============================================================*
+     C                     EXSR RTN010                     *INITIAL
+     C           *IN03     DOWEQ'0'
+     C*
+     C           SCID      CASEQ'SC01'    RTN100
+     C           SCID      CASEQ'SC02'    RTN200
+     C                     END
+     C*
+     C                     END
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+     CSR         RTN010    BEGSR
+     C                     MOVE 'SC01'    SCID    4
+     C                     MOVE *BLANKS   DRC01
+     C                     MOVE *BLANKS   DRC07
+     C                     Z-ADD0         DRC06A
+     C                     Z-ADD0         DRC06B
+     C                     MOVE *BLANKS   DCM04
+     CSR                   ENDSR
+     C*==============================================================*
+     C*          RTN100....'SC01' SCREEN MAIN ROUTINE
+     C*==============================================================*
+     CSR         RTN100    BEGSR
+     C                     EXFMTDSPC1
+     C*
+     C*: CLEAR ALL ERROR USED INDICATOR :
+     C*
+     C                     MOVEA*ALL'0'   *IN,60
+     C*
+     C           *IN03     IFEQ '0'
+     C*
+     C                     EXSR RTN110                     *SCR CHK
+     C*: SCREEN CHECK CORRECT :
+     C  N99                MOVE 'SC02'    SCID
+     C*
+     C                     END
+     C*
+     CSR                   ENDSR
+     C*==============================================================*
+     C*          RTN110....SCREEN CHECK
+     C*==============================================================*
+     CSR         RTN110    BEGSR
+     C           DRC01     IFEQ *BLANK                     *CK RC01
+     C                     SETON                     617199
+     C                     ELSE
+     C           DRC01     CHAINCMPF                 41
+     C  N41      CM04      COMP *BLANK                   41
+     C   41                SETON                     617299
+     C                     END
+     C   99                GOTO END110
+     C*
+     C           DRC07     IFEQ *BLANKS                    *CK RC07
+     C                     SETON                     627199
+     C                     END
+     C   99                GOTO END110
+     C*
+     C           DRC06A    IFEQ 0                          *CK STDATE
+     C                     Z-ADD000101    DRC06A
+     C                     ELSE
+     C                     Z-ADDDRC06A    I1      60
+     C                     MOVE *BLANK    R1      1
+     C                     CALL 'P04'
+     C                     PARM           I1
+     C                     PARM           R1
+     C           R1        IFEQ 'N'
+     C                     SETON                     637399
+     C                     END
+     C                     END
+     C*
+     C   99                GOTO END110
+     C*
+     C           DRC06B    IFEQ 0                          *CK ENDATE
+     C                     Z-ADD991231    DRC06B
+     C                     ELSE
+     C                     Z-ADDDRC06B    I1
+     C                     MOVE *BLANK    R1
+     C                     CALL 'P04'
+     C                     PARM           I1
+     C                     PARM           R1
+     C           R1        IFEQ 'N'
+     C                     SETON                     647399
+     C                     END
+     C                     END
+     C   99                GOTO END110
+     C*
+     C           DRC06A    IFGT DRC06B                     *STD > END
+     C                     SETON                     636474
+     C                     SETON                     99
+     C                     END
+     C   99                GOTO END110
+     C*
+     C           DCM04     IFNE '1'                        *CK OPTION
+     C           DCM04     ANDNE'2'
+     C                     SETON                     657599
+     C                     END
+     C   99                GOTO END110
+     C*
+     C*CK DATA EXIST OR NOT
+     C*
+     C                     MOVE '11'      DRC03
+     C*
+     C           DCM04     IFEQ '1'                        *CHK RXLF05
+     C           KEYRX5    SETLLRXLF05
+     C                     SETOF                         35
+     C           *IN35     DOWEQ'0'                        **
+     C                     READ RXLF05                   42
+     C           *IN42     IFEQ '0'                        ***
+     C           RX01      IFNE DRC01                      ****
+     C           RX07      ORNE DRC07
+     C           RX06      ORLT DRC06A
+     C           RX06      ORGT DRC06B
+     C                     SETON                     4235
+     C                     ELSE
+     C           RX03      IFEQ '11'
+     C           RX97      ANDEQ' '
+     C                     SETON                         35
+     C                     END
+     C                     END                             ****
+     C                     ELSE
+     C                     SETON                     35
+     C                     END                             ***
+     C                     END                             **
+     C                     END                             *
+     C*
+     C           DCM04     IFEQ '2'                        *CHK RCLF05
+     C           KEYRC5    SETLLRCLF05
+     C                     SETOF                         35
+     C           *IN35     DOWEQ'0'                        **
+     C                     READ RCLF05                   42
+     C           *IN42     IFEQ '0'                        ***
+     C           RC01      IFNE DRC01                      ****
+     C           RC07      ORNE DRC07
+     C           RC06      ORLT DRC06A
+     C           RC06      ORGT DRC06B
+     C                     SETON                     4235
+     C                     ELSE
+     C           RC03      IFEQ '11'
+     C           RC97      ANDEQ' '
+     C                     SETON                         35
+     C                     END
+     C                     END                             ****
+     C                     ELSE
+     C                     SETON                     35
+     C                     END                             ***
+     C                     END                             **
+     C                     END                             *
+     C*
+     C           *IN42     IFEQ '1'
+     C                     SETON                     616263
+     C                     SETON                     646599
+     C                     SETON                     76
+     C                     END
+     CSR         END110    ENDSR
+     C*==============================================================*
+     C*          RTN200....'SC02' SCREEN MAIN ROUTINE
+     C*==============================================================*
+     CSR         RTN200    BEGSR
+     C*GET CM03 & CU04
+     C                     MOVE *BLANKS   CM03
+     C                     MOVE *BLANKS   CU04
+     C           DRC01     CHAINCMPF                 41
+     C           DRC07     CHAINCUPF                 43
+     C*
+     C           DCM04     IFEQ '1'
+     C                     EXSR RTN210
+     C                     END
+     C*
+     C           DCM04     IFEQ '2'
+     C                     EXSR RTN220
+     C                     END
+     C*
+     C                     MOVE 'SC01'    SCID
+     C                     SETOF                     12
+     CSR                   ENDSR
+     C*=============================================================*
+     C*          RTN210....INQUIRY RXLF05
+     C*=============================================================*
+     CSR         RTN210    BEGSR
+     C           *IN12     DOWEQ'0'
+     C           *IN03     ANDEQ'0'
+     C*
+     C           *IN25     IFEQ '0'
+     C           *IN26     ANDEQ'0'
+     C                     EXSR RTN211                     *INITIAL
+     C*: CLEAR SUBFILE DATA :
+     C                     SETON                     52    *SFLCLR
+     C                     WRITEDSPC2
+     C                     SETOF                     52
+     C           KEYRX5    SETLLRXLF05
+     C                     EXSR RTN810                     *ADD SFLDTA
+     C                     END
+     C*
+     C           *IN25     IFEQ '1'
+     C                     EXSR RTN212                     *ROLLUP
+     C                     END
+     C*
+     C           *IN26     IFEQ '1'                        *ROLLDOWN
+     C                     SETON                     98    *1ST PAG
+     C                     Z-ADD1         DRRN
+     C                     END
+     C*
+     C                     EXSR RTN213                     *EXFMT
+     C*
+     C                     END
+     CSR                   ENDSR
+     C*=============================================================*
+     C*          RTN220....INQUIRY RCLF05
+     C*=============================================================*
+     CSR         RTN220    BEGSR
+     C           *IN12     DOWEQ'0'
+     C           *IN03     ANDEQ'0'
+     C*
+     C           *IN25     IFEQ '0'
+     C           *IN26     ANDEQ'0'
+     C                     EXSR RTN211                     *INITIAL
+     C*: CLEAR SUBFILE DATA :
+     C                     SETON                     52    *SFLCLR
+     C                     WRITEDSPC3
+     C                     SETOF                     52
+     C           KEYRC5    SETLLRCLF05
+     C                     EXSR RTN810                     *ADD SFLDTA
+     C                     END
+     C*
+     C           *IN25     IFEQ '1'
+     C                     EXSR RTN212                     *ROLLUP
+     C                     END
+     C*
+     C           *IN26     IFEQ '1'                        *ROLLDOWN
+     C                     SETON                     98    *1ST PAG
+     C                     Z-ADD1         DRRN
+     C                     END
+     C*
+     C                     EXSR RTN213                     *EXFMT
+     C*
+     C                     END
+     CSR                   ENDSR
+     C*=============================================================*
+     C*          RTN211....INITIAL
+     C*=============================================================*
+     CSR         RTN211    BEGSR
+     C*: INITIAL VALUE
+     C                     Z-ADD0         DRRN
+     C                     Z-ADD0         RRN
+     C                     Z-ADD0         DSPRCD  40       *DSP RCD
+     C                     Z-ADD12        WPRCD   20       *PAG RCD
+     C                     MOVE 'N'       WBOTOM  1        *BOTTOM
+     C                     SETOF                     4053  *EOF
+     CSR                   ENDSR
+     C*=============================================================*
+     C*          RTN212....ROLLUP MAIN ROUTINE
+     C*=============================================================*
+     CSR         RTN212    BEGSR
+     C           WBOTOM    IFEQ 'Y'
+     C                     SETON                         97*LST PAG
+     C                     Z-ADDRRN       DRRN
+     C                     ELSE
+     C                     EXSR RTN810                     *ADD SFL DTA
+     C                     END
+     CSR                   ENDSR
+     C*=============================================================*
+     C*          RTN213....EXFMT DSPF
+     C*=============================================================*
+     C           RTN213    BEGSR
+     C*: CHECK SFL DATA EXIST :
+     C           RRN       IFGT 0
+     C                     SETON                     50    *SFLDSP
+     C                     ELSE
+     C                     SETON                     96    *NO DTA
+     C                     END
+     C*: SHOW SCREEN :
+     C                     SETON                     51    *SFLCTL
+     C                     WRITEDSPC11
+     C           DCM04     IFEQ '1'
+     C                     EXFMTDSPC2
+     C                     END
+     C*
+     C           DCM04     IFEQ '2'
+     C                     EXFMTDSPC3
+     C                     END
+     C*
+     C                     SETOF                     5051
+     C                     MOVEA*ALL'0'   *IN,60
+     C                     ENDSR
+     C*=============================================================*
+     C*          RTN810....ADD SUBFILE DATA
+     C*=============================================================*
+     C           RTN810    BEGSR
+     C           DCM04     IFEQ '1'                         *RXLF05
+     C                     ADD  WPRCD     DSPRCD
+     C           RRN       DOWLTDSPRCD
+     C                     READ RXL5                     40*NF/EOF
+     C           *IN40     IFEQ '0'
+     C                     SETOF                     33
+     C           RX01      IFNE DRC01                      *
+     C           RX07      ORNE DRC07
+     C           RX06      ORLT DRC06A
+     C           RX06      ORGT DRC06B
+     C                     SETON                     40
+     C                     ELSE
+     C           RX03      IFNE '11'                       **
+     C           RX97      ORNE ' '
+     C                     SETON                     33    *PASS->RD NX
+     C                     END                             **
+     C                     END                             *
+     C           *IN33     IFEQ '0'                        *
+     C           *IN40     IFEQ '0'                        **
+     C           *IN53     ANDEQ'0'
+     C                     ADD  1         RRN
+     C*GET DPN02X
+     C           RX12      CHAINPNPF                 45
+     C           *IN45     IFEQ '1'                        ***
+     C                     MOVE *BLANK    DPN02X
+     C                     ELSE
+     C                     MOVELPN02      DPN02X
+     C                     END                             ***
+     C*
+     C                     WRITEDSPC2S                   53*SFLEND
+     C*
+     C                     ELSE
+     C                     Z-ADDRRN       DSPRCD
+     C                     MOVE 'Y'       WBOTOM
+     C                     SETON                         53
+     C                     END                             **
+     C                     END                             *
+     C*
+     C                     END                             *IN40='1'
+     C*
+     C                     END                             *DOW
+     C*
+     C                     Z-ADDRRN       DRRN
+     C                     END                             *DCM04='1'
+     C*
+     C           DCM04     IFEQ '2'                         *RCLF05
+     C                     ADD  WPRCD     DSPRCD
+     C           RRN       DOWLTDSPRCD
+     C                     READ RCL5                     40*NF/EOF
+     C           *IN40     IFEQ '0'
+     C                     SETOF                     33
+     C           RC01      IFNE DRC01                      *
+     C           RC07      ORNE DRC07
+     C           RC06      ORLT DRC06A
+     C           RC06      ORGT DRC06B
+     C                     SETON                     40
+     C                     ELSE
+     C           RC03      IFNE '11'                       **
+     C           RC97      ORNE ' '
+     C                     SETON                     33    *PASS->RD NX
+     C                     END                             **
+     C                     END                             *
+     C           *IN33     IFEQ '0'                        *
+     C           *IN40     IFEQ '0'                        **
+     C           *IN53     ANDEQ'0'
+     C                     ADD  1         RRN
+     C*GET DPN02C
+     C           RC12      CHAINPNPF                 45
+     C           *IN45     IFEQ '1'                        ***
+     C                     MOVE *BLANK    DPN02C
+     C                     ELSE
+     C                     MOVELPN02      DPN02C
+     C                     END                             ***
+     C*
+     C                     WRITEDSPC3S                   53*SFLEND
+     C*
+     C                     ELSE
+     C                     Z-ADDRRN       DSPRCD
+     C                     MOVE 'Y'       WBOTOM
+     C                     SETON                         53
+     C                     END                             **
+     C                     END                             *
+     C*
+     C                     END                             *IN40='1'
+     C*
+     C                     END                             *DOW
+     C*
+     C                     Z-ADDRRN       DRRN
+     C                     END                             *DCM04='1'
+     C*
+     CSR                   ENDSR
+

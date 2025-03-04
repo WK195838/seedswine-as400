@@ -1,0 +1,136 @@
+     A****************************************************************
+     A*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     A*--------------------------------------------------------------*
+     A*    PROGRAM ID   : DBR001                                     *
+     A*    AUTHOR       : A1650  DEREK                               *
+     A*    CREATE DATRE : 104/01/09                                  *
+     A*    SYSTEM       :西祺進銷存                                *
+     A*    SUBSYSTEM    :銷售系統                                  *
+     A*    DESCRIPTION  :家樂福商品銷貨金額統計表 (FOR DBQT)       *
+     A*--------------------------------------------------------------*
+     A* MODI CODE |   DATE   | DESCRIPTION                           *
+     A****************************************************************
+     FSEHAPF  IP  E           K        DISK
+     FMANCLF03IF  E           K        DISK
+     FPOCALF04IF  E           K        DISK
+     FPOCBLF01IF  E           K        DISK
+     FDBAAPF  IF  E           K        DISK
+     FDBABPF  O   E           K        DISK
+     FDBACPF  O   E           K        DISK
+     E*---------------------------------------------------------------*
+     IHA0
+     I                                              HA05  L1
+     C*===============================================================*
+     C*                    DEFINE                                    *
+     C*===============================================================*
+     C           *LIKE     DEFN AB04      WAB04            含稅銷售金額
+     C           *LIKE     DEFN AB05      WAB05            銷售數量
+     C*===============================================================*
+     C*                    MAIN                                       *
+     C*===============================================================*
+     C  N10                EXSR R0100                      .INIT
+     C   L1                EXSR R7100
+     C                     EXSR R2000                      .PROCESS
+     CL1 10                EXSR R8100
+     C*===============================================================*
+     C*          R0100 ... INIT                                       *
+     C*===============================================================*
+     C           R0100     BEGSR
+     C*
+     C                     SETON                     10
+     C*
+     C                     ENDSR
+     C*===============================================================*
+     C*          R7100 ... L1 -- INIT                                 *
+     C*===============================================================*
+     C           R7100     BEGSR
+     C*
+     C                     Z-ADD0         WAB04            含稅銷售金額
+     C                     Z-ADD0         WAB05            銷售數量
+     C                     Z-ADD0         WAB06  309       含稅銷貨成本
+     C*取得產品名稱
+     C                     MOVEL*BLANK    NC04             產品名稱
+     C           HA05      CHAINNC0                  40
+     C*
+     C                     MOVELHA05      AB01      P      產品代號
+     C                     MOVELNC04      AB02      P      產品名稱
+     C*讀取報價檔取得標準未稅成本(單價)
+     C                     Z-ADD0         AB03             標準未稅成本
+     C           HA05      SETLLCB0
+     C           HA05      READECB0                      46
+     C           *IN46     DOWEQ'0'
+     C           CB01      CHAINCA0                  40
+     C           *IN40     IFEQ '0'
+     C           HA03      ANDGECA07                       生效起日
+     C           HA03      ANDLECA08                       生效訖日
+     C                     Z-ADDCB03      AB03             標準未稅成本
+     C                     ENDIF
+     C           HA05      READECB0                      46
+     C                     ENDDO
+     C*
+     C                     ENDSR
+     C*===============================================================*
+     C*          R2000 ... PROCESS                                    *
+     C*===============================================================*
+     C           R2000     BEGSR
+     C*
+     C                     MOVEL*BLANK    PROMO   1        促銷活動
+     C*讀取條件檔判斷活動檔期
+     C           HA05      SETLLAA0
+     C           HA05      READEAA0                      46
+     C           *IN46     DOWEQ'0'
+     C           HA03      IFGE AA05                       活動日期起
+     C           HA03      ANDLEAA06                       活動日期迄
+     C                     MOVEL'Y'       PROMO     P      促銷活動
+     C                     MOVELHA05      AC01      P      產品代號
+     C                     Z-ADDAA08      AC02             活動序號
+     C                     Z-ADDAA03      AC03             活動未稅成本
+     C                     Z-ADDHA06      AC04             活動銷售數量
+     C           AC03      MULT AC04      WK01   309       銷貨成本
+     C                     ENDIF
+     C           HA05      READEAA0                      46
+     C                     ENDDO
+     C*有促銷活動寫入DBACPF
+     C           PROMO     IFEQ 'Y'
+     C                     WRITEAC0
+     C                     END
+     C*
+     C                     ADD  HA08      WAB04            含稅銷售金額
+     C*無活動檔期之數量寫入DBABPF
+     C           PROMO     IFEQ *BLANK
+     C                     ADD  HA06      WAB05            銷售數量
+     C           AB03      MULT HA06      WK01   309       銷貨成本
+     C                     END
+     C*
+     C*加總銷貨成本=
+     C*活動未稅成本*活動銷售數量+標準未稅成本*非活動銷售數量
+     C*
+     C                     ADD  WK01      WAB06            銷貨成本
+     C*
+     C                     ENDSR
+     C*===============================================================*
+     C*          R8100 ... L1 -- TOTAL                                *
+     C*===============================================================*
+     C           R8100     BEGSR
+     C*
+     C                     Z-ADDWAB04     AB04             含稅銷售金額
+     C                     Z-ADDWAB05     AB05             銷售數量
+     C*
+     C*含稅銷貨成本=加總銷貨成本*1.05
+     C*
+     C           WAB06     MULT 1.05      AB06      H      含稅銷貨成本
+     C*
+     C*活動進價%=((含稅銷售金額-含稅銷貨成本)/含稅銷售金額)*100
+     C*
+     C           AB04      SUB  AB06      WAB07  309       活動進價%
+     C           AB04      IFNE 0
+     C                     DIV  AB04      WAB07
+     C                     ELSE
+     C                     Z-ADD0         WAB07
+     C                     ENDIF
+     C           WAB07     MULT 100       AB07      H      活動進價%
+     C*
+     C                     WRITEAB0
+     C*
+     C                     ENDSR
+

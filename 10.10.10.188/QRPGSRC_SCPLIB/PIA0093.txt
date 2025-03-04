@@ -1,0 +1,131 @@
+     H****************************************************************
+     H*   泛太資訊科技開發股份有限公司－版權所有    TEL:27313250   *
+     H*                                                              *
+     H*    PROGRAM-ID   : PIA0093                                    *
+     H*    PROGRAM NAME :計算12/25庫存量-通路銷售數量          *
+     H*    AUTHOR       : RACHEL                                     *
+     H*    CREATE DATE  : 2022/09/28                                 *
+     H*    UPDATE DATE  :                                            *
+     H*    SYSTEM       :庫存系統作業                              *
+     H*    SUBSYSTEM    :盤點系統　　                              *
+     H*    REMARK       :計算盤點日與12/25之間的銷售數量         *
+     H*                                                              *
+     H****************************************************************
+     FSEHAPF  IF  E           K        DISK
+     FPIA9WF  UF  E           K        DISK
+     FPIA9LF01IF  E           K        DISK
+     F            PA9                               KRENAMEPA9L
+     E*---------------------------------------------------------------
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      201 2080$A8YMD
+     I                                      500 500 $DATA
+     I* PROGRAM USE DATA DEFINE ++++++++++++++++++++++++++++++++++++++
+     I                                      501 502 DPI01
+     I                                      503 504 DPI02
+     I                                      505 5080DPI03
+     I                                      509 5140DPI04S
+     I                                      509 5100DPI4SM
+     I                                      511 5120DPI4SD
+     I                                      515 5200DPI04E
+     I                                      515 5160DPI4EM
+     I                                      517 5180DPI4ED
+     I                                      521 5260DPIYM
+     I                                      527 5340DZA03S
+     I                                      535 5420DZA03E
+     I           IDS
+     I                                        1   80WZA03
+     I                                        1   60WZA3YM
+     I                                        1   40WZA03Y
+     I                                        5   60WZA03M
+     I                                        7   80WZA03D
+     C*==============================================================*
+     C*                    KEY LIST
+     C*==============================================================*
+     C           KEYND     KLIST
+     C                     KFLD           HA01             公司別
+     C                     KFLD           HA05             產品代號
+     C           KEYNE     KLIST
+     C                     KFLD           HA01             公司別
+     C                     KFLD           HA02             通路代號
+     C                     KFLD           HA04             分店代號
+     C           KEYA9     KLIST
+     C                     KFLD           HA01             公司別
+     C                     KFLD           HA02             通路代號
+     C                     KFLD           HA04             分店代號
+     C           KEYA91    KLIST
+     C                     KFLD           HA01             公司別
+     C                     KFLD           HA02             通路代號
+     C                     KFLD           HA04             分店代號
+     C                     KFLD           HA05             產品代號
+     C           KEYA9W    KLIST
+     C                     KFLD           P901             公司別
+     C                     KFLD           P902             通路代號
+     C                     KFLD           P903             分店代號
+     C                     KFLD           P905             盤點日期
+     C                     KFLD           HA05             產品代號
+     C*==============================================================*
+     C*                    MAIN ROUTINE
+     C*==============================================================*
+     C                     SETOF                     4041
+     C                     Z-ADDDPIYM     WZA3YM
+     C                     Z-ADD25        WZA03D           以25日為基準日
+     C                     READ HA0                      40
+  01-C           *IN40     DOWEQ'0'
+     C*
+     C                     MOVEL*BLANK    ACT
+     C           KEYA9     SETLLPA9L
+     C           KEYA9     CHAINPA9L                 41
+  02-C           *IN41     IFEQ '0'
+     C*
+     C*盤點日在25日，不異動銷售數量
+  03-C           P905      IFEQ WZA03
+    C                     GOTO NEXT
+  03-C                     END
+     C*
+     C*盤點日在25日前，以盤點日+1為銷售起日、25日為迄日
+  04-C           P905      IFLT WZA03
+    C                     Z-ADDP905      KZA03S  80
+    C                     ADD  1         KZA03S
+    C                     Z-ADDWZA03     KZA03E  80
+    C                     MOVEL'S'       ACT     1        減項
+  04-C                     END
+     C*
+     C*盤點日在25日後，以26日為銷售起日、盤點日為迄日
+  05-C           P905      IFGT WZA03
+    C                     Z-ADDWZA03     KZA03S
+    C                     ADD  1         KZA03S
+    C                     Z-ADDP905      KZA03E
+    C                     MOVEL'A'       ACT              加項
+  05-C                     END
+     C*
+  06-C           HA03      IFGE KZA03S
+    C           HA03      ANDLEKZA03E
+    C*計算銷售數量
+    C           KEYA9W    CHAINPA9                  42
+  07-C           *IN42     IFEQ '0'
+    C           ACT       IFEQ 'A'
+    C                     ADD  HA06      P912             銷售數量
+    C                     END
+    C           ACT       IFEQ 'S'
+    C                     SUB  HA06      P912             銷售數量
+    C                     END
+    C                     MOVEL'PIA0093' P9WW      P
+    C                     Z-ADD$A8YMD    P9XX
+    C                     TIME           P9YY
+    C                     UPDATPA9
+  07-C                     END
+    C*
+  06-C                     END
+  02-C                     END
+    C*
+    C           NEXT      TAG
+    C                     READ HA0                      40
+  01-C                     ENDDO
+     C*
+     C                     SETON                     LR
+     C*==============================================================*
+

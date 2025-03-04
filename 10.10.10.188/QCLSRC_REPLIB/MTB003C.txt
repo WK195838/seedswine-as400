@@ -1,0 +1,73 @@
+/********************************************************************/
+/*                                                                  */
+/* 5763SS1 V3R2M0 960517     RTVCLSRC Output     08/25/98 17:42:09  */
+/*                                                                  */
+/* Program name . . . . . . . . . . . . . . :   MTB003C           PN*/
+/* Library name . . . . . . . . . . . . . . :   REPLIB            PL*/
+/* Original source file . . . . . . . . . . :   QCLSRC            SN*/
+/* Library name . . . . . . . . . . . . . . :   REPLIB            SL*/
+/* Original source member . . . . . . . . . :   MTB003C           SM*/
+/* Source file change                                               */
+/*   date/time  . . . . . . . . . . . . . . :   01/31/96 11:46:20 SC*/
+/* Patch option . . . . . . . . . . . . . . :   *NOPATCH          PO*/
+/* User profile . . . . . . . . . . . . . . :   *USER             UP*/
+/* Text . . . : 客戶主檔整檔批次處理                            TX*/
+/* Owner  . . . . . . . . . . . . . . . . . :   REPGMR            OW*/
+/* Patch change ID  . . . . . . . . . . . . :                     PC*/
+/* Patch APAR ID  . . . . . . . . . . . . . :                     PA*/
+/* User mod flag  . . . . . . . . . . . . . :   *YES              UM*/
+/*                                                                ED*/
+/********************************************************************/
+/*   A* M004 |MICHELLE|03.05.26|額度計算必須使用發票客戶代號      */
+/*   A*-------------------------------------------------------------*/
+
+     PGM
+     DCL VAR(&DMD01S) TYPE(*CHAR) LEN(5)
+     DCL VAR(&DMD01E) TYPE(*CHAR) LEN(5)
+     DCL VAR(&IN03) TYPE(*LGL) LEN(1)
+     DCL VAR(&IN14) TYPE(*LGL) LEN(1)
+     DCL VAR(&IN97) TYPE(*LGL) LEN(1)
+     DCL VAR(&IN96) TYPE(*LGL) LEN(1)
+START: +
+     CALL PGM(MTB003) PARM(&IN03 &IN14 &IN97 &IN96)
+     IF COND(&IN03) THEN(DO)
+     CHGVAR VAR(%SST(*LDA 601 100)) VALUE(' ')
+     RETURN
+     ENDDO
+     IF COND(&IN14) THEN(DO)
+     OVRDBF FILE(SOSILF07) SHARE(*YES)
+     OVRDBF FILE(ARACLF03) SHARE(*YES)
+/*   OVRDBF FILE(SOSCLF02) SHARE(*YES)      */
+     OVRDBF FILE(SOSCLF08) SHARE(*YES)
+     OVRDBF FILE(MTMDPF) SHARE(*NO) SEQONLY(*NO)
+     CHGVAR VAR(&DMD01S) VALUE(%SST(*LDA 601 5))
+     CHGVAR VAR(&DMD01E) VALUE(%SST(*LDA 606 5))
+     OPNQRYF FILE((MTMDPF)) QRYSLT('MD01 *EQ %RANGE("' *CAT &DMD01S -
+*CAT '" "' *CAT &DMD01E *CAT '") ') KEYFLD((MD01))
+     OPNQRYF FILE((SOSILF07)) QRYSLT('SI12 *EQ %RANGE("' *CAT &DMD01S-
+ *CAT '" "' *CAT &DMD01E *CAT '")  & SI35 *NE 0 ') KEYFLD((SI12))
+     OPNQRYF FILE((ARACLF03)) QRYSLT(' AC02 *EQ %RANGE("' *CAT -
+&DMD01S *CAT '" "' *CAT &DMD01E *CAT '")  & ac05 *eq "10" & ac11 *eq -
+0 ') KEYFLD((AC02))
+/*   OPNQRYF FILE((SOSCLF02)) QRYSLT('SC04 *EQ %RANGE("' *CAT &DMD01S-
+ *CAT '" "' *CAT &DMD01E *CAT '")  & (SC13  *EQ "C" *OR SC13 *EQ "*" -
+*OR SC13 *EQ " " ) & SC29 *EQ " " ') KEYFLD((SC04))    */
+
+     OPNQRYF FILE((SOSCLF08)) QRYSLT('SC04 *EQ %RANGE("' *CAT &DMD01S-
+ *CAT '" "' *CAT &DMD01E *CAT '")  & (SC13  *EQ "C" *OR SC13 *EQ "*" -
+*OR SC13 *EQ " " ) & SC29 *EQ " " ') KEYFLD((SC04))
+
+     CALL PGM(MTB0031) PARM(&IN96)
+     IF COND(&IN96 = '0') THEN(DO)
+     CHGVAR VAR(&IN97) VALUE('1')
+     ENDDO
+     CLOF OPNID(SOSILF07)
+/*   CLOF OPNID(SOSCLF02)   */
+     CLOF OPNID(SOSCLF08)
+     CLOF OPNID(ARACLF03)
+     CLOF OPNID(MTMDPF)
+     DLTOVR FILE(*ALL)
+     ENDDO
+     GOTO CMDLBL(START)
+     ENDPGM
+

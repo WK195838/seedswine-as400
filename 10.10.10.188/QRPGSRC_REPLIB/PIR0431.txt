@@ -1,0 +1,222 @@
+      ****************************************************************
+      *   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250    *
+      *                                                              *
+      * PROGRAM NAME : PIR0431                                       *
+      * AUTHER       : A1087  JOYCE                                  *
+      * CREATE DATE  : 81/04/22                                      *
+      * UPDATE DATE  : 12/03/92 JUDY                                 *
+      * SYSTEM       :人頭馬匯東                                   *
+      * SUBSYSTEM    :盤點系統                                     *
+      * REMARK       :盤盈虧表                                     *
+     A*===============================================================
+     A* MODI CODE | AUTHOR |   DATE   | DESCRIPTION
+     A*---------------------------------------------------------------
+     A* M001      |MICHELLE| 01.10.25 |保稅倉不應包含成本DUTY
+     A*---------------------------------------------------------------
+      ****************************************************************
+     FIMIOLF01IF  E           K        DISK
+     FIMITLF01IF  E           K        DISK
+     FIMIVPF  IF  E           K        DISK
+     FMTMEPF  IF  E           K        DISK
+     FPA#APF  IF  E           K        DISK
+     FMTMAPF  IF  E           K        DISK
+     FPA#FLF  IF  E           K        DISK
+     F                                              KINFDS #FRCDN
+     F            #A0                               KRENAME#F0L
+     F            MD0                               KRENAMEMD0L
+     F*PA#BPF  IF  E           K        DISK
+     FPIR043APO   E             39     PRINTER
+     I           UDS
+     I                                      101 110 $USER
+     I                                      119 1240$EGMDY
+     I                                      162 1620$EVR
+     I                                      125 1270$CPY
+     I                                      598 5990$PRTID
+     I                                      601 605 DIO02S
+     I                                      606 610 DIO02E
+     I                                      611 611 DATA
+     I                                      612 612 DIO01
+     I#FRCDN      DS
+     I                                     *RECORD  RCDN
+M001AI            DS
+M001AI                                        1   5 IO02
+M001AI                                        1   1 T1
+      *==============================================================*
+      *                    DEFINE ROUTINE
+      *==============================================================*
+     C           *LIKE     DEFN IO02      OIO02
+      *==============================================================*
+      *                    KEY LIST
+      *==============================================================*
+     C           KEYIO1    KLIST
+     C                     KFLD           DIO02S
+     C*                    KFLD           DIO01
+     C*          KEYIO2    KLIST
+     C*                    KFLD           DIO01
+     C*          KEY#B     KLIST
+     C*                    KFLD           IO01
+     C           KEY#A     KLIST
+     C                     KFLD           #A01
+     C                     KFLD           #A02
+     C           KEYMA     KLIST
+     C                     KFLD           IO04
+     C           KEYIT     KLIST
+     C                     KFLD           IO02
+     C                     KFLD           IO01
+     C                     KFLD           IO04
+     C           KEYIV     KLIST
+     C                     KFLD           IO04
+      *==============================================================*
+      *                    MAIN ROUTINE
+      *==============================================================*
+     C                     EXSR RTN010                     *INIT ENVIRM
+     C*
+     C           KEYIO1    SETLLIO0
+     C                     READ IO0                      46
+  01-C           *IN46     DOWEQ'0'
+    C           IO02      ANDLEDIO02E
+  02-C           DIO01     IFEQ *BLANK
+    C           IO01      OREQ DIO01
+    C  N10                EXSR RTN100
+    C                     MOVE IO02      OIO02
+    C*
+    C                     EXSR RTN200                     *FILE TO SCR
+    C   39                EXSR RTN900
+  02-C                     END
+    C                     READ IO0                      46
+    C*
+  02-C           DIO01     IFEQ *BLANK
+    C           IO01      OREQ DIO01
+     C*
+  03-C           IO02      IFNE OIO02
+    C           IO02      ANDLEDIO02E
+    C           *IN46     ANDEQ'0'
+    C                     EXSR RTN910
+  03-C                     END
+    C                     END
+    C*
+  01-C                     END
+     C*
+     C                     EXSR RTN999
+     C                     SETON                     LR
+     C*==============================================================*
+     C*          RTN010....INITIAL VALUE
+     C*==============================================================*
+01===C           RTN010    BEGSR
+|    C*
+|    C                     MOVE *BLANKS   DSTOR
+|    C                     Z-ADD0         DATA1
+|    C                     Z-ADD0         DATA2
+|    C                     Z-ADD0         TDATA1
+|    C                     Z-ADD0         TDATA2
+|    C                     Z-ADD0         TTIT06
+|    C                     Z-ADD0         TTIO05
+|    C*
+01===C                     ENDSR
+     C*==============================================================*
+     C*          RTN100....GET HEADING
+     C*==============================================================*
+02===C           RTN100    BEGSR
+|    C* GET公司別
+|    C*          KEY#B     CHAIN#B0                  40
+|    C*  40                MOVE *BLANK    #B03
+|    C* GET物流點
+|    C           IO02      CHAINPA#FLF               40
+| 01-C           RCDN      IFEQ 'MD0L'
+|   C           IO02      CHAINME0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVELME04      DSTOR
+| 01*C                     ELSE
+|   C                     MOVE *BLANKS   #A01
+|   C                     MOVEL'STORAGE '#A01
+|   C                     MOVE *BLANKS   #A02
+|   C                     MOVELIO02      #A02
+|   C           KEY#A     CHAIN#A0                  40
+|   C   40                MOVE *BLANKS   DSTOR
+|   C  N40                MOVEL#A03      DSTOR
+| 01-C                     END
+|    C*
+|    C                     WRITEPH1
+|    C                     SETOF                     39
+|    C                     SETON                     10
+|    C*
+02===C                     ENDSR
+     C*==============================================================*
+     C*          RTN200....MOVE DATA TO SCREEN
+     C*==============================================================*
+03===C           RTN200    BEGSR
+|    C*
+|    C* GET 產品簡稱／單位／成本
+| 01-C           IO04      IFNE *BLANK
+|   C           IO09      ANDNE'V'
+|   C           KEYMA     CHAINMA0                  40
+|   C   40                MOVE *BLANK    MA03
+|   C   40                MOVE *BLANK    MA13
+|   C           KEYIV     CHAINIV0                  40
+M001MC*  40                Z-ADD0         IV05
+M001MC   40                Z-ADD0         WIV05
+M001AC           T1        IFEQ 'T'
+M001AC           IV02      ADD  IV03      WIV05
+M001AC                     ELSE
+M001AC                     Z-ADDIV05      WIV05
+M001AC                     END
+|   C* GET 帳面數量
+|   C           KEYIT     CHAINIT0                  40
+|   C   40                Z-ADD0         IT06
+|   C* GET 盤盈虧／盤盈虧金額
+|   C           IO05      SUB  IT06      DATA1
+|   C*          DATA1     MULT IV05      DATA2     H
+M001MC           DATA1     MULT WIV05     DATA2     H
+|   C* GET 合計
+|   C                     ADD  IT06      TTIT06
+|   C                     ADD  IO05      TTIO05
+|   C                     ADD  DATA1     TDATA1
+|   C                     ADD  DATA2     TDATA2
+|   C*
+|   C                     WRITEPD1
+|   C*                    SETON                         10
+|   C*
+|   C                     ENDIF
+03===C                     ENDSR
+      *==============================================================*
+      *          RTN900....OVERFLOW
+      *==============================================================*
+04===C           RTN900    BEGSR
+|   C*
+|   C                     WRITEPE1
+|   C                     WRITEPH1
+|   C                     SETOF                     39
+|   C*
+04===C                     ENDSR
+      *==============================================================*
+      *          RTN910....換下頁
+      *==============================================================*
+05===C           RTN910    BEGSR
+|   C*
+|   C                     WRITEPD2
+|   C                     WRITEPE3
+|   C                     Z-ADD0         TDATA1
+|   C                     Z-ADD0         TDATA2
+|   C                     Z-ADD0         TTIT06
+|   C                     Z-ADD0         TTIO05
+|   C                     EXSR RTN100                     *GET HEADING
+|   C*
+05===C                     ENDSR
+      *==============================================================*
+      *          RTN999....(NO DATA)
+      *==============================================================*
+06===C           RTN999    BEGSR
+|   C*
+| 01-C           *IN10     IFEQ '0'
+|   C*                    MOVE DIO01     IO01
+|   C                     MOVE *BLANKS   IO02
+|   C                     EXSR RTN100
+|   C                     WRITEPE9
+| 01*C                     ELSE
+|   C                     WRITEPD2                        *總計
+| 01-C                     END
+|   C  N10                WRITEPE9
+|   C                     WRITEPE2
+|   C*
+06===C                     ENDSR
+

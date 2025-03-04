@@ -1,0 +1,149 @@
+     /***************************************************************/
+     /*   泛太資訊科技開發股份有限公司－版權所有    TEL:7313250   */
+     /*                                                             */
+     /*    AUTHOR       : A1087   JOYCE TSAI                        */
+     /*    CREATE DATE  : 81/03/18                                  */
+     /*    UPDATE DATE  : 81/04/18 BY STEPHANIE                     */
+     /*    PROGRAM NAME : ARA009 ARA0091                            */
+     /*    SYSTEM       :人頭馬匯東                               */
+     /*    SUBSYSTEM    :應收帳款作業                             */
+     /*    REMARK       :轉帳資料批次作業                         */
+     /***************************************************************/
+             PGM
+
+             DCL        VAR(&IN98) TYPE(*LGL) LEN(1)
+             DCL        VAR(&DSC01) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&WSC39S) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&WSC39E) TYPE(*CHAR) LEN(6)
+             DCL        VAR(&DSC33S) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSC33E) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&DSC31S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSC31E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSC02S) TYPE(*CHAR) LEN(12)
+             DCL        VAR(&DSC02E) TYPE(*CHAR) LEN(12)
+             DCL        VAR(&DSC01S) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&DSC01E) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&IN03)   TYPE(*LGL)  LEN(1)
+             DCL        VAR(&IN14)   TYPE(*LGL)  LEN(1)
+
+ START:      CALL       PGM(ARA009) PARM(&IN03 &IN14 &IN98)
+             IF         COND(&IN03) THEN(DO)
+             CHGVAR     VAR(%SST(*LDA 601 100)) VALUE(' ')
+             RETURN
+             ENDDO
+
+             IF         COND(&IN14) THEN(DO)
+             CHGVAR     VAR(&DSC01) VALUE(%SST(*LDA 601 2))
+             CHGVAR     VAR(&WSC39S) VALUE(%SST(*LDA 603 6))
+             CHGVAR     VAR(&WSC39E) VALUE(%SST(*LDA 609 6))
+             CHGVAR     VAR(&DSC33S) VALUE(%SST(*LDA 615 1))
+             CHGVAR     VAR(&DSC33E) VALUE(%SST(*LDA 616 1))
+             CHGVAR     VAR(&DSC31S) VALUE(%SST(*LDA 617 2))
+             CHGVAR     VAR(&DSC31E) VALUE(%SST(*LDA 619 2))
+             CHGVAR     VAR(&DSC02S) VALUE(%SST(*LDA 621 12))
+             CHGVAR     VAR(&DSC02E) VALUE(%SST(*LDA 633 12))
+             CHGVAR     VAR(&DSC01S) VALUE(%SST(*LDA 657 2))
+             CHGVAR     VAR(&DSC01E) VALUE(%SST(*LDA 659 2))
+
+  /*銷售訂單*/
+             OVRDBF     FILE(SOSCPF) SHARE(*YES)
+             OVRPRTF    FILE(ARA009P) USRDTA('轉帳批次')
+             OPNQRYF    FILE((SOSCPF)) OPTION(*ALL) QRYSLT(' +
+                        SC39 *EQ %RANGE(' *CAT &WSC39S *CAT '  +
+                                        ' *CAT &WSC39E *CAT ') +
+                      & SC01 *EQ %RANGE("' *CAT &DSC01S *CAT '" +
+                                        "' *CAT &DSC01E *CAT '") +
+                      & SC33 *EQ %RANGE("' *CAT &DSC33S *CAT '" +
+                                        "' *CAT &DSC33E *CAT '") +
+                      & SC31 *EQ %RANGE("' *CAT &DSC31S *CAT '" +
+                                        "' *CAT &DSC31E *CAT '") +
+                      & SC02 *EQ %RANGE("' *CAT &DSC02S *CAT '" +
+                                        "' *CAT &DSC02E *CAT '") +
+                      & ( ((SC03 *EQ "S3") & +
+                           (SC13 *EQ "V"  *OR  SC13 *EQ "C" *OR +
+                           SC13 *EQ " ") & (SC30 *NE " ")) +
+                        | ((SC03 *NE "S2" *AND SC03 *NE "S3") & +
+                           (SC13 *EQ "V")                   ))  +
+                      & SC35 *EQ " " ') +
+                          KEYFLD((SC02))
+
+  /*送貨單*/
+             OVRDBF     FILE(SOSEPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSEPF)) OPTION(*ALL) QRYSLT(' +
+                        SE24 *EQ %RANGE(' *CAT &WSC39S *CAT '  +
+                                        ' *CAT &WSC39E *CAT ') +
+                      & SE01 *EQ %RANGE("' *CAT &DSC01S *CAT '" +
+                                        "' *CAT &DSC01E *CAT '") +
+                      & SE27 *EQ %RANGE("' *CAT &DSC33S *CAT '" +
+                                        "' *CAT &DSC33E *CAT '") +
+                      & SE34 *EQ %RANGE("' *CAT &DSC31S *CAT '" +
+                                        "' *CAT &DSC31E *CAT '") +
+                      & SE02 *EQ %RANGE("' *CAT &DSC02S *CAT '" +
+                                        "' *CAT &DSC02E *CAT '") +
+                      & SE09 *EQ "V" +
+                      & SE29 *EQ " " +
+                      & SE36 *EQ " "  ') +
+                          KEYFLD((SE02))
+
+
+  /*銷貨退回*/
+             OVRDBF     FILE(SOSGPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSGPF)) OPTION(*ALL) QRYSLT(' +
+                        SG26 *EQ %RANGE(' *CAT &WSC39S *CAT '  +
+                                        ' *CAT &WSC39E *CAT ') +
+                      & SG01 *EQ %RANGE("' *CAT &DSC01S *CAT '" +
+                                        "' *CAT &DSC01E *CAT '") +
+                      & SG15 *EQ %RANGE("' *CAT &DSC31S *CAT '" +
+                                        "' *CAT &DSC31E *CAT '") +
+                      & SG02 *EQ %RANGE("' *CAT &DSC02S *CAT '" +
+                                        "' *CAT &DSC02E *CAT '") +
+                      & SG17 *EQ " " +
+                      & (SG14 *EQ " " *OR SG14 *EQ "V")') +
+                          KEYFLD((SG02))
+
+  /*產品收回*/
+             OVRDBF     FILE(SOSNPF) SHARE(*YES)
+             OPNQRYF    FILE((SOSNPF)) OPTION(*ALL) QRYSLT(' +
+                        SN06 *EQ %RANGE(' *CAT &WSC39S *CAT '  +
+                                        ' *CAT &WSC39E *CAT ') +
+                      & SN01 *EQ %RANGE("' *CAT &DSC01S *CAT '" +
+                                        "' *CAT &DSC01E *CAT '") +
+                      & SN02 *EQ %RANGE("' *CAT &DSC02S *CAT '" +
+                                        "' *CAT &DSC02E *CAT '") +
+                      & SN06 *NE 0   +
+                      & SN10 *EQ " "  ') +
+                          KEYFLD((SN02))
+
+  /*產品調撥*/
+             OVRDBF     FILE(IMIIPF) SHARE(*YES)
+             OPNQRYF    FILE((IMIIPF)) OPTION(*ALL) QRYSLT(' +
+                        II06 *EQ %RANGE(' *CAT &WSC39S *CAT '  +
+                                        ' *CAT &WSC39E *CAT ') +
+                      & II01 *EQ %RANGE("' *CAT &DSC01S *CAT '" +
+                                        "' *CAT &DSC01E *CAT '") +
+                      & II02 *EQ %RANGE("' *CAT &DSC02S *CAT '" +
+                                        "' *CAT &DSC02E *CAT '") +
+                      & II06 *NE 0   +
+                      & II08 *EQ " "  ') +
+                          KEYFLD((II02))
+
+             CALL       PGM(ARA0091)
+
+             CLOF       OPNID(SOSCPF)
+             CLOF       OPNID(SOSEPF)
+             CLOF       OPNID(SOSGPF)
+             CLOF       OPNID(SOSNPF)
+             CLOF       OPNID(IMIIPF)
+             DLTOVR     FILE(SOSCPF)
+             DLTOVR     FILE(SOSEPF)
+             DLTOVR     FILE(SOSGPF)
+             DLTOVR     FILE(SOSNPF)
+             DLTOVR     FILE(IMIIPF)
+
+             ENDDO
+
+             CHGVAR     VAR(&IN98) VALUE('1')
+
+             GOTO       START
+             ENDPGM
+
