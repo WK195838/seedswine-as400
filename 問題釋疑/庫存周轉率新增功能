@@ -1,0 +1,1044 @@
+# 庫存周轉率報表程式完整實施方案
+
+根據所有提供的條件與定義，以下是完整的庫存周轉率報表程式實施方案，包括詳細的步驟說明。
+
+## 一、程式架構概述
+
+庫存周轉率報表程式採用三層架構：
+1. **主控程式 (IMR050C)** - 負責流程控制和子程式呼叫
+2. **介面程式 (IMR0501)** - 負責使用者互動和參數收集
+3. **處理程式 (IMR0502)** - 負責資料計算和報表生成
+
+## 二、程式碼清單
+
+### 1. 主控程式 (IMR050C)
+
+```CL
+PGM
+DCL VAR(&WDATE) TYPE(*CHAR) LEN(6)
+DCL VAR(&$USER) TYPE(*CHAR) LEN(10)
+DCL VAR(&$EVR) TYPE(*CHAR) LEN(1)
+DCL VAR(&IN03) TYPE(*LGL) LEN(1)
+DCL VAR(&IN98) TYPE(*LGL) LEN(1)
+
+/* 從LDA獲取使用者資訊和系統日期 */
+RTVDTAARA DTAARA(*LDA (101 10)) RTNVAR(&$USER)
+RTVDTAARA DTAARA(*LDA (119 6)) RTNVAR(&WDATE)
+RTVDTAARA DTAARA(*LDA (162 1)) RTNVAR(&$EVR)
+
+/* 設定初始參數 */
+CHGVAR VAR(&IN03) VALUE('0')
+CHGVAR VAR(&IN98) VALUE('0')
+
+START:
+/* 呼叫介面程式 */
+CALL PGM(IMR0501) PARM(&IN03 &IN98)
+
+/* 檢查是否退出 */
+IF COND(&IN03) THEN(RETURN)
+
+/* 檢查是否有錯誤 */
+IF COND(&IN98) THEN(GOTO START)
+
+/* 根據執行模式選擇處理方式 */
+IF COND(&$EVR *EQ '1') THEN(DO)
+   /* 互動式模式 */
+   CALL PGM(IMR0502)
+   CHGVAR VAR(&IN98) VALUE('0')
+ENDDO
+ELSE CMD(DO)
+   /* 批次處理模式 */
+   SBMJOB JOB(IMR0502) JOBD(QBATCH) CMD(CALL PGM(IMR0502))
+   CHGVAR VAR(&IN98) VALUE('1')
+ENDDO
+
+GOTO START
+ENDPGM
+```
+
+### 2. 介面程式 (IMR0501)
+
+```RPG
+     FIMR050D  CF   E             WORKSTN
+     C     *ENTRY        PLIST
+     C                   PARM           *IN03
+     C                   PARM           *IN98
+     
+     /* 初始化 */
+     C                   MOVE *ZEROS    SDATE     60
+     C                   MOVE *ZEROS    EDATE     60
+     C                   MOVE '1'       RTYPE     1
+     C                   MOVE 'T9999'   WH1       5
+     C                   MOVE 'W0001'   WH2       5
+     C                   MOVE 'W0002'   WH3       5
+     C                   MOVE 'W0003'   WH4       5
+     C                   MOVE 'W0004'   WH5       5
+     C                   MOVE 'W0005'   WH6       5
+     C                   MOVE 'W0006'   WH7       5
+     C                   MOVE '*ALL'    COMPANY   10
+     C                   MOVE 0         TURNDAYS  30
+     C                   MOVE 0         SELMONTH  20
+     
+     /* 顯示介面 */
+     C                   EXFMT DSPF1
+     
+     /* 處理功能鍵 */
+     C   03              SETON                     LR
+     C   03              RETRN
+     
+     /* 參數驗證 */
+     C                   COMP SDATE     EDATE     9090
+     C   90              SETON                     98
+     C   90              MOVE '結束日期必須大於或等於開始日期' ERR1
+     
+     /* 月份驗證 */
+     C     SELMONTH      IFGT 0
+     C     SELMONTH      IFLT 1
+     C     SELMONTH      ORGT 12
+     C                   SETON                     98
+     C                   MOVE '月份必須在1-12之間' ERR1
+     C                   END
+     C                   END
+     
+     /* 檢查是否有錯誤 */
+     C   98              RETRN
+     
+     /* 儲存參數到LDA */
+     C                   Z-ADD SDATE    LDASD     60
+     C                   Z-ADD EDATE    LDAED     60
+     C                   MOVE  RTYPE    LDART     1
+     C                   MOVE  COMPANY  LDACO     10
+     C                   Z-ADD TURNDAYS LDATD     30
+     C                   Z-ADD SELMONTH LDAMO     20
+     
+     /* 組合倉庫清單 */
+     C                   MOVE  WH1      WHLIST    5
+     C                   CAT   WH2:5    WHLIST    60
+     C                   CAT   WH3:5    WHLIST    60
+     C                   CAT   WH4:5    WHLIST    60
+     C                   CAT   WH5:5    WHLIST    60
+     C                   CAT   WH6:5    WHLIST    60
+     C                   CAT   WH7:5    WHLIST    60
+     C                   MOVE  WHLIST   LDAWH     60
+     
+     C                   RETURN
+```
+
+### 3. 顯示檔案 (IMR050D)
+
+```DDS
+     A                                      DSPSIZ(24 80 *DS3)
+     A                                      REF(*LIBL/IMIOPF)
+     A                                      PRINT
+     A                                      CA03(03 '返回')
+     A                                      CA14(14 '執行')
+     A          R DSPF1
+     A                                  1  2'IMR050'
+     A                                  1 30'庫存周轉率報表'
+     A                                      DSPATR(HI)
+     A                                  1 70DATE
+     A                                      EDTCDE(Y)
+     A                                  2 70TIME
+     A                                  3  2'使用者:'
+     A            $USER         10A  O  3 10
+     A                                  5 10'請輸入報表參數:'
+     A                                      DSPATR(HI)
+     A                                  7 10'開始日期:'
+     A            SDATE          6Y 0B  7 20EDTCDE(Y)
+     A                                  7 30'(YYMMDD)'
+     A                                  8 10'結束日期:'
+     A            EDATE          6Y 0B  8 20EDTCDE(Y)
+     A                                  8 30'(YYMMDD)'
+     A                                  9 10'報表類型:'
+     A            RTYPE          1A  B  9 20VALUES('1' '2')
+     A                                  9 25'(1=明細 2=彙總)'
+     A                                 10 10'公司別:'
+     A            COMPANY       10A  B 10 20
+     A                                 10 35'(*ALL=全部)'
+     A                                 11 10'存貨週轉天數:'
+     A            TURNDAYS       3Y 0B 11 25
+     A                                 11 30'(超過此天數才列出)'
+     A                                 12 10'月份:'
+     A            SELMONTH       2Y 0B 12 25
+     A                                 12 30'(0=全部月份)'
+     A                                 13 10'倉庫清單:'
+     A                                 13 25'(可用量計算用)'
+     A            WH1            5A  B 14 20
+     A            WH2            5A  B 15 20
+     A            WH3            5A  B 16 20
+     A            WH4            5A  B 17 20
+     A            WH5            5A  B 18 20
+     A            WH6            5A  B 19 20
+     A            WH7            5A  B 20 20
+     A                                 22  2'功能鍵:'
+     A                                 22 10'F3=返回'
+     A                                 22 25'F14=執行'
+     A  98        ERR1          50A  O 23  2DSPATR(HI)
+```
+
+### 4. 處理程式 (IMR0502)
+
+```RPG
+     FIMR050P  O    E             PRINTER
+     FIMIOPF   IF   E           K DISK
+     FIMITLF   IF   E           K DISK
+     FIMISLF   IF   E           K DISK
+     
+     /* 從LDA獲取參數 */
+     C                   MOVE  LDASD    SDATE     60
+     C                   MOVE  LDAED    EDATE     60
+     C                   MOVE  LDART    RTYPE     1
+     C                   MOVE  LDAWH    WHLIST    60
+     C                   MOVE  LDACO    COMPANY   10
+     C                   MOVE  LDATD    TURNDAYS  30
+     C                   MOVE  LDAMO    SELMONTH  20
+     
+     /* 創建臨時工作檔 */
+     C                   CALL 'QTEMP/CRTIMTWF'
+     
+     /* 處理月份選擇 */
+     C                   EXSR PROCMONTH
+     
+     /* 計算庫存周轉率 */
+     C                   EXSR CALCITR
+     
+     /* 產生報表 */
+     C                   EXSR GENRPT
+     
+     C                   SETON                     LR
+     C                   RETURN
+     
+     /* 處理月份選擇 */
+     C     PROCMONTH     BEGSR
+     /* 如果選擇了特定月份，調整日期範圍 */
+     C     SELMONTH      IFGT 0
+     /* 提取年份 */
+     C                   DIV   10000    EDATE     YEAR      40
+     /* 組合新的日期範圍 */
+     C                   MULT  10000    YEAR      TMPDT     60
+     C                   MULT  100      SELMONTH  TMPMON    40
+     C                   ADD   TMPMON   TMPDT     TMPDT     60
+     C                   ADD   1        TMPDT     SDATE     60
+     
+     /* 計算月末日期 */
+     C     SELMONTH      CASBEQ1         DAYS31    99
+     C                   CASBEQ2         DAYS28    99
+     C                   CASBEQ3         DAYS31    99
+     C                   CASBEQ4         DAYS30    99
+     C                   CASBEQ5         DAYS31    99
+     C                   CASBEQ6         DAYS30    99
+     C                   CASBEQ7         DAYS31    99
+     C                   CASBEQ8         DAYS31    99
+     C                   CASBEQ9         DAYS30    99
+     C                   CASBEQ10        DAYS31    99
+     C                   CASBEQ11        DAYS30    99
+     C                   CASBEQ12        DAYS31    99
+     C                   ENDCS
+     
+     C     DAYS31        TAG
+     C                   Z-ADD31        LASTDAY   20
+     C                   GOTO SETEND
+     
+     C     DAYS30        TAG
+     C                   Z-ADD30        LASTDAY   20
+     C                   GOTO SETEND
+     
+     C     DAYS28        TAG
+     /* 檢查閏年 */
+     C     YEAR          DIV  4         TMPYR     40
+     C                   MVR             LEAPCHK   10
+     C     LEAPCHK       IFEQ 0
+     C                   Z-ADD29        LASTDAY   20
+     C                   ELSE
+     C                   Z-ADD28        LASTDAY   20
+     C                   END
+     
+     C     SETEND        TAG
+     C                   Z-ADD TMPDT    EDATE     60
+     C                   ADD   LASTDAY  EDATE     60
+     C                   END
+     
+     C                   ENDSR
+     
+     /* 計算庫存周轉率子程序 */
+     C     CALCITR       BEGSR
+     
+     /* 初始化合計變數 */
+     C                   Z-ADD 0         TOTBEG
+     C                   Z-ADD 0         TOTEND
+     C                   Z-ADD 0         TOTAVG
+     C                   Z-ADD 0         TOTSLS
+     C                   Z-ADD 0         TOTCOG
+     C                   Z-ADD 0         ITEMCNT
+     
+     /* 讀取庫存主檔 */
+     C                   READ IMIOPF                90
+     C     *IN90         DOWEQ'0'
+     
+     /* 檢查公司別 */
+     C     COMPANY       IFNE '*ALL'
+     C     IMOCO         IFNE COMPANY
+     C                   GOTO NEXTITEM
+     C                   END
+     C                   END
+     
+     /* 檢查產品容積是否為0.7L或0.75L */
+     C                   MOVE  IMOVOL    VOLCHK    4
+     C     VOLCHK        IFEQ  '0.7L'
+     C     VOLCHK        OREQ  '0.75L'
+     
+     /* 提取產品代號前七碼 */
+     C                   MOVE  ITMNO     ITMKEY    7
+     
+     /* 計算期初可用量 */
+     C                   EXSR CALCBAVL
+     
+     /* 計算期末可用量 */
+     C                   EXSR CALCEAVL
+     
+     /* 計算平均可用量 */
+     C                   ADD  BEGAVL    ENDAVL    AVGAVL
+     C                   DIV  2         AVGAVL
+     
+     /* 計算銷貨成本 */
+     C                   EXSR CALCCOGS
+     
+     /* 計算銷售數量 */
+     C                   EXSR CALCSALES
+     
+     /* 計算周轉率(基於成本) */
+     C     AVGAVL        IFGT 0
+     C                   DIV  AVGAVL    COGS      TURNRT
+     C                   ELSE
+     C                   Z-ADD0         TURNRT
+     C                   END
+     
+     /* 計算周轉率(基於數量) */
+     C     AVGAVL        IFGT 0
+     C                   DIV  AVGAVL    SALESQTY  TURNQTY
+     C                   ELSE
+     C                   Z-ADD0         TURNQTY
+     C                   END
+     
+     /* 計算周轉天數(基於成本) */
+     C                   Z-ADD365       DAYS
+     C     TURNRT        IFGT 0
+     C                   DIV  TURNRT    DAYS      TURNDY
+     C                   ELSE
+     C                   Z-ADD0         TURNDY
+     C                   END
+     
+     /* 計算周轉天數(基於數量) */
+     C                   Z-ADD365       DAYS
+     C     TURNQTY       IFGT 0
+     C                   DIV  TURNQTY   DAYS      TURNDYQ
+     C                   ELSE
+     C                   Z-ADD0         TURNDYQ
+     C                   END
+     
+     /* 檢查周轉天數是否超過指定天數 */
+     C     TURNDAYS      IFGT 0
+     C     TURNDYQ       IFLT TURNDAYS
+     C                   GOTO NEXTITEM
+     C                   END
+     C                   END
+     
+     /* 累加合計 */
+     C                   ADD  1         ITEMCNT
+     C                   ADD  BEGAVL    TOTBEG
+     C                   ADD  ENDAVL    TOTEND
+     C                   ADD  AVGAVL    TOTAVG
+     C                   ADD  SALESQTY  TOTSLS
+     C                   ADD  COGS      TOTCOG
+     
+     /* 寫入臨時檔案 */
+     C                   WRITE IMTWFR
+     
+     C                   END
+     
+     C     NEXTITEM      TAG
+     /* 讀取下一筆 */
+     C                   READ IMIOPF                90
+     C                   END
+     
+     /* 計算平均周轉率和周轉天數 */
+     C     ITEMCNT       IFGT 0
+     C     TOTAVG        IFGT 0
+     C                   DIV  TOTAVG    TOTSLS    AVGTQTY
+     C                   DIV  TOTAVG    TOTCOG    AVGTRN
+     C                   Z-ADD365       DAYS
+     C                   DIV  AVGTQTY   DAYS      AVGDYQ
+     C                   DIV  AVGTRN    DAYS      AVGDAY
+     C                   END
+     C                   END
+     
+     C                   ENDSR
+     
+     /* 計算期初可用量 - 選定月份往前推十一個月的期初可用量 */
+     C     CALCBAVL      BEGSR
+     /* 初始化期初可用量 */
+     C                   Z-ADD 0         BEGAVL
+     
+     /* 計算11個月前的日期 */
+     C                   Z-ADD EDATE     TMPDT     60
+     C                   EXSR  CALC11M
+     C                   Z-ADD TMPDT     BEGDT     60
+     
+     /* 獲取該日期的期初可用量 */
+     C                   Z-ADD BEGDT    TMPDT     60
+     C                   EXSR  GETAVL
+     C                   Z-ADD AVLQTY    BEGAVL
+     
+     C                   ENDSR
+     
+     /* 計算期末可用量 - 選定月份的期末可用量 */
+     C     CALCEAVL      BEGSR
+     /* 初始化期末可用量 */
+     C                   Z-ADD 0         ENDAVL
+     
+     /* 獲取選定月份的期末可用量 */
+     C                   Z-ADD EDATE     TMPDT     60
+     C                   EXSR  GETAVL
+     C                   Z-ADD AVLQTY    ENDAVL
+     
+     C                   ENDSR
+     
+     /* 獲取指定日期的可用量 */
+     C     GETAVL        BEGSR
+     /* 初始化可用量 */
+     C                   Z-ADD 0         AVLQTY
+     
+     /* 計算T9999倉庫可用量 */
+     C     ITMNO         CHAIN T9999                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   T9QTY     AVLQTY
+     C                   END
+     
+     /* 計算W0001-W0006倉庫可用量 */
+     C                   EXSR  CALCW01
+     C                   EXSR  CALCW02
+     C                   EXSR  CALCW03
+     C                   EXSR  CALCW04
+     C                   EXSR  CALCW05
+     C                   EXSR  CALCW06
+     
+     C                   ENDSR
+     
+     /* 計算W0001倉庫可用量 */
+     C     CALCW01       BEGSR
+     C     ITMNO         CHAIN W0001                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   W1QTY     AVLQTY
+     C                   END
+     C                   ENDSR
+     
+     /* 計算W0002倉庫可用量 */
+     C     CALCW02       BEGSR
+     C     ITMNO         CHAIN W0002                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   W2QTY     AVLQTY
+     C                   END
+     C                   ENDSR
+     
+     /* 計算W0003倉庫可用量 */
+     C     CALCW03       BEGSR
+     C     ITMNO         CHAIN W0003                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   W3QTY     AVLQTY
+     C                   END
+     C                   ENDSR
+     
+     /* 計算W0004倉庫可用量 */
+     C     CALCW04       BEGSR
+     C     ITMNO         CHAIN W0004                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   W4QTY     AVLQTY
+     C                   END
+     C                   ENDSR
+     
+     /* 計算W0005倉庫可用量 */
+     C     CALCW05       BEGSR
+     C     ITMNO         CHAIN W0005                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   W5QTY     AVLQTY
+     C                   END
+     C                   ENDSR
+     
+     /* 計算W0006倉庫可用量 */
+     C     CALCW06       BEGSR
+     C     ITMNO         CHAIN W0006                 93
+     C     *IN93         IFEQ  '0'
+     C                   ADD   W6QTY     AVLQTY
+     C                   END
+     C                   ENDSR
+     
+     /* 計算銷貨成本 - 修改為考慮前七碼 */
+     C     CALCCOGS      BEGSR
+     /* 從庫存交易檔案中計算期間內的銷貨成本 */
+     C                   Z-ADD 0         COGS
+     
+     /* 計算12個月區間的起始日期 */
+     C                   Z-ADD EDATE     TMPDT     60
+     C                   EXSR  CALC12M
+     C                   Z-ADD TMPDT     STDATE    60
+     
+     /* 設定讀取條件 */
+     C                   SETLL*LOVAL    IMITLF
+     C                   READ  IMITLF                92
+     C     *IN92         DOWEQ '0'
+     
+     /* 提取交易記錄產品代號前七碼 */
+     C                   MOVE  IMT00     TRNKEY    7
+     
+     /* 檢查交易日期是否在指定範圍內 */
+     C     IMT01         IFGE  STDATE
+     C     IMT01         IFLE  EDATE
+     /* 檢查產品代號前七碼是否匹配 */
+     C     TRNKEY        IFEQ  ITMKEY
+     /* 檢查交易類型是否為出庫 */
+     C     IMT02         IFEQ  'O'
+     /* 累加銷貨成本 */
+     C                   Z-ADD IMT03     TRNQTY
+     C                   Z-ADD IMT04     TRNPRC
+     C                   MULT  TRNQTY    TRNPRC    TRNCST
+     C                   ADD   TRNCST    COGS
+     C                   END
+     C                   END
+     C                   END
+     C                   READ  IMITLF                92
+     C                   END
+     C                   ENDSR
+     
+     /* 計算銷售數量 - 十二個月銷售總量 */
+     C     CALCSALES     BEGSR
+     /* 從庫存交易檔案中計算期間內的銷售數量 */
+     C                   Z-ADD 0         SALESQTY
+     
+     /* 計算12個月區間的起始日期 */
+     C                   Z-ADD EDATE     TMPDT     60
+     C                   EXSR  CALC12M
+     C                   Z-ADD TMPDT     STDATE    60
+     
+     /* 設定讀取條件 */
+     C                   SETLL*LOVAL    IMITLF
+     C                   READ  IMITLF                92
+     C     *IN92         DOWEQ '0'
+     
+     /* 提取交易記錄產品代號前七碼 */
+     C                   MOVE  IMT00     TRNKEY    7
+     
+     /* 檢查交易日期是否在指定範圍內 */
+     C     IMT01         IFGE  STDATE
+     C     IMT01         IFLE  EDATE
+     /* 檢查產品代號前七碼是否匹配 */
+     C     TRNKEY        IFEQ  ITMKEY
+     /* 檢查交易類型是否為出庫 */
+     C     IMT02         IFEQ  'O'
+     /* 累加銷售數量 */
+     C                   Z-ADD IMT03     TRNQTY
+     C                   ADD   TRNQTY    SALESQTY
+     C                   END
+     C                   END
+     C                   END
+     C                   READ  IMITLF                92
+     C                   END
+     C                   ENDSR
+     
+     /* 產生報表 */
+     C     GENRPT        BEGSR
+     
+     /* 寫入報表標題 */
+     C                   WRITE TITLE1
+     C                   WRITE TITLE2
+     
+     /* 讀取臨時檔案並產生報表 */
+     C                   SETLL*LOVAL    IMTWF
+     C                   READ IMTWF                  91
+     C     *IN91         DOWEQ'0'
+     
+     /* 根據報表類型處理 */
+     C     RTYPE         IFEQ '1'
+     C                   WRITE DETAIL1
+     C                   ELSE
+     C     RTYPE         IFEQ '2'
+     C                   EXSR GENSUM
+     C                   END
+     C                   END
+     
+     C                   READ IMTWF                  91
+     C                   END
+     
+     /* 寫入報表合計 */
+     C                   WRITE TOTAL
+     
+     C                   ENDSR
+     
+     /* 產生彙總報表 */
+     C     GENSUM        BEGSR
+     /* 彙總報表邏輯 */
+     C                   ENDSR
+     
+     /* 計算12個月前日期 */
+     C     CALC12M       BEGSR
+     /* 提取年月日 */
+     C                   DIV   10000    TMPDT     YEAR      40
+     C                   MVR             MONTH     20
+     C                   DIV   100      MONTH     MONTH     20
+     C                   MVR             DAY       20
+     
+     /* 減去12個月 */
+     C                   SUB   12       MONTH     MONTH     20
+     C     MONTH         IFLT  1
+     C                   ADD   12       MONTH     MONTH     20
+     C                   SUB   1        YEAR      YEAR      40
+     C                   END
+     
+     /* 重組日期 */
+     C                   MULT  10000    YEAR      TMPDT     60
+     C                   MULT  100      MONTH     TMPMON    40
+     C                   ADD   TMPMON   TMPDT     TMPDT     60
+     C                   ADD   DAY      TMPDT     TMPDT     60
+     
+     C                   ENDSR
+     
+     /* 計算11個月前日期 */
+     C     CALC11M       BEGSR
+     /* 提取年月日 */
+     C                   DIV   10000    TMPDT     YEAR      40
+     C                   MVR             MONTH     20
+     C                   DIV   100      MONTH     MONTH     20
+     C                   MVR             DAY       20
+     
+     /* 減去11個月 */
+     C                   SUB   11       MONTH     MONTH     20
+     C     MONTH         IFLT  1
+     C                   ADD   12       MONTH     MONTH     20
+     C                   SUB   1        YEAR      YEAR      40
+     C                   END
+     
+     /* 重組日期 */
+     C                   MULT  10000    YEAR      TMPDT     60
+     C                   MULT  100      MONTH     TMPMON    40
+     C                   ADD   TMPMON   TMPDT     TMPDT     60
+     C                   ADD   DAY      TMPDT     TMPDT     60
+     
+     C                   ENDSR
+```
+
+### 5. 列印檔案 (IMR050P)
+
+```DDS
+     A          R TITLE1
+     A                                  1  2'IMR050'
+     A                                  1 50'庫存周轉率報表'
+     A                                  1 95'頁碼:'
+     A                                  1100PAGNBR
+     A                                  2  2'報表日期:'
+     A                                  2 12DATE
+     A                                      EDTCDE(Y)
+     A                                  2 25'報表時間:'
+     A                                  2 35TIME
+     A                                  2 50'期間:'
+     A            SDATE          6Y 0   2 57EDTCDE(Y)
+     A                                  2 65'-'
+     A            EDATE          6Y 0   2 67EDTCDE(Y)
+     A
+# 庫存周轉率報表程式完整實施方案（續）
+
+### 5. 列印檔案 (IMR050P)（續）
+
+```DDS
+     A                                  3  2'公司別:'
+     A            COMPANY       10A     3 10
+     A                                  3 25'月份:'
+     A            SELMONTH       2Y 0   3 32EDTCDE(Z)
+     A                                  3 40'週轉天數閾值:'
+     A            TURNDAYS       3Y 0   3 55EDTCDE(Z)
+     A                                  3 60'天以上'
+     A                                  4  2'說明:'
+     A                                  4 10'銷售數量計算期間為往前推12個月(含選定月份)'
+     A                                  4 60'僅考慮產品代號前七碼'
+     A                                  5  2'容積篩選:'
+     A                                  5 15'僅計算容積為0.7L和0.75L的產品'
+     A                                  6  2'計算公式1:'
+     A                                  6 15'存貨週轉率 = 十二個月銷售總量 / 庫存可用量'
+     A                                  7  2'計算公式2:'
+     A                                  7 15'存貨週轉天數 = 365天 / 存貨週轉率'
+     A          R TITLE2
+     A                                  9  2'料號'
+     A                                  9 15'品名'
+     A                                  9 40'容積'
+     A                                  9 50'期初可用量'
+     A                                  9 65'期末可用量'
+     A                                  9 80'平均可用量'
+     A                                  9 95'銷售數量'
+     A                                  9110'銷貨成本'
+     A                                  9125'周轉率(數量)'
+     A                                  9140'周轉率(成本)'
+     A                                  9155'周轉天數(數量)'
+     A                                  9170'周轉天數(成本)'
+     A                                 10  2'------'
+     A                                 10 15'------'
+     A                                 10 40'------'
+     A                                 10 50'------'
+     A                                 10 65'------'
+     A                                 10 80'------'
+     A                                 10 95'------'
+     A                                 10110'------'
+     A                                 10125'------'
+     A                                 10140'------'
+     A                                 10155'------'
+     A                                 10170'------'
+     A          R DETAIL1
+     A            ITMNO         10A    11  2
+     A            ITMNM         20A    11 15
+     A            IMOVOL         4A    11 40
+     A            BEGAVL        10Y 2  11 50EDTCDE(J)
+     A            ENDAVL        10Y 2  11 65EDTCDE(J)
+     A            AVGAVL        10Y 2  11 80EDTCDE(J)
+     A            SALESQTY      10Y 2  11 95EDTCDE(J)
+     A            COGS          10Y 2  11110EDTCDE(J)
+     A            TURNQTY        5Y 2  11125EDTCDE(1)
+     A            TURNRT         5Y 2  11140EDTCDE(1)
+     A            TURNDYQ        5Y 0  11155EDTCDE(1)
+     A            TURNDY         5Y 0  11170EDTCDE(1)
+     A          R TOTAL
+     A                                    2'合計:'
+     A            TOTBEG        10Y 2     50EDTCDE(J)
+     A            TOTEND        10Y 2     65EDTCDE(J)
+     A            TOTAVG        10Y 2     80EDTCDE(J)
+     A            TOTSLS        10Y 2     95EDTCDE(J)
+     A            TOTCOG        10Y 2    110EDTCDE(J)
+     A            AVGTQTY        5Y 2    125EDTCDE(1)
+     A            AVGTRN         5Y 2    140EDTCDE(1)
+     A            AVGDYQ         5Y 0    155EDTCDE(1)
+     A            AVGDAY         5Y 0    170EDTCDE(1)
+```
+
+### 6. 臨時工作檔案創建程式 (CRTIMTWF)
+
+```CL
+PGM
+DLTF FILE(QTEMP/IMTWF) MONMSG MSGID(CPF2105)
+CRTPF FILE(QTEMP/IMTWF) RCDLEN(300) MAXMBRS(*NOMAX) SIZE(*NOMAX) AUT(*ALL)
+ADDPFM FILE(QTEMP/IMTWF) MBR(IMTWF) TEXT('庫存周轉率臨時檔')
+ENDPGM
+```
+
+## 三、實施步驟
+
+### 步驟1：準備開發環境
+
+1. **建立開發庫**：
+   ```
+   CRTLIB LIB(DEVLIB) TEXT('庫存周轉率報表開發庫')
+   ```
+
+2. **設定開發環境**：
+   ```
+   CHGCURLIB CURLIB(DEVLIB)
+   ```
+
+### 步驟2：創建顯示檔案 (IMR050D)
+
+1. **創建源碼成員**：
+   ```
+   STRSEU SRCFILE(DEVLIB/QDDSSRC) SRCMBR(IMR050D) TYPE(DSPF)
+   ```
+
+2. **輸入顯示檔案源碼**（如上述IMR050D代碼）
+
+3. **編譯顯示檔案**：
+   ```
+   CRTDSPF FILE(DEVLIB/IMR050D) SRCFILE(DEVLIB/QDDSSRC) SRCMBR(IMR050D)
+   ```
+
+### 步驟3：創建列印檔案 (IMR050P)
+
+1. **創建源碼成員**：
+   ```
+   STRSEU SRCFILE(DEVLIB/QDDSSRC) SRCMBR(IMR050P) TYPE(PRTF)
+   ```
+
+2. **輸入列印檔案源碼**（如上述IMR050P代碼）
+
+3. **編譯列印檔案**：
+   ```
+   CRTPRTF FILE(DEVLIB/IMR050P) SRCFILE(DEVLIB/QDDSSRC) SRCMBR(IMR050P)
+   ```
+
+### 步驟4：創建臨時工作檔案程式 (CRTIMTWF)
+
+1. **創建源碼成員**：
+   ```
+   STRSEU SRCFILE(DEVLIB/QCLSRC) SRCMBR(CRTIMTWF) TYPE(CLP)
+   ```
+
+2. **輸入CL程式源碼**（如上述CRTIMTWF代碼）
+
+3. **編譯CL程式**：
+   ```
+   CRTCLPGM PGM(DEVLIB/CRTIMTWF) SRCFILE(DEVLIB/QCLSRC) SRCMBR(CRTIMTWF)
+   ```
+
+### 步驟5：創建介面程式 (IMR0501)
+
+1. **創建源碼成員**：
+   ```
+   STRSEU SRCFILE(DEVLIB/QRPGSRC) SRCMBR(IMR0501) TYPE(RPG)
+   ```
+
+2. **輸入RPG程式源碼**（如上述IMR0501代碼）
+
+3. **編譯RPG程式**：
+   ```
+   CRTRPGPGM PGM(DEVLIB/IMR0501) SRCFILE(DEVLIB/QRPGSRC) SRCMBR(IMR0501)
+   ```
+
+### 步驟6：創建處理程式 (IMR0502)
+
+1. **創建源碼成員**：
+   ```
+   STRSEU SRCFILE(DEVLIB/QRPGSRC) SRCMBR(IMR0502) TYPE(RPG)
+   ```
+
+2. **輸入RPG程式源碼**（如上述IMR0502代碼）
+
+3. **編譯RPG程式**：
+   ```
+   CRTRPGPGM PGM(DEVLIB/IMR0502) SRCFILE(DEVLIB/QRPGSRC) SRCMBR(IMR0502)
+   ```
+
+### 步驟7：創建主控程式 (IMR050C)
+
+1. **創建源碼成員**：
+   ```
+   STRSEU SRCFILE(DEVLIB/QCLSRC) SRCMBR(IMR050C) TYPE(CLP)
+   ```
+
+2. **輸入CL程式源碼**（如上述IMR050C代碼）
+
+3. **編譯CL程式**：
+   ```
+   CRTCLPGM PGM(DEVLIB/IMR050C) SRCFILE(DEVLIB/QCLSRC) SRCMBR(IMR050C)
+   ```
+
+### 步驟8：測試程式
+
+1. **執行主控程式**：
+   ```
+   CALL PGM(DEVLIB/IMR050C)
+   ```
+
+2. **測試各種參數組合**：
+   - 測試不同公司別
+   - 測試不同週轉天數閾值
+   - 測試不同月份選擇
+   - 測試不同倉庫組合
+
+### 步驟9：修正問題
+
+1. **檢查報表輸出**：
+   ```
+   WRKSPLF
+   ```
+
+2. **檢視報表內容並修正問題**
+
+3. **重新編譯修改後的程式**
+
+### 步驟10：準備生產環境部署
+
+1. **創建生產庫物件**：
+   ```
+   CRTDUPOBJ OBJ(IMR050D) FROMLIB(DEVLIB) OBJTYPE(*FILE) TOLIB(IMLIB) NEWOBJ(IMR050D)
+   CRTDUPOBJ OBJ(IMR050P) FROMLIB(DEVLIB) OBJTYPE(*FILE) TOLIB(IMLIB) NEWOBJ(IMR050P)
+   ```
+
+2. **複製程式到生產庫**：
+   ```
+   CRTDUPOBJ OBJ(IMR050C) FROMLIB(DEVLIB) OBJTYPE(*PGM) TOLIB(IMLIB) NEWOBJ(IMR050C)
+   CRTDUPOBJ OBJ(IMR0501) FROMLIB(DEVLIB) OBJTYPE(*PGM) TOLIB(IMLIB) NEWOBJ(IMR0501)
+   CRTDUPOBJ OBJ(IMR0502) FROMLIB(DEVLIB) OBJTYPE(*PGM) TOLIB(IMLIB) NEWOBJ(IMR0502)
+   CRTDUPOBJ OBJ(CRTIMTWF) FROMLIB(DEVLIB) OBJTYPE(*PGM) TOLIB(IMLIB) NEWOBJ(CRTIMTWF)
+   ```
+
+### 步驟11：更新選單程式
+
+1. **修改庫存管理系統主選單程式**：
+   ```
+   STRSEU SRCFILE(IMLIB/QRPGSRC) SRCMBR(IMM000) TYPE(RPG)
+   ```
+
+2. **在報表選項區域添加新選項**：
+   ```
+   C                   WHEN OPTION = '50'
+   C                   CALL 'IMR050C'
+   ```
+
+3. **重新編譯選單程式**：
+   ```
+   CRTRPGPGM PGM(IMLIB/IMM000) SRCFILE(IMLIB/QRPGSRC) SRCMBR(IMM000)
+   ```
+
+### 步驟12：準備使用者文檔
+
+1. **創建使用者手冊**：
+   - 說明報表功能和用途
+   - 解釋各項參數的含義
+   - 提供報表解讀指南
+   - 提供常見問題解答
+
+2. **創建技術文檔**：
+   - 記錄程式架構和流程
+   - 說明計算邏輯和公式
+   - 提供維護指南
+
+### 步驟13：使用者培訓
+
+1. **準備培訓材料**：
+   - 報表功能介紹
+   - 參數設定說明
+   - 報表解讀指南
+   - 實際操作演示
+
+2. **進行使用者培訓**：
+   - 向相關部門人員介紹新報表
+   - 演示報表操作流程
+   - 解答使用者問題
+
+### 步驟14：上線部署
+
+1. **安排上線時間**：
+   - 選擇非業務高峰期
+   - 通知相關使用者
+
+2. **執行上線部署**：
+   - 將程式移至生產環境
+   - 更新選單程式
+   - 設定適當的權限
+
+3. **上線後監控**：
+   - 監控報表執行情況
+   - 收集使用者反饋
+   - 解決可能出現的問題
+
+## 四、程式功能說明
+
+### 1. 主要功能
+
+1. **庫存周轉率計算**：
+   - 基於銷售數量的周轉率 = 十二個月銷售總量 / 庫存可用量
+   - 基於銷貨成本的周轉率 = 十二個月銷貨成本 / 庫存可用量
+
+2. **庫存周轉天數計算**：
+   - 周轉天數 = 365天 / 周轉率
+
+3. **多維度篩選**：
+   - 公司別篩選
+   - 存貨週轉天數閾值篩選
+   - 月份篩選
+   - 容積篩選（僅0.7L和0.75L）
+
+### 2. 計算邏輯
+
+1. **銷售數量(含搭贈)**：
+   - 選定月份往前推12個月（含選定月份）
+   - 僅考慮產品代號前七碼（相同容積產品合併計算）
+
+2. **期初可用量**：
+   - 選定月份往前推十一個月的期初可用量
+
+3. **期末可用量**：
+   - 選定月份的期末可用量
+
+4. **庫存可用量**：
+   - (期初可用量+期末可用量)/2
+   - 僅考慮T9999+SUM(W0001:W0006)倉庫
+
+### 3. 報表格式
+
+1. **報表標題**：
+   - 報表名稱和日期
+   - 篩選條件摘要
+   - 計算公式說明
+
+2. **明細資料**：
+   - 產品基本資訊（料號、品名、容積）
+   - 庫存資訊（期初可用量、期末可用量、平均可用量）
+   - 銷售資訊（銷售數量、銷貨成本）
+   - 周轉指標（周轉率、周轉天數）
+
+3. **合計資訊**：
+   - 各數值欄位的合計
+   - 平均周轉率和周轉天數
+
+## 五、注意事項與最佳實踐
+
+### 1. 效能考慮
+
+1. **索引優化**：
+   - 確保IMITLF檔案有適當的索引（產品代號、交易日期）
+   - 考慮為產品代號前七碼建立索引
+
+2. **批次處理**：
+   - 大量資料時自動切換到批次處理模式
+   - 使用臨時檔案減少重複計算
+
+### 2. 資料完整性
+
+1. **日期處理**：
+   - 正確處理跨年度的日期計算
+   - 處理月份天數差異和閏年
+
+2. **零值處理**：
+   - 避免除以零錯誤
+   - 適當處理無銷售或無庫存的情況
+
+### 3. 使用者體驗
+
+1. **參數驗證**：
+   - 驗證日期範圍的合理性
+   - 驗證月份輸入的有效性
+
+2. **錯誤處理**：
+   - 提供清晰的錯誤訊息
+   - 引導使用者修正錯誤
+
+### 4. 維護考慮
+
+1. **程式碼註解**：
+   - 為複雜邏輯添加詳細註解
+   - 說明計算公式和篩選條件
+
+2. **模組化設計**：
+   - 使用子程序分離不同功能
+   - 便於未來擴展和維護
+
+## 六、未來擴展建議
+
+1. **報表格式擴展**：
+   - 增加圖形化輸出選項
+   - 提供Excel匯出功能
+
+2. **分析功能增強**：
+   - 增加同期比較功能
+   - 增加趨勢分析功能
+   - 增加異常產品標記
+
+3. **篩選條件擴展**：
+   - 增加產品類別篩選
+   - 增加供應商篩選
+   - 增加銷售通路篩選
+
+4. **整合功能**：
+   - 與庫存預警系統整合
+   - 與採購建議系統整合
+
+## 七、總結
+
+庫存周轉率報表程式是一個功能完善的分析工具，能夠幫助企業有效管理庫存，提高資金使用效率。通過多維度的篩選和靈活的計算邏輯，使用者可以深入分析不同產品的庫存周轉情況，識別潛在問題，並制定相應的改進措施。
+
+程式的實施需要遵循嚴格的開發流程，確保程式碼質量和功能正確性。同時，適當的使用者培訓和文檔支持也是成功實施的關鍵因素。
+
+通過持續的維護和功能擴展，庫存周轉率報表程式可以不斷適應企業的變化需求，為庫存管理決策提供更有價值的支持。
