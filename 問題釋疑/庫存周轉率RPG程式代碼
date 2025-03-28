@@ -1,0 +1,429 @@
+# IBM RPG 程式集原始代碼
+
+以下是根據您的需求所轉寫的 IBM RPG 程式集的原始代碼。包含 DDS 檔案定義、CLP 程式和 RPG 程式。
+
+## 檔案定義 (DDS)
+
+### IMR0861F 檔案定義
+
+```
+     A                                      UNIQUE
+     A          R IMR0861R
+     A            COMPANY       2A          TEXT('公司別')
+     A            ORDERNO      12A          TEXT('訂單編號')
+     A            PRODCODE      9A          TEXT('產品編號')
+     A            PRODCODE7     7A          TEXT('產品編號7碼')
+     A            ORDQTY        5P 0        TEXT('訂貨數量')
+     A            FREQTY        4P 0        TEXT('搭贈數量')
+     A            ESTDELDATE    8P 0        TEXT('預計送貨日')
+     A            CNFRMDATE     8P 0        TEXT('確認日期')
+     A            LOGPOINT      5A          TEXT('出貨物流點')
+     A          K COMPANY
+     A          K ORDERNO
+     A          K PRODCODE
+```
+
+### IMR0862F 檔案定義
+
+```
+     A                                      UNIQUE
+     A          R IMR0862R
+     A            PRODCODE7     7A          TEXT('產品編號7碼')
+     A            BEGAVAIL      9P 0        TEXT('期初可用量')
+     A            ENDAVAIL      9P 0        TEXT('期末可用量')
+     A            INVAVAIL      9P 0        TEXT('庫存可用量')
+     A            SALESQTY      9P 0        TEXT('銷售數量')
+     A            TURNOVER      7P 2        TEXT('存貨週轉率')
+     A            TURNDAYS      7P 2        TEXT('存貨週轉天數')
+     A          K PRODCODE7
+```
+
+### IMR086PF 檔案定義
+
+```
+     A                                      UNIQUE
+     A          R IMR086PR
+     A            PRODCODE7     7A          TEXT('產品編號7碼')
+     A            BEGAVAIL      9P 0        TEXT('期初可用量')
+     A            ENDAVAIL      9P 0        TEXT('期末可用量')
+     A            INVAVAIL      9P 0        TEXT('庫存可用量')
+     A            SALESQTY      9P 0        TEXT('銷售數量')
+     A            TURNOVER      7P 2        TEXT('存貨週轉率')
+     A            TURNDAYS      7P 2        TEXT('存貨週轉天數')
+     A          K PRODCODE7
+```
+
+### DSPF 畫面定義
+
+```
+     A                                      DSPSIZ(24 80 *DS3)
+     A                                      PRINT
+     A                                      INDARA
+     A                                      CA03(03 'Exit')
+     A          R SCREEN1
+     A                                  1  2'IMR086'
+     A                                  1 29'存貨週轉率分析系統'
+     A                                  1 71DATE
+     A                                      EDTCDE(Y)
+     A                                  2 71TIME
+     A                                  5  5'公司別:'
+     A            COMPANY       2A  B  5 14
+     A                                  7  5'存貨週轉天數:'
+     A            TURNDAYS      3P 0B  7 19
+     A                                  9  5'月份(YYMM):'
+     A            MONTH         4P 0B  9 19
+     A                                 21  5'F3=結束'
+     A          R MSGLINE
+     A                                 23  2' '
+     A            ERRMSG       78A  O 23  2
+```
+
+## 程式代碼
+
+### CLP1 (主程式)
+
+```
+             PGM
+             CALL       RPG1
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             CALL       CLP2
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             GOTO       ENDPGM
+ERROR:       SNDPGMMSG  MSG('程式執行錯誤，請聯繫系統管理員') +
+                          MSGTYPE(*ESCAPE)
+ENDPGM:      ENDPGM
+```
+
+### RPG1 (檢核及參數設定)
+
+```
+     H DATEDIT(*YMD)
+
+     FIMR086D   CF   E             WORKSTN
+     F                                     INDDS(INDDS)
+     F                                     SFILE(SUBFILE:RRN)
+
+     D INDDS           DS
+     D  EXIT           N                   INF(03)
+     D  ERROR          N                   INF(99)
+
+     D RRN             S              4  0
+     D ERRMSG          S             78A
+     D STARTMTH        S              4P 0
+     D STARTDAY        S              2P 0
+     D STARTDATE       S              8P 0
+     D ENDDAY          S              2P 0
+     D ENDDATE         S              8P 0
+     D MSG             S             50A
+
+      * 主程式
+     C                   EXFMT     SCREEN1
+     C                   DOW       NOT EXIT
+      * 檢核公司別
+     C                   IF        COMPANY = *BLANKS
+     C                   MOVE      '錯誤: 公司別必須輸入' ERRMSG
+     C                   EXFMT     MSGLINE
+     C                   EXFMT     SCREEN1
+     C                   ITER
+     C                   ENDIF
+
+      * 檢核存貨週轉天數
+     C                   IF        TURNDAYS = *ZEROS
+     C                   MOVE      '錯誤: 存貨週轉天數必須輸入' ERRMSG
+     C                   EXFMT     MSGLINE
+     C                   EXFMT     SCREEN1
+     C                   ITER
+     C                   ENDIF
+
+      * 檢核月份
+     C                   IF        MONTH = *ZEROS
+     C                   MOVE      '錯誤: 月份必須輸入' ERRMSG
+     C                   EXFMT     MSGLINE
+     C                   EXFMT     SCREEN1
+     C                   ITER
+     C                   ENDIF
+
+      * 驗證月份是否正確
+     C                   CALL      'P38'
+     C                   PARM                    MONTH
+     C                   PARM                    MSG
+     C                   IF        MSG <> *BLANKS
+     C                   MOVE      MSG           ERRMSG
+     C                   EXFMT     MSGLINE
+     C                   EXFMT     SCREEN1
+     C                   ITER
+     C                   ENDIF
+
+      * 計算迄日
+     C                   CALL      'P34'
+     C                   PARM                    MONTH
+     C                   PARM                    ENDDAY
+     C                   EVAL      ENDDATE = %DEC(MONTH * 100 + ENDDAY : 8 : 0)
+
+      * 計算起日 (前推12個月)
+     C                   EVAL      STARTMTH = MONTH - 1200
+     C                   IF        %SUBST(%CHAR(STARTMTH):3:2) > '12'
+     C                   EVAL      STARTMTH = STARTMTH - 88
+     C                   ENDIF
+     C                   CALL      'P34'
+     C                   PARM                    STARTMTH
+     C                   PARM                    STARTDAY
+     C                   EVAL      STARTDATE = %DEC(STARTMTH * 100 + STARTDAY : 8 : 0)
+
+      * 將參數寫入 LDA
+     C                   CALL      'QCLRDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   CALL      'QWRTDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      COMPANY        2
+     C                   PARM      500            10I 0
+     C                   CALL      'QWRTDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      TURNDAYS       3
+     C                   PARM      502            10I 0
+     C                   CALL      'QWRTDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      MONTH          4
+     C                   PARM      505            10I 0
+     C                   CALL      'QWRTDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      STARTDATE      8
+     C                   PARM      509            10I 0
+     C                   CALL      'QWRTDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      ENDDATE        8
+     C                   PARM      517            10I 0
+
+      * 成功完成，離開程式
+     C                   LEAVE
+     C                   ENDDO
+
+     C                   IF        EXIT
+     C                   EVAL      *INLR = *ON
+     C                   RETURN
+     C                   ENDIF
+
+     C                   EVAL      *INLR = *ON
+```
+
+### CLP2 (數據處理批次)
+
+```
+             PGM
+             DCL        VAR(&COMPANY) TYPE(*CHAR) LEN(2)
+             DCL        VAR(&TURNDAYS) TYPE(*DEC) LEN(3 0)
+             DCL        VAR(&MONTH) TYPE(*DEC) LEN(4 0)
+             DCL        VAR(&STARTDATE) TYPE(*DEC) LEN(8 0)
+             DCL        VAR(&ENDDATE) TYPE(*DEC) LEN(8 0)
+             
+             /* 從LDA讀取參數 */
+             RTVDTAARA  DTAARA(LDA (501 2)) RTNVAR(&COMPANY)
+             RTVDTAARA  DTAARA(LDA (503 3)) RTNVAR(&TURNDAYS)
+             RTVDTAARA  DTAARA(LDA (506 4)) RTNVAR(&MONTH)
+             RTVDTAARA  DTAARA(LDA (510 8)) RTNVAR(&STARTDATE)
+             RTVDTAARA  DTAARA(LDA (518 8)) RTNVAR(&ENDDATE)
+
+             /* 清空工作檔案 */
+             CLRPFM     FILE(IMR0861F)
+             MONMSG     MSGID(CPF0000)
+             
+             CLRPFM     FILE(IMR0862F)
+             MONMSG     MSGID(CPF0000)
+             
+             CLRPFM     FILE(IMR086PF)
+             MONMSG     MSGID(CPF0000)
+             
+             /* 篩選 SOSCPF */
+             OVRDBF     FILE(SOSCPF) TOFILE(*LIBL/SOSCPF)
+             OPNQRYF    FILE((SOSCPF)) QRYSLT('SC01 *EQ "' *CAT &COMPANY +
+                          *TCAT '" *AND SC39 *GE ' *CAT &STARTDATE *TCAT +
+                          ' *AND SC39 *LE ' *CAT &ENDDATE *TCAT +
+                          ' *AND SC03 *NE "S4" *AND (SC11 *EQ "T9999" +
+                          *OR SC11 *EQ "W0001" *OR SC11 *EQ "W0002" +
+                          *OR SC11 *EQ "W0003" *OR SC11 *EQ "W0004" +
+                          *OR SC11 *EQ "W0005" *OR SC11 *EQ "W0006" +
+                          *OR SC11 *EQ "W9999")')
+             
+             /* 執行數據提取 */
+             CALL       RPG2
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             
+             CLOF       OPNID(SOSCPF)
+             
+             /* 篩選 IMR0861F 並按產品編號前7碼排序 */
+             OVRDBF     FILE(IMR0861F) TOFILE(*LIBL/IMR0861F)
+             OPNQRYF    FILE((IMR0861F)) KEYFLD((PRODCODE7))
+             
+             /* 執行數據匯總 */
+             CALL       RPG3
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             
+             CLOF       OPNID(IMR0861F)
+             
+             /* 篩選 IMR0862F */
+             OVRDBF     FILE(IMR0862F) TOFILE(*LIBL/IMR0862F)
+             OPNQRYF    FILE((IMR0862F)) QRYSLT('TURNDAYS *GE ' *CAT &TURNDAYS)
+             
+             /* 執行最終數據處理 */
+             CALL       RPG4
+             MONMSG     MSGID(CPF0000) EXEC(GOTO ERROR)
+             
+             CLOF       OPNID(IMR0862F)
+             
+             GOTO       ENDPGM
+             
+ERROR:       SNDPGMMSG  MSG('數據處理錯誤，請檢查日誌') MSGTYPE(*ESCAPE)
+ENDPGM:      ENDPGM
+```
+
+### RPG2 (數據提取)
+
+```
+     H DATEDIT(*YMD)
+
+     FSOSCPF    IF   E           K DISK
+     FSOSDPF    IF   E           K DISK
+     FMTMAPF    IF   E           K DISK
+     FIMR0861F  O    E             DISK
+
+     D PRODTYPE        S              2P 0
+
+      * 主程式 - 使用 RPG CYCLE
+     C     SC02          CHAIN     SOSDPF                           9999
+     C                   IF        *IN9999 = *OFF
+      * 找到 SOSDPF 記錄，繼續處理
+     C     SD03          CHAIN     MTMAPF                           9998
+     C                   IF        *IN9998 = *OFF
+      * 找到 MTMAPF 記錄，檢查單位容積
+     C                   EVAL      PRODTYPE = %DEC(MA15:2:0)
+     C                   IF        PRODTYPE = 70 OR PRODTYPE = 75
+      * 容積符合條件，寫入輸出檔案
+     C                   WRITE     IMR0861R
+     C                   EVAL      COMPANY = SC01
+     C                   EVAL      ORDERNO = SC02
+     C                   EVAL      PRODCODE = SD03
+     C                   EVAL      PRODCODE7 = %SUBST(SD03:1:7)
+     C                   EVAL      ORDQTY = SD04
+     C                   EVAL      FREQTY = SD05
+     C                   EVAL      ESTDELDATE = SC08
+     C                   EVAL      CNFRMDATE = SC39
+     C                   EVAL      LOGPOINT = SC11
+     C                   ENDIF
+     C                   ENDIF
+     C                   ENDIF
+
+     C                   EVAL      *INLR = *ON
+```
+
+### RPG3 (數據匯總)
+
+```
+     H DATEDIT(*YMD)
+
+     FIMR0861F  IF   E           K DISK
+     FIMR0862F  O    E             DISK
+
+     D L1              S              1    INZ('N')
+     D SALESQTY        S              9P 0
+     D BEGAVAIL        S              9P 0
+     D ENDAVAIL        S              9P 0
+     D INVAVAIL        S              9P 0
+     D TURNOVER        S              7P 2
+     D TURNDAYS        S              7P 2
+     D CURPRODCODE     S              7A
+     D STARTDATE       S              8P 0
+     D ENDDATE         S              8P 0
+
+      * 從 LDA 獲取日期範圍
+     C                   CALL      'QRTVDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      STARTDATE      8
+     C                   PARM      509            10I 0
+     C                   CALL      'QRTVDTAQ'
+     C                   PARM      'DTAQLDANAM'   10
+     C                   PARM      ENDDATE        8
+     C                   PARM      517            10I 0
+
+      * 初始化
+     C                   EVAL      SALESQTY = 0
+     C                   EVAL      CURPRODCODE = PRODCODE7
+
+      * 主循環 - 使用 RPG CYCLE
+     C                   IF        PRODCODE7 <> CURPRODCODE
+      * Level Break - 處理上一個產品
+     C                   EXSR      PROCESS
+     C                   EVAL      SALESQTY = 0
+     C                   EVAL      CURPRODCODE = PRODCODE7
+     C                   ENDIF
+
+      * 累計銷售數量
+     C                   EVAL      SALESQTY = SALESQTY + ORDQTY + FREQTY
+
+      * 最後一筆記錄的處理
+     C                   IF        %EOF
+     C                   EXSR      PROCESS
+     C                   ENDIF
+
+     C                   EVAL      *INLR = *ON
+
+      * 處理和寫入記錄的子程序
+     C     PROCESS       BEGSR
+      * 計算期初可用量 (調用IMR085系列程式)
+     C                   CALL      'IMR085A'
+     C                   PARM                    CURPRODCODE
+     C                   PARM                    STARTDATE
+     C                   PARM                    BEGAVAIL
+
+      * 計算期末可用量 (調用IMR085系列程式)
+     C                   CALL      'IMR085A'
+     C                   PARM                    CURPRODCODE
+     C                   PARM                    ENDDATE
+     C                   PARM                    ENDAVAIL
+
+      * 計算庫存可用量、存貨週轉率和週轉天數
+     C                   EVAL      INVAVAIL = (BEGAVAIL + ENDAVAIL) / 2
+     C                   IF        INVAVAIL > 0
+     C                   EVAL      TURNOVER = %DEC(SALESQTY / INVAVAIL:7:2)
+     C                   ELSE
+     C                   EVAL      TURNOVER = 0
+     C                   ENDIF
+
+     C                   IF        TURNOVER > 0
+     C                   EVAL      TURNDAYS = %DEC(365 / TURNOVER:7:2)
+     C                   ELSE
+     C                   EVAL      TURNDAYS = 0
+     C                   ENDIF
+
+      * 寫入 IMR0862F
+     C                   WRITE     IMR0862R
+     C                   EVAL      PRODCODE7 = CURPRODCODE
+     C                   ENDSR
+```
+
+### RPG4 (最終數據處理)
+
+```
+     H DATEDIT(*YMD)
+
+     FIMR0862F  IF   E           K DISK
+     FIMR086PF  O    E             DISK
+
+      * 主程式 - 使用 RPG CYCLE
+      * 從 IMR0862F 讀取每條記錄並寫入 IMR086PF
+     C                   READ      IMR0862F                          9999
+     C                   DOW       *IN9999 = *OFF
+     C                   WRITE     IMR086PR
+     C                   EVAL      PRODCODE7 = IMR0862F.PRODCODE7
+     C                   EVAL      BEGAVAIL = IMR0862F.BEGAVAIL
+     C                   EVAL      ENDAVAIL = IMR0862F.ENDAVAIL
+     C                   EVAL      INVAVAIL = IMR0862F.INVAVAIL
+     C                   EVAL      SALESQTY = IMR0862F.SALESQTY
+     C                   EVAL      TURNOVER = IMR0862F.TURNOVER
+     C                   EVAL      TURNDAYS = IMR0862F.TURNDAYS
+     C                   READ      IMR0862F                          9999
+     C                   ENDDO
+
+     C                   EVAL      *INLR = *ON
+```
+
+這套程式集根據您的需求實現了存貨週轉率分析系統，從用戶輸入的參數開始，處理訂單資料，計算庫存週轉率，並將結果存入最終檔案。系統架構清晰，包含參數檢核、資料提取、匯總計算和結果輸出等完整流程。
